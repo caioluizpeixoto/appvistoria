@@ -1,0 +1,87 @@
+name: app_vistoria
+description: "App de Vistoria Cautelar Automotiva — Inspeção profissional pelo celular."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  shimmer: ^3.0.0
+  flutter_spinkit: ^5.2.1
+
+  # Supabase
+  supabase_flutter: ^2.5.9
+
+  # Estado (BLoC)
+  flutter_bloc: ^8.1.6
+  equatable: ^2.0.7
+
+  # Injeção de dependência
+  get_it: ^7.7.0
+
+  # Navegação
+  go_router: ^14.8.1
+
+  # Banco local (offline-first)
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.5
+  path: ^1.9.0
+
+  # HTTP (API BIN futura)
+  dio: ^5.7.0
+
+  # Câmera e fotos
+  image_picker: ^1.2.2
+  camera: ^0.11.0+2
+  cached_network_image: ^3.4.1
+
+  # OCR (leitura de placa)
+  google_mlkit_text_recognition: ^0.15.1
+
+  # PDF
+  pdf: ^3.11.2
+  printing: ^5.14.2
+
+  # QR Code
+  qr_flutter: ^4.1.0
+
+  # Assinatura digital
+  signature: ^5.4.0
+
+  # Gerenciamento de estado do wizard
+  provider: ^6.1.2
+
+  # Utilitários
+  intl: ^0.19.0
+  uuid: ^4.5.3
+  flutter_dotenv: ^5.2.1
+  connectivity_plus: ^6.1.4
+  permission_handler: ^11.4.0
+  open_file: ^3.5.10
+  xml: ^6.6.1
+  flutter_image_compress: ^2.4.0
+  url_launcher: ^6.3.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.14
+  json_serializable: ^6.8.0
+  json_annotation: ^4.9.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - .env
