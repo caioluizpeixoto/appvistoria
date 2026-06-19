@@ -229,12 +229,14 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
     try {
       final dao = sl<VistoriaDao>();
-      final veiculoExistente = await dao.buscarVeiculoPorPlaca(_placaEditCtrl.text);
+      final veiculoExistente =
+          await dao.buscarVeiculoPorPlaca(_placaEditCtrl.text);
       String vistoriaId;
       bool reuse = false;
 
       if (veiculoExistente != null) {
-        final vistoriaAnterior = await dao.buscarPorId(veiculoExistente.vistoriaId);
+        final vistoriaAnterior =
+            await dao.buscarPorId(veiculoExistente.vistoriaId);
         if (vistoriaAnterior != null) {
           final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
           if (diff.inHours <= 72) {
@@ -261,7 +263,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       } else {
         vistoriaId = const Uuid().v4();
         final shortCode = vistoriaId.substring(0, 8).toUpperCase();
-        final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? 'usuario-deslogado';
+        final currentUserId = Supabase.instance.client.auth.currentUser?.id ??
+            'usuario-deslogado';
 
         await dao.inserirVistoria(VistoriasCompanion.insert(
           id: vistoriaId,
@@ -274,14 +277,28 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           id: vistoriaId, // Usando o mesmo ID pro veículo localmente
           vistoriaId: vistoriaId,
           placa: _placaEditCtrl.text,
-          chassiVeiculo: drift.Value(_chassiEditCtrl.text.isNotEmpty ? _chassiEditCtrl.text : (veiculoExistente?.chassiVeiculo ?? '')),
-          motorVeiculo: drift.Value(_motorEditCtrl.text.isNotEmpty ? _motorEditCtrl.text : (veiculoExistente?.motorVeiculo ?? '')),
-          marca: drift.Value(_marcaEditCtrl.text.isNotEmpty ? _marcaEditCtrl.text : (veiculoExistente?.marca ?? '')),
-          modelo: drift.Value(_modeloEditCtrl.text.isNotEmpty ? _modeloEditCtrl.text : (veiculoExistente?.modelo ?? '')),
-          anoFabricacao: drift.Value(int.tryParse(_anoFabEditCtrl.text) ?? veiculoExistente?.anoFabricacao),
-          anoModelo: drift.Value(int.tryParse(_anoModEditCtrl.text) ?? veiculoExistente?.anoModelo),
-          cor: drift.Value(_corEditCtrl.text.isNotEmpty ? _corEditCtrl.text : (veiculoExistente?.cor ?? '')),
-          renavam: drift.Value(_renavamEditCtrl.text.isNotEmpty ? _renavamEditCtrl.text : (veiculoExistente?.renavam ?? '')),
+          chassiVeiculo: drift.Value(_chassiEditCtrl.text.isNotEmpty
+              ? _chassiEditCtrl.text
+              : (veiculoExistente?.chassiVeiculo ?? '')),
+          motorVeiculo: drift.Value(_motorEditCtrl.text.isNotEmpty
+              ? _motorEditCtrl.text
+              : (veiculoExistente?.motorVeiculo ?? '')),
+          marca: drift.Value(_marcaEditCtrl.text.isNotEmpty
+              ? _marcaEditCtrl.text
+              : (veiculoExistente?.marca ?? '')),
+          modelo: drift.Value(_modeloEditCtrl.text.isNotEmpty
+              ? _modeloEditCtrl.text
+              : (veiculoExistente?.modelo ?? '')),
+          anoFabricacao: drift.Value(int.tryParse(_anoFabEditCtrl.text) ??
+              veiculoExistente?.anoFabricacao),
+          anoModelo: drift.Value(int.tryParse(_anoModEditCtrl.text) ??
+              veiculoExistente?.anoModelo),
+          cor: drift.Value(_corEditCtrl.text.isNotEmpty
+              ? _corEditCtrl.text
+              : (veiculoExistente?.cor ?? '')),
+          renavam: drift.Value(_renavamEditCtrl.text.isNotEmpty
+              ? _renavamEditCtrl.text
+              : (veiculoExistente?.renavam ?? '')),
         ));
       }
 
@@ -337,7 +354,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       if (_modoEntrada == 'placa' && valor.isNotEmpty) {
         veiculoExistente = await dao.buscarVeiculoPorPlaca(valor);
         if (veiculoExistente != null) {
-          final vistoriaAnterior = await dao.buscarPorId(veiculoExistente.vistoriaId);
+          final vistoriaAnterior =
+              await dao.buscarPorId(veiculoExistente.vistoriaId);
           if (vistoriaAnterior != null) {
             final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
             if (diff.inHours <= 72) {
@@ -363,32 +381,46 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         await dao.inserirVeiculo(VeiculosCompanion.insert(
           id: vistoriaId,
           vistoriaId: vistoriaId,
-          placa: _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? ''),
-          chassiVeiculo: drift.Value(_modoEntrada == 'chassi' ? valor : (veiculoExistente?.chassiVeiculo ?? '')),
-          motorVeiculo: drift.Value(_modoEntrada == 'motor' ? valor : (veiculoExistente?.motorVeiculo ?? '')),
+          placa:
+              _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? ''),
+          chassiVeiculo: drift.Value(_modoEntrada == 'chassi'
+              ? valor
+              : (veiculoExistente?.chassiVeiculo ?? '')),
+          motorVeiculo: drift.Value(_modoEntrada == 'motor'
+              ? valor
+              : (veiculoExistente?.motorVeiculo ?? '')),
         ));
       }
 
       // Inicia consulta em segundo plano sem await
       final service = sl<AutoCredService>();
-      service.consultarVeiculo(
+      service
+          .consultarVeiculo(
         codigoConsulta: _codigoSelecionado,
         tipoConsulta: _modoEntrada,
         valorConsulta: valor,
         vistoriaId: vistoriaId,
-      ).then((veiculoApi) async {
+      )
+          .then((veiculoApi) async {
         final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
         if (veiculoDb != null) {
           await dao.atualizarVeiculo(VeiculosCompanion(
             id: drift.Value(veiculoDb.id),
             vistoriaId: drift.Value(veiculoDb.vistoriaId),
-            placa: drift.Value(veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
-            chassiVeiculo: drift.Value(veiculoApi.chassi ?? veiculoDb.chassiVeiculo),
-            motorVeiculo: drift.Value(veiculoApi.motor ?? veiculoDb.motorVeiculo),
+            placa: drift.Value(veiculoApi.placa.isNotEmpty
+                ? veiculoApi.placa
+                : veiculoDb.placa),
+            chassiVeiculo:
+                drift.Value(veiculoApi.chassi ?? veiculoDb.chassiVeiculo),
+            motorVeiculo:
+                drift.Value(veiculoApi.motor ?? veiculoDb.motorVeiculo),
             marca: drift.Value(veiculoApi.marca ?? veiculoDb.marca),
             modelo: drift.Value(veiculoApi.modelo ?? veiculoDb.modelo),
-            anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao ?? '') ?? veiculoDb.anoFabricacao),
-            anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo ?? '') ?? veiculoDb.anoModelo),
+            anoFabricacao: drift.Value(
+                int.tryParse(veiculoApi.anoFabricacao ?? '') ??
+                    veiculoDb.anoFabricacao),
+            anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo ?? '') ??
+                veiculoDb.anoModelo),
             cor: drift.Value(veiculoApi.cor ?? veiculoDb.cor),
             renavam: drift.Value(veiculoApi.renavam ?? veiculoDb.renavam),
           ));
@@ -447,8 +479,6 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-
               // Dropdown Tipo de Consulta
               DropdownButtonFormField<int>(
                 initialValue: _codigoSelecionado,
@@ -493,7 +523,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                         if (_modoEntrada == 'placa') ...[
                           PlacaInputFormatter(),
                         ] else ...[
-                          FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9\-]')),
+                          FilteringTextInputFormatter.allow(
+                              RegExp(r'[A-Za-z0-9\-]')),
                           LengthLimitingTextInputFormatter(25),
                         ]
                       ],
@@ -538,7 +569,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 ),
               ),
               const SizedBox(height: 12),
-              
+
               // Botão Buscar em Background
               SizedBox(
                 width: double.infinity,
@@ -546,13 +577,17 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     side: const BorderSide(color: AppTheme.primary, width: 2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
                   ),
-                  onPressed: _buscandoVeiculo ? null : _iniciarVistoriaEmBackground,
-                  icon: const Icon(Icons.speed_rounded, color: AppTheme.primary),
+                  onPressed:
+                      _buscandoVeiculo ? null : _iniciarVistoriaEmBackground,
+                  icon:
+                      const Icon(Icons.speed_rounded, color: AppTheme.primary),
                   label: const Text(
                     'Iniciar Vistoria (Consulta Automática)',
-                    style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        color: AppTheme.primary, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -573,10 +608,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                         }
                       });
                     },
-                    icon: const Icon(Icons.cloud_off_rounded, color: AppTheme.textSecondary, size: 20),
+                    icon: const Icon(Icons.cloud_off_rounded,
+                        color: AppTheme.textSecondary, size: 20),
                     label: const Text(
                       'Sistema fora do ar? Preencher Manualmente',
-                      style: TextStyle(color: AppTheme.textSecondary, decoration: TextDecoration.underline),
+                      style: TextStyle(
+                          color: AppTheme.textSecondary,
+                          decoration: TextDecoration.underline),
                     ),
                   ),
                 ),
@@ -587,7 +625,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 _SectionHeader(
                   icon: Icons.directions_car_rounded,
                   title: 'Dados da Vistoria',
-                  subtitle: _modoOffline ? 'Preencha os dados manualmente (Modo Offline)' : 'Revise e edite os dados retornados',
+                  subtitle: _modoOffline
+                      ? 'Preencha os dados manualmente (Modo Offline)'
+                      : 'Revise e edite os dados retornados',
                 ),
                 const SizedBox(height: 16),
 
@@ -595,24 +635,30 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 _buildFormularioEditavel(),
 
                 const SizedBox(height: 24),
-                if (_arquivoPesquisaUrl != null && _arquivoPesquisaUrl!.isNotEmpty) ...[
+                if (_arquivoPesquisaUrl != null &&
+                    _arquivoPesquisaUrl!.isNotEmpty) ...[
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        side: const BorderSide(color: AppTheme.primary, width: 2),
+                        side:
+                            const BorderSide(color: AppTheme.primary, width: 2),
                       ),
                       onPressed: () async {
                         final uri = Uri.parse(_arquivoPesquisaUrl!);
                         if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
                         }
                       },
-                      icon: const Icon(Icons.picture_as_pdf_rounded, color: AppTheme.primary),
+                      icon: const Icon(Icons.picture_as_pdf_rounded,
+                          color: AppTheme.primary),
                       label: const Text(
                         'Ver Relatório AutoCredCar',
-                        style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -706,13 +752,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: _situacaoVeiculo!.toLowerCase() == 'ok' || _situacaoVeiculo!.toLowerCase().contains('conforme') 
-                    ? AppTheme.conforme.withValues(alpha: 0.1) 
+                color: _situacaoVeiculo!.toLowerCase() == 'ok' ||
+                        _situacaoVeiculo!.toLowerCase().contains('conforme')
+                    ? AppTheme.conforme.withValues(alpha: 0.1)
                     : AppTheme.naoConforme.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: _situacaoVeiculo!.toLowerCase() == 'ok' || _situacaoVeiculo!.toLowerCase().contains('conforme') 
-                      ? AppTheme.conforme 
+                  color: _situacaoVeiculo!.toLowerCase() == 'ok' ||
+                          _situacaoVeiculo!.toLowerCase().contains('conforme')
+                      ? AppTheme.conforme
                       : AppTheme.naoConforme,
                   width: 1.5,
                 ),
@@ -720,11 +768,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               child: Row(
                 children: [
                   Icon(
-                    _situacaoVeiculo!.toLowerCase() == 'ok' || _situacaoVeiculo!.toLowerCase().contains('conforme') 
-                        ? Icons.check_circle_outline_rounded 
+                    _situacaoVeiculo!.toLowerCase() == 'ok' ||
+                            _situacaoVeiculo!.toLowerCase().contains('conforme')
+                        ? Icons.check_circle_outline_rounded
                         : Icons.warning_amber_rounded,
-                    color: _situacaoVeiculo!.toLowerCase() == 'ok' || _situacaoVeiculo!.toLowerCase().contains('conforme') 
-                        ? AppTheme.conforme 
+                    color: _situacaoVeiculo!.toLowerCase() == 'ok' ||
+                            _situacaoVeiculo!.toLowerCase().contains('conforme')
+                        ? AppTheme.conforme
                         : AppTheme.naoConforme,
                     size: 24,
                   ),
@@ -735,15 +785,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       children: [
                         const Text(
                           'Situação do Veículo',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textSecondary),
                         ),
                         Text(
                           _situacaoVeiculo!,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: _situacaoVeiculo!.toLowerCase() == 'ok' || _situacaoVeiculo!.toLowerCase().contains('conforme') 
-                                ? AppTheme.conforme 
+                            color: _situacaoVeiculo!.toLowerCase() == 'ok' ||
+                                    _situacaoVeiculo!
+                                        .toLowerCase()
+                                        .contains('conforme')
+                                ? AppTheme.conforme
                                 : AppTheme.naoConforme,
                           ),
                         ),
@@ -757,26 +813,31 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           ],
           Row(
             children: [
-              Expanded(child:          TextFormField(
-            controller: _placaEditCtrl,
-            textCapitalization: TextCapitalization.characters,
-            inputFormatters: [PlacaInputFormatter()],
-            decoration: InputDecoration(
-              labelText: 'Placa',
-              prefixIcon: const Icon(Icons.credit_card_rounded),
-              filled: true,
-              fillColor: AppTheme.background,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          )),
+              Expanded(
+                  child: TextFormField(
+                controller: _placaEditCtrl,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [PlacaInputFormatter()],
+                decoration: InputDecoration(
+                  labelText: 'Placa',
+                  prefixIcon: const Icon(Icons.credit_card_rounded),
+                  filled: true,
+                  fillColor: AppTheme.background,
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              )),
               const SizedBox(width: 12),
-              Expanded(child: _buildField('Renavam', _renavamEditCtrl, icon: Icons.confirmation_num_rounded)),
+              Expanded(
+                  child: _buildField('Renavam', _renavamEditCtrl,
+                      icon: Icons.confirmation_num_rounded)),
             ],
           ),
           const SizedBox(height: 12),
           _buildField('Chassi', _chassiEditCtrl, icon: Icons.tag_rounded),
           const SizedBox(height: 12),
-          _buildField('Motor', _motorEditCtrl, icon: Icons.settings_applications_rounded),
+          _buildField('Motor', _motorEditCtrl,
+              icon: Icons.settings_applications_rounded),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -796,45 +857,61 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: _buildField('Cor', _corEditCtrl, icon: Icons.color_lens_rounded)),
+              Expanded(
+                  child: _buildField('Cor', _corEditCtrl,
+                      icon: Icons.color_lens_rounded)),
               const SizedBox(width: 12),
-              Expanded(child: _buildField('UF', _ufEditCtrl, icon: Icons.map_rounded)),
+              Expanded(
+                  child:
+                      _buildField('UF', _ufEditCtrl, icon: Icons.map_rounded)),
             ],
           ),
           const SizedBox(height: 12),
-          _buildField('Município', _municipioEditCtrl, icon: Icons.location_city_rounded),
+          _buildField('Município', _municipioEditCtrl,
+              icon: Icons.location_city_rounded),
           const SizedBox(height: 12),
-          _buildField('Restrições', _restricoesEditCtrl, icon: Icons.warning_amber_rounded, maxLines: 2),
+          _buildField('Restrições', _restricoesEditCtrl,
+              icon: Icons.warning_amber_rounded, maxLines: 2),
         ],
       ),
     );
   }
 
-  Widget _buildField(String label, TextEditingController ctrl, {IconData? icon, int maxLines = 1}) {
+  Widget _buildField(String label, TextEditingController ctrl,
+      {IconData? icon, int maxLines = 1}) {
     return TextFormField(
       controller: ctrl,
       maxLines: maxLines,
       textCapitalization: TextCapitalization.characters,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+      style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimary),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.normal),
+        labelStyle: const TextStyle(
+            color: AppTheme.textSecondary, fontWeight: FontWeight.normal),
         filled: true,
         fillColor: AppTheme.surfaceVariant.withValues(alpha: 0.3),
-        prefixIcon: icon != null ? Icon(icon, size: 20, color: AppTheme.primary.withValues(alpha: 0.7)) : null,
+        prefixIcon: icon != null
+            ? Icon(icon,
+                size: 20, color: AppTheme.primary.withValues(alpha: 0.7))
+            : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppTheme.surfaceVariant.withValues(alpha: 0.8)),
+          borderSide:
+              BorderSide(color: AppTheme.surfaceVariant.withValues(alpha: 0.8)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       ),
     );
   }
@@ -1036,13 +1113,13 @@ class PlacaInputFormatter extends TextInputFormatter {
       TextEditingValue oldValue, TextEditingValue newValue) {
     var text = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     if (text.length > 7) text = text.substring(0, 7);
-    
+
     var formatted = '';
     for (int i = 0; i < text.length; i++) {
       if (i == 3) formatted += '-';
       formatted += text[i];
     }
-    
+
     return TextEditingValue(
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
