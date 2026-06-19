@@ -19,7 +19,26 @@ class AppDrawer extends StatelessWidget {
         children: [
           _DrawerHeader(),
           Expanded(
-            child: _LaudosRecentes(),
+            child: ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.fact_check_rounded, color: AppTheme.textSecondary),
+                  title: const Text(
+                    'Laudos',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/historico-vistorias');
+                  },
+                ),
+              ],
+            ),
           ),
           _DrawerFooter(),
         ],
@@ -96,200 +115,6 @@ class _DrawerHeader extends StatelessWidget {
   }
 }
 
-// ── Lista de Laudos Recentes ──────────────────────────────────────────────────
-
-class _LaudosRecentes extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.history_rounded,
-                size: 16,
-                color: AppTheme.textSecondary,
-              ),
-              const SizedBox(width: 6),
-              const Text(
-                'LAUDOS RECENTES',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textSecondary,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: FutureBuilder<List<dynamic>>(
-            // Import injection_container and vistoria_dao if needed, but since we are in drawer, we can just use sl
-            future: _buscarVistorias(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final laudos = snapshot.data ?? [];
-              if (laudos.isEmpty) {
-                return _EmptyLaudos();
-              }
-              return ListView.builder(
-                padding: EdgeInsets.zero,
-                itemCount: laudos.length,
-                itemBuilder: (context, index) {
-                  return _LaudoTile(vistoria: laudos[index]);
-                },
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<List<dynamic>> _buscarVistorias() async {
-    // Retorna a lista real usando o DAO local
-    final dao = sl<VistoriaDao>();
-    final vistorias = await dao.listarVistorias();
-    // Para obter a placa, poderíamos buscar os veículos, mas para ficar rápido, 
-    // vamos listar as vistorias e buscar os veículos associados
-    final lista = [];
-    for (var v in vistorias) {
-      final veiculo = await dao.buscarVeiculoPorVistoria(v.id);
-      lista.add({
-        'vistoria': v,
-        'veiculo': veiculo,
-      });
-    }
-    return lista;
-  }
-}
-
-class _LaudoTile extends StatelessWidget {
-  final dynamic vistoria;
-  const _LaudoTile({required this.vistoria});
-
-  @override
-  Widget build(BuildContext context) {
-    final v = vistoria['vistoria'];
-    final veiculo = vistoria['veiculo'];
-    
-    final isEmAndamento = v.status != 'concluido';
-    final placa = veiculo?.placa ?? 'Sem Placa';
-    final tipo = v.tipoVistoria ?? 'Vistoria';
-    final data = v.createdAt;
-
-    return InkWell(
-      onTap: () {
-        Navigator.pop(context); // Fecha o drawer
-        // Redireciona para o fluxo da vistoria usando go_router
-        context.push('/vistoria-wizard/${v.id}');
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            // Ícone de status
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: isEmAndamento
-                    ? AppTheme.comObsLight
-                    : AppTheme.conformeLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                isEmAndamento
-                    ? Icons.pending_rounded
-                    : Icons.check_circle_rounded,
-                color: isEmAndamento ? AppTheme.comObs : AppTheme.conforme,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Dados do laudo
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    placa,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    tipo,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            // Data
-            Text(
-              _formatData(data),
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textHint,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _formatData(DateTime? dt) {
-    if (dt == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inHours < 24 && now.day == dt.day) return 'Hoje';
-    if (diff.inDays <= 1 && now.day - 1 == dt.day) return 'Ontem';
-    return DateFormat('dd/MM').format(dt);
-  }
-}
-
-class _EmptyLaudos extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.folder_open_rounded,
-            size: 48,
-            color: AppTheme.textHint,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Nenhum laudo ainda',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppTheme.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 // ── Rodapé ────────────────────────────────────────────────────────────────────
 
 class _DrawerFooter extends StatelessWidget {
@@ -347,18 +172,3 @@ class _DrawerFooter extends StatelessWidget {
   }
 }
 
-// ── Modelo temporário ─────────────────────────────────────────────────────────
-
-class _LaudoItem {
-  final String placa;
-  final String tipo;
-  final DateTime data;
-  final String status;
-
-  _LaudoItem({
-    required this.placa,
-    required this.tipo,
-    required this.data,
-    required this.status,
-  });
-}

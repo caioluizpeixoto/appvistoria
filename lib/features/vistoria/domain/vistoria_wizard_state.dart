@@ -40,6 +40,7 @@ class VistoriaWizardState extends ChangeNotifier {
   final Map<String, String> checklistStatus = {};
   final Map<String, String> checklistObs = {};
   final Map<String, String> checklistCodigo = {}; // Para vidros: código gravado
+  final List<String> vidrosExtrasIds = [];
 
   // ── Fotos: itemId -> lista de caminhos locais ─────────────────────────────
   final Map<String, List<String>> fotosLocais = {};
@@ -70,8 +71,9 @@ class VistoriaWizardState extends ChangeNotifier {
 
   // ── Navegação ──────────────────────────────────────────────────────────────
 
+  int get totalSteps => tipoVistoria.toLowerCase().contains('cautelar') ? 12 : 10;
   bool get isFirstStep => currentStep == 0;
-  bool get isLastStep => currentStep == 13;
+  bool get isLastStep => currentStep >= totalSteps - 1;
 
   void nextStep() {
     if (!isLastStep) {
@@ -110,6 +112,16 @@ class VistoriaWizardState extends ChangeNotifier {
 
   void setCodigo(String itemId, String codigo) {
     checklistCodigo[itemId] = codigo;
+    notifyListeners();
+  }
+
+  void addVidroExtra() {
+    vidrosExtrasIds.add('vidro_extra_${DateTime.now().millisecondsSinceEpoch}');
+    notifyListeners();
+  }
+
+  void removeVidroExtra(String itemId) {
+    vidrosExtrasIds.remove(itemId);
     notifyListeners();
   }
 

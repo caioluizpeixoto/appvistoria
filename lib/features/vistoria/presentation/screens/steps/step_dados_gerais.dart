@@ -89,7 +89,9 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
 
           // ── Tipo de vistoria ─────────────────────────────────────────────
           DropdownButtonFormField<String>(
-            value: state.tipoVistoria,
+            value: _tiposVistoria.contains(state.tipoVistoria)
+                ? state.tipoVistoria
+                : _tiposVistoria.first,
             decoration: const InputDecoration(
               labelText: 'Tipo de Vistoria',
               prefixIcon: Icon(Icons.category_rounded, color: AppTheme.primary),
@@ -159,6 +161,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
           TextFormField(
             controller: _vistoriadorCpfCtrl,
             keyboardType: TextInputType.number,
+            obscureText: true,
             decoration: const InputDecoration(
               labelText: 'CPF do Vistoriador',
               hintText: '000.000.000-00',

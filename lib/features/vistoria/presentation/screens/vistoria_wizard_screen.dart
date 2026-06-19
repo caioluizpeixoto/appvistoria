@@ -44,21 +44,19 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   bool _isSaving = false;
 
   List<_StepInfo> get _activeSteps {
-    final temCroqui = _wizardState.tipoVistoria.toLowerCase().contains('croqui');
+    final temCroqui = _wizardState.tipoVistoria.toLowerCase().contains('cautelar');
     return [
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
-      const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
       const _StepInfo(titulo: 'Fotos Externas', icone: Icons.photo_camera_rounded),
-      const _StepInfo(titulo: 'Painel / Hodômetro', icone: Icons.speed_rounded),
-      const _StepInfo(titulo: 'Chassi', icone: Icons.tag_rounded),
-      const _StepInfo(titulo: 'Motor', icone: Icons.settings_rounded),
-      const _StepInfo(titulo: 'Etiquetas VIS', icone: Icons.qr_code_rounded),
       const _StepInfo(titulo: 'Vidros', icone: Icons.window_rounded),
-      const _StepInfo(titulo: 'Placas', icone: Icons.subtitles_rounded),
+      const _StepInfo(titulo: 'Hodômetro', icone: Icons.speed_rounded),
+      const _StepInfo(titulo: 'Motor e Câmbio', icone: Icons.settings_rounded),
+      const _StepInfo(titulo: 'Etiquetas e Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui) const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
       if (temCroqui) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
-      const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
       const _StepInfo(titulo: 'Observações', icone: Icons.notes_rounded),
+      const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
+      const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
       const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
     ];
   }
@@ -77,7 +75,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   Future<void> _carregarEtapaAnterior() async {
     final vistoria = await _dao.buscarPorId(widget.vistoriaId);
     if (vistoria != null && vistoria.tipoVistoria != null) {
-      _wizardState.tipoVistoria = vistoria.tipoVistoria!;
+      if (vistoria.tipoVistoria == 'cautelar_carro') {
+        _wizardState.tipoVistoria = 'Vistoria Cautelar Automotiva';
+      } else {
+        _wizardState.tipoVistoria = vistoria.tipoVistoria!;
+      }
     }
     
     // Carregar veículo (caso venha do histórico sem dadosIniciais)
@@ -128,6 +130,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     if (vistoria != null && vistoria.etapaAtual > 0) {
       _wizardState.currentStep = vistoria.etapaAtual;
+      if (_wizardState.currentStep >= _wizardState.totalSteps) {
+        _wizardState.currentStep = _wizardState.totalSteps - 1;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _pageController.jumpToPage(_wizardState.currentStep);
       });
@@ -459,18 +464,16 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
                       const StepDadosGerais(),
-                      const StepDadosVeiculo(),
                       const StepFotosExternas(),
-                      const StepPainelHodometro(),
-                      const StepChassi(),
-                      const StepMotor(),
-                      const StepEtiquetasVis(),
                       const StepVidros(),
-                      const StepPlacas(),
-                      if (_wizardState.tipoVistoria.toLowerCase().contains('croqui')) const StepEstrutura(),
-                      if (_wizardState.tipoVistoria.toLowerCase().contains('croqui')) const StepPintura(),
-                      const StepFotosExtras(),
+                      const StepPainelHodometro(),
+                      const StepMotorCambio(),
+                      const StepEtiquetasChassi(),
+                      if (_wizardState.tipoVistoria.toLowerCase().contains('cautelar')) const StepEstrutura(),
+                      if (_wizardState.tipoVistoria.toLowerCase().contains('cautelar')) const StepPintura(),
                       const StepObservacoes(),
+                      const StepFotosExtras(),
+                      const StepDadosVeiculo(),
                       const StepConclusao(),
                     ],
                   ),
@@ -513,7 +516,7 @@ class _WizardProgressBar extends StatelessWidget {
 
 // ── Indicador de etapas (scrollable) ─────────────────────────────────────────
 
-class _StepIndicatorRow extends StatelessWidget {
+class _StepIndicatorRow extends StatefulWidget {
   final List<_StepInfo> steps;
   final int currentStep;
   final ValueChanged<int> onTap;
@@ -521,56 +524,97 @@ class _StepIndicatorRow extends StatelessWidget {
       {required this.steps, required this.currentStep, required this.onTap});
 
   @override
+  State<_StepIndicatorRow> createState() => _StepIndicatorRowState();
+}
+
+class _StepIndicatorRowState extends State<_StepIndicatorRow> {
+  late ScrollController _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+  }
+
+  @override
+  void didUpdateWidget(covariant _StepIndicatorRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentStep != widget.currentStep) {
+      _scrollToCurrent();
+    }
+  }
+
+  void _scrollToCurrent() {
+    if (!_scrollController.hasClients) return;
+    // O item inativo tem aproximadamente 46px de largura + 12px de margem = 58px.
+    // Tenta centralizar a etapa atual subtraindo metade da largura da tela.
+    final screenWidth = MediaQuery.of(context).size.width;
+    final offset = (widget.currentStep * 58.0) - (screenWidth / 2) + 50; 
+    
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final target = offset.clamp(0.0, maxScroll);
+    
+    _scrollController.animateTo(
+      target,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
-      height: 56,
+      height: 66,
       color: AppTheme.surface,
       child: ListView.builder(
+        controller: _scrollController,
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        itemCount: steps.length,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        itemCount: widget.steps.length,
         itemBuilder: (ctx, i) {
-          final isActive = i == currentStep;
-          final isDone = i < currentStep;
+          final isActive = i == widget.currentStep;
+          final isDone = i < widget.currentStep;
           return GestureDetector(
-            onTap: () => onTap(i),
+            onTap: () => widget.onTap(i),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.only(right: 6),
-              padding: EdgeInsets.symmetric(horizontal: isActive ? 12 : 8, vertical: 4),
+              duration: const Duration(milliseconds: 250),
+              margin: const EdgeInsets.only(right: 12),
+              padding: EdgeInsets.symmetric(horizontal: isActive ? 16 : 10, vertical: 8),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: isActive
                     ? AppTheme.primary
-                    : isDone
-                        ? AppTheme.conformeLight
-                        : AppTheme.surfaceVariant,
-                borderRadius: BorderRadius.circular(20),
+                    : AppTheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isActive
                       ? AppTheme.primary
-                      : isDone
-                          ? AppTheme.conforme.withValues(alpha: 0.4)
-                          : AppTheme.border,
+                      : AppTheme.border,
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isDone ? Icons.check_rounded : steps[i].icone,
-                    size: 14,
+                    widget.steps[i].icone,
+                    size: 18,
                     color: isActive
                         ? Colors.white
-                        : isDone
-                            ? AppTheme.conforme
-                            : AppTheme.textSecondary,
+                        : AppTheme.textSecondary,
                   ),
                   if (isActive) ...[
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 8),
                     Text(
-                      steps[i].titulo,
+                      widget.steps[i].titulo,
                       style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Colors.white),
                     ),

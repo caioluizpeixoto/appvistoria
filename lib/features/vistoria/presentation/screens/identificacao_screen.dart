@@ -48,9 +48,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
   final _laudoCtrl = TextEditingController();
 
+  bool _veiculoEncontrado = false;
+  bool _modoOffline = false;
   bool _buscandoVeiculo = false;
   bool _buscandoLaudo = false;
-  bool _veiculoEncontrado = false;
   String _mensagemCarregamento = '';
   String? _arquivoPesquisaUrl;
   String? _situacaoVeiculo;
@@ -228,29 +229,61 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
     try {
       final dao = sl<VistoriaDao>();
-      final vistoriaId = const Uuid().v4();
+      final veiculoExistente = await dao.buscarVeiculoPorPlaca(_placaEditCtrl.text);
+      String vistoriaId;
+      bool reuse = false;
 
-      final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? 'usuario-deslogado';
+      if (veiculoExistente != null) {
+        final vistoriaAnterior = await dao.buscarPorId(veiculoExistente.vistoriaId);
+        if (vistoriaAnterior != null) {
+          final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
+          if (diff.inHours <= 72) {
+            reuse = true;
+          }
+        }
+      }
 
-      await dao.inserirVistoria(VistoriasCompanion.insert(
-        id: vistoriaId,
-        numeroLaudo: 'VST-$vistoriaId',
-        vistoriadorId: currentUserId,
-      ));
+      if (reuse) {
+        vistoriaId = veiculoExistente!.vistoriaId;
+        await dao.atualizarVeiculo(VeiculosCompanion(
+          id: drift.Value(veiculoExistente.id),
+          vistoriaId: drift.Value(veiculoExistente.vistoriaId),
+          placa: drift.Value(_placaEditCtrl.text),
+          chassiVeiculo: drift.Value(_chassiEditCtrl.text),
+          motorVeiculo: drift.Value(_motorEditCtrl.text),
+          marca: drift.Value(_marcaEditCtrl.text),
+          modelo: drift.Value(_modeloEditCtrl.text),
+          anoFabricacao: drift.Value(int.tryParse(_anoFabEditCtrl.text)),
+          anoModelo: drift.Value(int.tryParse(_anoModEditCtrl.text)),
+          cor: drift.Value(_corEditCtrl.text),
+          renavam: drift.Value(_renavamEditCtrl.text),
+        ));
+      } else {
+        vistoriaId = const Uuid().v4();
+        final shortCode = vistoriaId.substring(0, 8).toUpperCase();
+        final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? 'usuario-deslogado';
 
-      await dao.inserirVeiculo(VeiculosCompanion.insert(
-        id: vistoriaId, // Usando o mesmo ID pro veículo localmente
-        vistoriaId: vistoriaId,
-        placa: _placaEditCtrl.text,
-        chassiVeiculo: drift.Value(_chassiEditCtrl.text),
-        motorVeiculo: drift.Value(_motorEditCtrl.text),
-        marca: drift.Value(_marcaEditCtrl.text),
-        modelo: drift.Value(_modeloEditCtrl.text),
-        anoFabricacao: drift.Value(int.tryParse(_anoFabEditCtrl.text)),
-        anoModelo: drift.Value(int.tryParse(_anoModEditCtrl.text)),
-        cor: drift.Value(_corEditCtrl.text),
-        renavam: drift.Value(_renavamEditCtrl.text),
-      ));
+        await dao.inserirVistoria(VistoriasCompanion.insert(
+          id: vistoriaId,
+          numeroLaudo: 'VST-$shortCode',
+          vistoriadorId: currentUserId,
+          tipoVistoria: drift.Value(widget.tipo.titulo),
+        ));
+
+        await dao.inserirVeiculo(VeiculosCompanion.insert(
+          id: vistoriaId, // Usando o mesmo ID pro veículo localmente
+          vistoriaId: vistoriaId,
+          placa: _placaEditCtrl.text,
+          chassiVeiculo: drift.Value(_chassiEditCtrl.text.isNotEmpty ? _chassiEditCtrl.text : (veiculoExistente?.chassiVeiculo ?? '')),
+          motorVeiculo: drift.Value(_motorEditCtrl.text.isNotEmpty ? _motorEditCtrl.text : (veiculoExistente?.motorVeiculo ?? '')),
+          marca: drift.Value(_marcaEditCtrl.text.isNotEmpty ? _marcaEditCtrl.text : (veiculoExistente?.marca ?? '')),
+          modelo: drift.Value(_modeloEditCtrl.text.isNotEmpty ? _modeloEditCtrl.text : (veiculoExistente?.modelo ?? '')),
+          anoFabricacao: drift.Value(int.tryParse(_anoFabEditCtrl.text) ?? veiculoExistente?.anoFabricacao),
+          anoModelo: drift.Value(int.tryParse(_anoModEditCtrl.text) ?? veiculoExistente?.anoModelo),
+          cor: drift.Value(_corEditCtrl.text.isNotEmpty ? _corEditCtrl.text : (veiculoExistente?.cor ?? '')),
+          renavam: drift.Value(_renavamEditCtrl.text.isNotEmpty ? _renavamEditCtrl.text : (veiculoExistente?.renavam ?? '')),
+        ));
+      }
 
       if (mounted) {
         context.push('/vistoria-wizard/$vistoriaId', extra: {
@@ -297,21 +330,44 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
     try {
       final dao = sl<VistoriaDao>();
-      final vistoriaId = DateTime.now().millisecondsSinceEpoch.toString();
+      String vistoriaId;
+      Veiculo? veiculoExistente;
+      bool reuse = false;
 
-      await dao.inserirVistoria(VistoriasCompanion.insert(
-        id: vistoriaId,
-        numeroLaudo: 'VST-$vistoriaId',
-        vistoriadorId: 'local-user', // TODO: obter ID real do usuário
-      ));
+      if (_modoEntrada == 'placa' && valor.isNotEmpty) {
+        veiculoExistente = await dao.buscarVeiculoPorPlaca(valor);
+        if (veiculoExistente != null) {
+          final vistoriaAnterior = await dao.buscarPorId(veiculoExistente.vistoriaId);
+          if (vistoriaAnterior != null) {
+            final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
+            if (diff.inHours <= 72) {
+              reuse = true;
+            }
+          }
+        }
+      }
 
-      await dao.inserirVeiculo(VeiculosCompanion.insert(
-        id: vistoriaId,
-        vistoriaId: vistoriaId,
-        placa: _modoEntrada == 'placa' ? valor : '',
-        chassiVeiculo: drift.Value(_modoEntrada == 'chassi' ? valor : ''),
-        motorVeiculo: drift.Value(_modoEntrada == 'motor' ? valor : ''),
-      ));
+      if (reuse) {
+        vistoriaId = veiculoExistente!.vistoriaId;
+      } else {
+        vistoriaId = DateTime.now().millisecondsSinceEpoch.toString();
+        final shortCode = const Uuid().v4().substring(0, 8).toUpperCase();
+
+        await dao.inserirVistoria(VistoriasCompanion.insert(
+          id: vistoriaId,
+          numeroLaudo: 'VST-$shortCode',
+          vistoriadorId: 'local-user', // TODO: obter ID real do usuário
+          tipoVistoria: drift.Value(widget.tipo.titulo),
+        ));
+
+        await dao.inserirVeiculo(VeiculosCompanion.insert(
+          id: vistoriaId,
+          vistoriaId: vistoriaId,
+          placa: _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? ''),
+          chassiVeiculo: drift.Value(_modoEntrada == 'chassi' ? valor : (veiculoExistente?.chassiVeiculo ?? '')),
+          motorVeiculo: drift.Value(_modoEntrada == 'motor' ? valor : (veiculoExistente?.motorVeiculo ?? '')),
+        ));
+      }
 
       // Inicia consulta em segundo plano sem await
       final service = sl<AutoCredService>();
@@ -420,6 +476,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                   _modoEntrada = v;
                   _buscaCtrl.clear();
                   _veiculoEncontrado = false;
+                  _modoOffline = false;
                 }),
               ),
               const SizedBox(height: 14),
@@ -500,12 +557,37 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 ),
               ),
 
-              if (_veiculoEncontrado) ...[
+              if (!_veiculoEncontrado && !_modoOffline) ...[
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _modoOffline = true;
+                        if (_modoEntrada == 'placa') {
+                          _placaEditCtrl.text = _buscaCtrl.text.trim();
+                        } else if (_modoEntrada == 'chassi') {
+                          _chassiEditCtrl.text = _buscaCtrl.text.trim();
+                        } else if (_modoEntrada == 'motor') {
+                          _motorEditCtrl.text = _buscaCtrl.text.trim();
+                        }
+                      });
+                    },
+                    icon: const Icon(Icons.cloud_off_rounded, color: AppTheme.textSecondary, size: 20),
+                    label: const Text(
+                      'Sistema fora do ar? Preencher Manualmente',
+                      style: TextStyle(color: AppTheme.textSecondary, decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ),
+              ],
+
+              if (_veiculoEncontrado || _modoOffline) ...[
                 const SizedBox(height: 32),
-                const _SectionHeader(
+                _SectionHeader(
                   icon: Icons.directions_car_rounded,
                   title: 'Dados da Vistoria',
-                  subtitle: 'Revise e edite os dados retornados',
+                  subtitle: _modoOffline ? 'Preencha os dados manualmente (Modo Offline)' : 'Revise e edite os dados retornados',
                 ),
                 const SizedBox(height: 16),
 

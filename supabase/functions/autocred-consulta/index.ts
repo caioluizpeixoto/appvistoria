@@ -3,6 +3,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// @ts-ignore
 Deno.serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -13,7 +14,9 @@ Deno.serve(async (req) => {
     const body = await req.json()
     const { action, tipoConsulta, valorConsulta, codigoConsulta, idPesquisa } = body
 
+    // @ts-ignore
     const usuario = Deno.env.get('AUTOCRED_USUARIO') || '1932202'
+    // @ts-ignore
     const senha = Deno.env.get('AUTOCRED_SENHA') || 'CDywvWZLV3!'
 
     if (!usuario || !senha) {

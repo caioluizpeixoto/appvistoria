@@ -11,30 +11,30 @@ class StepPintura extends StatelessWidget {
 
   static const List<String> _pecas = [
     'peca_capo_dianteiro',
-    'peca_paralama_dianteiro_direito',
     'peca_paralama_dianteiro_esquerdo',
-    'peca_porta_dianteira_direita',
     'peca_porta_dianteira_esquerda',
-    'peca_porta_traseira_direita',
     'peca_porta_traseira_esquerda',
-    'peca_lateral_traseira_direita',
     'peca_lateral_traseira_esquerda',
-    'peca_teto',
     'peca_tampa_traseira',
+    'peca_teto',
+    'peca_lateral_traseira_direita',
+    'peca_porta_traseira_direita',
+    'peca_porta_dianteira_direita',
+    'peca_paralama_dianteiro_direito',
   ];
 
   static const Map<String, String> _labels = {
     'peca_capo_dianteiro': 'Capô Dianteiro',
-    'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
     'peca_paralama_dianteiro_esquerdo': 'Para-lama Dianteiro Esquerdo',
-    'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
     'peca_porta_dianteira_esquerda': 'Porta Dianteira Esquerda',
-    'peca_porta_traseira_direita': 'Porta Traseira Direita',
     'peca_porta_traseira_esquerda': 'Porta Traseira Esquerda',
-    'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
     'peca_lateral_traseira_esquerda': 'Lateral Traseira Esquerda',
+    'peca_tampa_traseira': 'Capô Traseiro / Porta-malas',
     'peca_teto': 'Teto',
-    'peca_tampa_traseira': 'Tampa Traseira / Capô Traseiro',
+    'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
+    'peca_porta_traseira_direita': 'Porta Traseira Direita',
+    'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
+    'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
   };
 
   static const List<String> _statusOpcoes = [
@@ -42,6 +42,7 @@ class StepPintura extends StatelessWidget {
     'Repintura',
     'Repintura e/ou massa',
     'Substituído',
+    'Envelopado',
     'Danificado',
     'Amassado',
     'Riscado',
@@ -52,7 +53,7 @@ class StepPintura extends StatelessWidget {
     if (status.isEmpty || status == 'Não analisado') return AppTheme.naoAplicavel;
     final s = status.toLowerCase();
     if (s.contains('original')) return AppTheme.conforme;
-    if (s.contains('repintura') || s.contains('amassado') || s.contains('riscado')) return AppTheme.comObs;
+    if (s.contains('repintura') || s.contains('amassado') || s.contains('riscado') || s.contains('envelopado')) return AppTheme.comObs;
     if (s.contains('substituído') || s.contains('danificado')) return AppTheme.naoConforme;
     return AppTheme.textSecondary;
   }

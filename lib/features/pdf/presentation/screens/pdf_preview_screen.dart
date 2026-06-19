@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import 'package:share_plus/share_plus.dart';
 
 class PdfPreviewScreen extends StatelessWidget {
   final String vistoriaId;
@@ -24,7 +25,15 @@ class PdfPreviewScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Laudo PDF'),
         actions: [
-          // Remove default printing actions if desired, or keep them
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Compartilhar',
+            onPressed: () {
+              if (pdfPath != null && File(pdfPath!).existsSync()) {
+                Share.shareXFiles([XFile(pdfPath!)], text: 'Laudo Vistoria');
+              }
+            },
+          ),
         ],
       ),
       body: PdfPreview(

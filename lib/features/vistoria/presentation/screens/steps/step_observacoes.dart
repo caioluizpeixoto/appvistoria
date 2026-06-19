@@ -167,6 +167,7 @@ class _StepObservacoesState extends State<StepObservacoes> {
             child: TextFormField(
               controller: controller,
               maxLines: 4,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               decoration: InputDecoration(
                 hintText: hint,
                 border: OutlineInputBorder(

@@ -51,9 +51,14 @@ class PdfGeneratorService {
     } catch (_) {}
 
     pw.ImageProvider? carroEstruturaImage;
+    pw.ImageProvider? caminhaoEstruturaImage;
     try {
-      final carroBytes = await rootBundle.load('assets/images/carro_estrutura.png');
-      carroEstruturaImage = pw.MemoryImage(carroBytes.buffer.asUint8List());
+      final bytes = await rootBundle.load('assets/images/carro_estrutura.png');
+      carroEstruturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final bytes = await rootBundle.load('assets/images/caminhao_estrutura.png');
+      caminhaoEstruturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (_) {}
 
     pw.ImageProvider? assinaturaImage;
@@ -69,31 +74,112 @@ class PdfGeneratorService {
     // Página 1 — Dados Gerais
     pdf.addPage(await _buildPage1(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage));
 
-    // Página 2 — Fotos Principais
-    pdf.addPage(_buildPageFotosGrid(
-      titulo: 'FOTOS PRINCIPAIS',
-      fotoIds: const [
-        'placa_dianteira', 'frente_direita', 'lateral_direita',
-        'traseira_direita', 'placa_traseira', 'traseira_esquerda',
-        'lateral_esquerda', 'frente_esquerda', 'painel_hodometro',
-        'chassi_gravacao', 'motor_gravacao', 'compartimento_motor',
-      ],
-      state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, assinatura: assinaturaImage,
-    ));
+    final temCroqui = vistoria.tipoVistoria?.toLowerCase().contains('cautelar') ?? false;
+    final isCaminhao = vistoria.tipoVistoria?.toLowerCase().contains('caminh') ?? false;
+    final bgImage = isCaminhao ? caminhaoEstruturaImage : carroEstruturaImage;
 
-    // Página 3 — Fotos Técnicas
-    pdf.addPage(_buildPageFotosGrid(
-      titulo: 'FOTOS TÉCNICAS',
-      fotoIds: const [
-        'etiqueta_vis_motor', 'etiqueta_vis_porta', 'vidro_dianteiro_direito',
-        'vidro_dianteiro_esquerdo', 'vidro_frontal', 'vidro_traseiro',
-        'vidro_traseiro_direito', 'vidro_traseiro_esquerdo', 'etiqueta_eta',
-        'cinto_seguranca',
-      ],
-      state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, assinatura: assinaturaImage,
-    ));
+    // ── Geração de Fotos Padronizada (Item 15) ──────────────────────────────
+    final orderedFotoIds = [
+      'foto_placa',
+      'frente_esquerda',
+      'frente_direita',
+      'traseira_esquerda',
+      'traseira_direita',
+      'vidro_para_brisa',
+      'vidro_traseiro',
+      'vidro_lateral_direito',
+      'vidro_lateral_esquerdo',
+      if (wizardState != null) ...wizardState.vidrosExtrasIds,
+      'painel_hodometro',
+      'compartimento_motor',
+      'motor_gravacao',
+      'cambio_gravacao',
+      'etiqueta_vis_motor',
+      'etiqueta_vis_porta',
+      'chassi_gravacao',
+    ];
 
-    final temCroqui = vistoria.tipoVistoria?.toLowerCase().contains('croqui') ?? false;
+    if (temCroqui) {
+      orderedFotoIds.addAll([
+        'longarina_dianteira_esquerda',
+        'longarina_dianteira_direita',
+        'longarina_centro_esquerda',
+        'longarina_centro_direita',
+        'longarina_traseira_esquerda',
+        'longarina_traseira_direita',
+        'peca_capo_dianteiro',
+        'peca_paralama_dianteiro_esquerdo',
+        'peca_porta_dianteira_esquerda',
+        'peca_porta_traseira_esquerda',
+        'peca_lateral_traseira_esquerda',
+        'peca_tampa_traseira',
+        'peca_teto',
+        'peca_lateral_traseira_direita',
+        'peca_porta_traseira_direita',
+        'peca_porta_dianteira_direita',
+        'peca_paralama_dianteiro_direito',
+      ]);
+    }
+
+    // Montar a lista completa de fotos (principais + extras)
+    final todasFotos = <Map<String, dynamic>>[];
+    if (wizardState != null) {
+      for (final id in orderedFotoIds) {
+        final locals = wizardState.getFotosLocais(id);
+        // O usuário pediu "múltiplas fotos por avaria" e itens normais também
+        // Então pegamos TODAS as fotos salvas para aquele ID, não só a primeira.
+        for (final localPath in locals) {
+          final f = File(localPath);
+          if (f.existsSync()) {
+            todasFotos.add({
+              'path': localPath,
+              'label': id.replaceAll('_', ' ').toUpperCase(),
+            });
+          }
+        }
+      }
+      
+      // Adicionar Fotos Extras (T2)
+      for (final extra in wizardState.fotosExtras) {
+        final path = extra['pathLocal'] as String?;
+        final titulo = extra['titulo'] as String? ?? 'FOTO EXTRA';
+        if (path != null && path.isNotEmpty) {
+          final f = File(path);
+          if (f.existsSync()) {
+            todasFotos.add({
+              'path': path,
+              'label': titulo.toUpperCase(),
+            });
+          }
+        }
+      }
+    }
+
+    // Dividir em chunks de 15 fotos por página (3x5)
+    final chunkSize = 15;
+    if (todasFotos.isEmpty) {
+      pdf.addPage(_buildPageFotosGrid(
+        titulo: 'FOTOS DA VISTORIA',
+        fotos: [],
+        vistoria: vistoria,
+        styles: styles,
+        logo: logoImage,
+        assinatura: assinaturaImage,
+      ));
+    } else {
+      for (var i = 0; i < todasFotos.length; i += chunkSize) {
+        final end = (i + chunkSize < todasFotos.length) ? i + chunkSize : todasFotos.length;
+        final chunk = todasFotos.sublist(i, end);
+        pdf.addPage(_buildPageFotosGrid(
+          titulo: i == 0 ? 'FOTOS PRINCIPAIS' : 'FOTOS PRINCIPAIS (CONT.)',
+          fotos: chunk,
+          vistoria: vistoria,
+          styles: styles,
+          logo: logoImage,
+          assinatura: assinaturaImage,
+        ));
+      }
+    }
 
     if (temCroqui) {
       // Página 4 — Análise Estrutural (Tabela até ter o Croqui)
@@ -117,7 +203,7 @@ class PdfGeneratorService {
           'assoalho': 'Assoalho',
           'caixa_roda': 'Caixa de Roda',
         },
-        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroEstruturaImage, assinatura: assinaturaImage,
+        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
       ));
 
       // Página 5 — Análise de Pintura (Tabela até ter o Croqui)
@@ -247,7 +333,7 @@ class PdfGeneratorService {
                   pw.Container(width: 150, height: 1, color: _kBlack),
                   pw.SizedBox(height: 4),
                   pw.Text(vistoria.vistoriadorNome?.toUpperCase() ?? 'ANALISTA', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                  pw.Text('CPF: ${vistoria.vistoriadorCpf ?? "Não informado"}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
+                  pw.Text('CPF: ${_maskCpf(vistoria.vistoriadorCpf)}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
                   pw.Text('Analista', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
                 ],
               ),
@@ -263,7 +349,7 @@ class PdfGeneratorService {
                   pw.Container(width: 150, height: 1, color: _kBlack),
                   pw.SizedBox(height: 4),
                   pw.Text(vistoria.vistoriadorNome?.toUpperCase() ?? 'EXAMINADOR', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                  pw.Text('CPF: ${vistoria.vistoriadorCpf ?? "Não informado"}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
+                  pw.Text('CPF: ${_maskCpf(vistoria.vistoriadorCpf)}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
                   pw.Text('Examinador', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
                 ],
               ),
@@ -297,7 +383,7 @@ class PdfGeneratorService {
   }) async {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(24),
+      margin: const pw.EdgeInsets.all(16),
       build: (ctx) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -472,30 +558,34 @@ class PdfGeneratorService {
       'traseira_esquerda': 'TRASEIRA ESQUERDA'
     };
 
-    final isOdd = itens.length % 2 != 0;
     final half = (itens.length / 2).ceil();
     final colItems = colIndex == 1 ? itens.sublist(0, half) : itens.sublist(half);
-    final startIndex = colIndex == 1 ? 1 : half + 1;
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: List.generate(colItems.length, (i) {
         final id = colItems[i];
-        final num = startIndex + i;
         final status = state?.getStatus(id) ?? 'NÃO ANALISADO';
+        final isConforme = status.toUpperCase().contains('CONFORME') || status.toUpperCase().contains('ORIGINAL') || status.toUpperCase().contains('PADRÕES');
+        final color = isConforme ? _kGreen : (status == 'NÃO ANALISADO' ? _kGreyDark : _kRed);
+
         return pw.Container(
-          margin: const pw.EdgeInsets.only(bottom: 6),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
+          margin: const pw.EdgeInsets.only(bottom: 4),
+          padding: const pw.EdgeInsets.only(bottom: 2),
+          decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _kGreyLight, width: 1))),
+          child: pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
+              pw.Expanded(child: pw.Text(labels[id]!, style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack))),
               pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.symmetric(vertical: 2, horizontal: 4),
-                color: _kGreyDark,
-                child: pw.Text('$num - ${labels[id]!}', style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kWhite)),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: pw.BoxDecoration(
+                  color: PdfColor(color.red, color.green, color.blue, 0.1),
+                  borderRadius: pw.BorderRadius.circular(2),
+                  border: pw.Border.all(color: color, width: 0.5),
+                ),
+                child: pw.Text(status.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 5, color: color)),
               ),
-              pw.SizedBox(height: 2),
-              pw.Text(status.toUpperCase(), style: pw.TextStyle(font: styles.regular, fontSize: 5, color: _kBlack)),
             ],
           ),
         );
@@ -507,8 +597,7 @@ class PdfGeneratorService {
 
   pw.Page _buildPageFotosGrid({
     required String titulo,
-    required List<String> fotoIds,
-    required VistoriaWizardState? state,
+    required List<Map<String, dynamic>> fotos,
     required Vistoria vistoria,
     required _PdfStyles styles,
     pw.ImageProvider? logo,
@@ -516,21 +605,8 @@ class PdfGeneratorService {
   }) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(24),
+      margin: const pw.EdgeInsets.all(16),
       build: (ctx) {
-        final fotos = <Map<String, dynamic>>[];
-        if (state != null) {
-          for (final id in fotoIds) {
-            final locals = state.getFotosLocais(id);
-            if (locals.isNotEmpty) {
-              final f = File(locals.first);
-              if (f.existsSync()) {
-                fotos.add({'path': locals.first, 'label': id.replaceAll('_', ' ').toUpperCase()});
-              }
-            }
-          }
-        }
-
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -607,7 +683,7 @@ class PdfGeneratorService {
   }) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(24),
+      margin: const pw.EdgeInsets.all(16),
       build: (ctx) {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -753,6 +829,13 @@ class PdfGeneratorService {
 
   String _formatDate(DateTime dt) {
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _maskCpf(String? cpf) {
+    if (cpf == null || cpf.isEmpty) return 'Não informado';
+    final raw = cpf.replaceAll(RegExp(r'\D'), '');
+    if (raw.length != 11) return cpf;
+    return '***.${raw.substring(3, 6)}.${raw.substring(6, 9)}-**';
   }
 }
 

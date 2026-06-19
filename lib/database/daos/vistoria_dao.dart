@@ -80,6 +80,12 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
       (select(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .getSingleOrNull();
 
+  Future<Veiculo?> buscarVeiculoPorPlaca(String placa) async {
+    final results = await (select(veiculos)..where((t) => t.placa.equals(placa))).get();
+    if (results.isEmpty) return null;
+    return results.last; // Retorna o mais recente caso haja vários antigos
+  }
+
   Future<int> inserirVeiculo(VeiculosCompanion v) => into(veiculos).insert(v);
 
   Future<int> atualizarVeiculo(VeiculosCompanion v) {

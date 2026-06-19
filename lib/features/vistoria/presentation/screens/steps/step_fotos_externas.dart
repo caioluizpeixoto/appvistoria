@@ -10,15 +10,11 @@ class StepFotosExternas extends StatelessWidget {
   const StepFotosExternas({super.key});
 
   static const List<Map<String, dynamic>> _itens = [
-    {'id': 'frente_direita', 'label': 'Frente Direita', 'icon': Icons.north_east},
+    {'id': 'foto_placa', 'label': 'Foto da Placa', 'icon': Icons.subtitles_rounded, 'showCodigo': true},
     {'id': 'frente_esquerda', 'label': 'Frente Esquerda', 'icon': Icons.north_west},
-    {'id': 'traseira_direita', 'label': 'Traseira Direita', 'icon': Icons.south_east},
+    {'id': 'frente_direita', 'label': 'Frente Direita', 'icon': Icons.north_east},
     {'id': 'traseira_esquerda', 'label': 'Traseira Esquerda', 'icon': Icons.south_west},
-    {'id': 'lateral_direita', 'label': 'Lateral Direita', 'icon': Icons.east},
-    {'id': 'lateral_esquerda', 'label': 'Lateral Esquerda', 'icon': Icons.west},
-    {'id': 'placa_dianteira', 'label': 'Placa Dianteira', 'icon': Icons.subtitles_rounded},
-    {'id': 'placa_traseira', 'label': 'Placa Traseira', 'icon': Icons.subtitles_outlined},
-    {'id': 'compartimento_motor', 'label': 'Compartimento do Motor', 'icon': Icons.settings_rounded},
+    {'id': 'traseira_direita', 'label': 'Traseira Direita', 'icon': Icons.south_east},
   ];
 
   static const List<String> _statusOpcoes = [
@@ -105,6 +101,9 @@ class StepFotosExternas extends StatelessWidget {
               label: item['label'],
               statusOptions: _statusOpcoes,
               obrigatoria: true,
+              showCodigoField: item['showCodigo'] == true,
+              codigoLabel: 'Placa lida / informada',
+              codigoHint: 'Ex: ABC-1234',
             )),
 
         const SizedBox(height: 32),

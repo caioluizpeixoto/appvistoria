@@ -8,11 +8,11 @@ enum TipoVistoria {
   String get titulo {
     switch (this) {
       case TipoVistoria.cautelarCarro:
-        return 'Vistoria Croqui + Avarias';
+        return 'Vistoria Cautelar Automotiva';
       case TipoVistoria.cautelarCaminhao:
-        return 'Caminhão';
+        return 'Vistoria Cautelar Caminhão';
       case TipoVistoria.carroComCroqui:
-        return 'Vistoria Croqui';
+        return 'Vistoria Cautelar com Croqui';
     }
   }
 

@@ -5,9 +5,109 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
 import '../../widgets/inspecao_item_widget.dart';
 
-/// Step 5 — Chassi
-class StepChassi extends StatelessWidget {
-  const StepChassi({super.key});
+/// Step 5 — Motor e Câmbio
+class StepMotorCambio extends StatelessWidget {
+  const StepMotorCambio({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<VistoriaWizardState>();
+    final motorDivergente = state.motorBin.isNotEmpty &&
+        state.motorVeiculo.isNotEmpty &&
+        state.motorBin != state.motorVeiculo;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (state.motorBin.isNotEmpty)
+          _InfoBadge(
+            icon: Icons.cloud_done_rounded,
+            label: 'Motor na BIN / Consulta',
+            value: state.motorBin,
+            color: AppTheme.primary,
+          ),
+
+        if (motorDivergente)
+          _DivergenciaAlert(
+            'O motor da BIN (${state.motorBin}) difere do informado no veículo (${state.motorVeiculo}).',
+          ),
+
+        const SizedBox(height: 12),
+
+        const InspecaoItemWidget(
+          itemId: 'compartimento_motor',
+          label: 'Compartimento do Motor',
+          obrigatoria: true,
+          statusOptions: [
+            'Em perfeito estado',
+            'Dentro dos padrões',
+            'Possui avaria',
+            'Com observação',
+            'Não analisado',
+          ],
+        ),
+
+        InspecaoItemWidget(
+          itemId: 'motor_gravacao',
+          label: 'Gravação do Motor',
+          obrigatoria: true,
+          showCodigoField: true,
+          codigoLabel: 'Motor encontrado no veículo',
+          codigoHint: 'Ex: EA823...',
+          infoTexto: state.motorBin.isNotEmpty
+              ? 'BIN/Consulta: ${state.motorBin}'
+              : null,
+          showDivergenciaAlert: true,
+          statusOptions: const [
+            'Dentro dos padrões',
+            'Original',
+            'Divergente',
+            'Remarcado',
+            'Não localizado',
+            'Ilegível',
+            'Com indício de adulteração',
+          ],
+        ),
+
+        const InspecaoItemWidget(
+          itemId: 'cambio_gravacao',
+          label: 'Gravação do Câmbio',
+          obrigatoria: true,
+          statusOptions: [
+            'Dentro dos padrões',
+            'Original',
+            'Divergente',
+            'Remarcado',
+            'Não localizado',
+            'Ilegível',
+            'Com indício de adulteração',
+          ],
+        ),
+
+        const InspecaoItemWidget(
+          itemId: 'etiqueta_vis_motor',
+          label: 'Etiqueta VIS — Compartimento do Motor',
+          obrigatoria: true,
+          statusOptions: [
+            'Dentro dos padrões',
+            'Original',
+            'Ausente',
+            'Danificada',
+            'Divergente',
+            'Com indício de adulteração',
+            'Não localizado',
+          ],
+        ),
+
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+}
+
+/// Step 6 — Etiquetas e Chassi
+class StepEtiquetasChassi extends StatelessWidget {
+  const StepEtiquetasChassi({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +119,23 @@ class StepChassi extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const InspecaoItemWidget(
+          itemId: 'etiqueta_vis_porta',
+          label: 'Etiqueta VIS — Porta / Coluna',
+          obrigatoria: true,
+          statusOptions: [
+            'Dentro dos padrões',
+            'Original',
+            'Ausente',
+            'Danificada',
+            'Divergente',
+            'Com indício de adulteração',
+            'Não localizado',
+          ],
+        ),
+
+        const SizedBox(height: 16),
+
         // Info: chassi da BIN
         if (state.chassiBin.isNotEmpty)
           _InfoBadge(
@@ -48,63 +165,6 @@ class StepChassi extends StatelessWidget {
           showDivergenciaAlert: true,
           statusOptions: const [
             'Dentro dos padrões',
-            'Divergente',
-            'Remarcado',
-            'Não localizado',
-            'Ilegível',
-            'Com indício de adulteração',
-          ],
-        ),
-
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-}
-
-/// Step 6 — Motor
-class StepMotor extends StatelessWidget {
-  const StepMotor({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<VistoriaWizardState>();
-    final motorDivergente = state.motorBin.isNotEmpty &&
-        state.motorVeiculo.isNotEmpty &&
-        state.motorBin != state.motorVeiculo;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (state.motorBin.isNotEmpty)
-          _InfoBadge(
-            icon: Icons.cloud_done_rounded,
-            label: 'Motor na BIN / Consulta',
-            value: state.motorBin,
-            color: AppTheme.primary,
-          ),
-
-        if (motorDivergente)
-          _DivergenciaAlert(
-            'O motor da BIN (${state.motorBin}) difere do informado no veículo (${state.motorVeiculo}).',
-          ),
-
-        const SizedBox(height: 12),
-
-        InspecaoItemWidget(
-          itemId: 'motor_gravacao',
-          label: 'Gravação do Motor',
-          obrigatoria: true,
-          showCodigoField: true,
-          codigoLabel: 'Motor encontrado no veículo',
-          codigoHint: 'Ex: EA823...',
-          infoTexto: state.motorBin.isNotEmpty
-              ? 'BIN/Consulta: ${state.motorBin}'
-              : null,
-          showDivergenciaAlert: true,
-          statusOptions: const [
-            'Dentro dos padrões',
-            'Original',
             'Divergente',
             'Remarcado',
             'Não localizado',

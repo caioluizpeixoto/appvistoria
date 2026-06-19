@@ -61,32 +61,7 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _MenuActionCard(
-                      titulo: 'Histórico\nConsultas',
-                      icone: Icons.search_rounded,
-                      cor: const Color(0xFF0277BD), // light blue
-                      onTap: () => context.push('/historico-consultas'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _MenuActionCard(
-                      titulo: 'Histórico\nVistorias',
-                      icone: Icons.fact_check_rounded,
-                      cor: const Color(0xFF2E7D32), // green
-                      onTap: () => context.push('/historico-vistorias'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+
           SliverList(
             delegate: SliverChildListDelegate([
               _VistoriaCard(tipo: TipoVistoria.carroComCroqui),
@@ -140,31 +115,6 @@ class _WelcomeBanner extends StatelessWidget {
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.assignment_rounded,
-                              size: 14, color: Colors.white),
-                          SizedBox(width: 6),
-                          Text(
-                            'Laudos de hoje: 0',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],
@@ -284,58 +234,6 @@ class _VistoriaCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Botões de Ação do Menu ────────────────────────────────────────────────────
-
-class _MenuActionCard extends StatelessWidget {
-  final String titulo;
-  final IconData icone;
-  final Color cor;
-  final VoidCallback onTap;
-
-  const _MenuActionCard({
-    required this.titulo,
-    required this.icone,
-    required this.cor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: cor.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: cor.withValues(alpha: 0.2)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icone, color: cor, size: 28),
-              const SizedBox(height: 8),
-              Text(
-                titulo,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: cor.withAlpha(200),
-                  height: 1.2,
-                ),
-              ),
-            ],
           ),
         ),
       ),

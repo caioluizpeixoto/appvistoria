@@ -10,29 +10,21 @@ class StepEstrutura extends StatelessWidget {
   const StepEstrutura({super.key});
 
   static const List<String> _itens = [
-    'longarina_dianteira_direita',
     'longarina_dianteira_esquerda',
-    'longarina_centro_direita',
+    'longarina_dianteira_direita',
     'longarina_centro_esquerda',
-    'longarina_traseira_direita',
+    'longarina_centro_direita',
     'longarina_traseira_esquerda',
-    'painel_frontal',
-    'painel_traseiro',
-    'assoalho',
-    'caixa_roda',
+    'longarina_traseira_direita',
   ];
 
   static const Map<String, String> _labels = {
-    'longarina_dianteira_direita': 'Longarina Dianteira Direita',
     'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
-    'longarina_centro_direita': 'Longarina Centro Direita',
+    'longarina_dianteira_direita': 'Longarina Dianteira Direita',
     'longarina_centro_esquerda': 'Longarina Centro Esquerda',
-    'longarina_traseira_direita': 'Longarina Traseira Direita',
+    'longarina_centro_direita': 'Longarina Centro Direita',
     'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
-    'painel_frontal': 'Painel Frontal',
-    'painel_traseiro': 'Painel Traseiro',
-    'assoalho': 'Assoalho',
-    'caixa_roda': 'Caixa de Roda',
+    'longarina_traseira_direita': 'Longarina Traseira Direita',
   };
 
   static const List<String> _statusOpcoes = [

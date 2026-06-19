@@ -50,7 +50,13 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = context.read<VistoriaWizardState>();
       _obsController.text = state.getObs(widget.itemId);
-      _codigoController.text = state.getCodigo(widget.itemId);
+      
+      var cod = state.getCodigo(widget.itemId);
+      if (cod.isEmpty && widget.itemId == 'foto_placa') {
+        cod = state.placa;
+        state.setCodigo(widget.itemId, cod);
+      }
+      _codigoController.text = cod;
     });
   }
 
@@ -404,7 +410,17 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
               ].map((s) {
                 return DropdownMenuItem(
                   value: s,
-                  child: Text(s, style: const TextStyle(fontSize: 13)),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _statusIcon(s),
+                        size: 16,
+                        color: _statusColor(s),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(s, style: const TextStyle(fontSize: 13)),
+                    ],
+                  ),
                 );
               }).toList(),
               onChanged: (v) {
@@ -448,7 +464,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
             child: TextFormField(
               controller: _obsController,
-              maxLines: 2,
+              maxLines: 3,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
               decoration: const InputDecoration(
                 labelText: 'Observação (opcional)',
                 hintText: 'Descreva detalhes relevantes...',
@@ -467,30 +484,69 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   Color _statusColor(String status) {
     if (status.isEmpty) return AppTheme.textHint;
     final s = status.toLowerCase();
-    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado')) {
+    
+    // NÃO CONFORME (Vermelho)
+    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
+        s.contains('não original') || s.contains('substituído') || s.contains('ausente') ||
+        s.contains('danificado') || s.contains('colisão')) {
       return AppTheme.naoConforme;
     }
-    if (s.contains('reparo') || s.contains('repintura') || s.contains('observação') || s.contains('danificad')) {
+    
+    // COM OBSERVAÇÃO (Laranja/Amarelo)
+    if (s.contains('reparo') || s.contains('repintura') || s.contains('observação') || 
+        s.contains('envelopado') || s.contains('amassado') || s.contains('riscado') ||
+        s.contains('soldado') || s.contains('avaria') || s.contains('massa')) {
       return AppTheme.comObs;
     }
-    if (s.contains('original') || s.contains('perfeito') || s.contains('padrão') || s.contains('regular')) {
+    
+    // CONFORME (Verde)
+    if (s.contains('original') || s.contains('perfeito') || s.contains('padr') || 
+        s.contains('regular') || s.contains('sem reparo')) {
       return AppTheme.conforme;
     }
+    
+    // NEUTRO (Cinza) - "Não analisado" ou outros
     return AppTheme.textSecondary;
   }
 
   IconData _statusIcon(String status) {
     if (status.isEmpty) return Icons.help_outline_rounded;
     final s = status.toLowerCase();
-    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado')) {
+    
+    // NÃO CONFORME
+    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
+        s.contains('não original') || s.contains('ausente') || s.contains('colisão')) {
       return Icons.cancel_rounded;
     }
-    if (s.contains('reparo') || s.contains('repintura') || s.contains('observação')) {
-      return Icons.warning_amber_rounded;
+    if (s.contains('substituído')) {
+      return Icons.swap_horizontal_circle_rounded;
     }
-    if (s.contains('original') || s.contains('perfeito') || s.contains('padrão')) {
+    if (s.contains('danificado')) {
+      return Icons.broken_image_rounded;
+    }
+
+    // COM OBSERVAÇÃO
+    if (s.contains('reparo') || s.contains('soldado') || s.contains('avaria')) {
+      return Icons.build_circle_rounded;
+    }
+    if (s.contains('repintura') || s.contains('massa') || s.contains('envelopado')) {
+      return Icons.format_paint_rounded;
+    }
+    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado')) {
+      return Icons.warning_rounded;
+    }
+
+    // CONFORME
+    if (s.contains('original') || s.contains('perfeito') || s.contains('padr') || 
+        s.contains('regular') || s.contains('sem reparo')) {
       return Icons.check_circle_rounded;
     }
+
+    // NEUTRO
+    if (s.contains('não analisado')) {
+      return Icons.remove_circle_outline_rounded;
+    }
+    
     return Icons.radio_button_unchecked_rounded;
   }
 }
