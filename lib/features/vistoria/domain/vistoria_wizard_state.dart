@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 class VistoriaWizardState extends ChangeNotifier {
   // ── Identificação ──────────────────────────────────────────────────────────
   final String vistoriaId;
+  String numeroLaudo = '';
   int currentStep;
 
   // ── Dados Gerais (Step 1) ──────────────────────────────────────────────────

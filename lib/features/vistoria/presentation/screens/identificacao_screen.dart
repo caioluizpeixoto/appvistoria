@@ -198,16 +198,52 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   // ── Retomar laudo ─────────────────────────────────────────────────────────
 
   Future<void> _buscarLaudo() async {
-    final codigo = _laudoCtrl.text.trim();
+    final codigo = _laudoCtrl.text.trim().toUpperCase();
     if (codigo.isEmpty) return;
     setState(() => _buscandoLaudo = true);
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      final dao = sl<VistoriaDao>();
+      final vistoria = await dao.buscarPorNumeroLaudoOuId(codigo);
+      
+      if (vistoria != null) {
+        if (mounted) {
+          if (vistoria.status == 'concluido') {
+            final diff = DateTime.now().difference(vistoria.updatedAt);
+            if (diff.inHours > 72) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Laudo concluído há mais de 72h. Prazo de retificação expirado.'),
+                  backgroundColor: AppTheme.naoConforme,
+                ),
+              );
+              return;
+            }
+            // Retificar (dentro das 72h)
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Modo Retificação ativado. (${72 - diff.inHours}h restantes)'),
+                backgroundColor: AppTheme.comObs,
+              ),
+            );
+          }
+          context.push('/vistoria-wizard/${vistoria.id}');
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Laudo "$codigo" não encontrado.'),
+              backgroundColor: AppTheme.comObs,
+            ),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Laudo "$codigo" não encontrado.'),
-            backgroundColor: AppTheme.comObs,
+            content: Text('Erro ao buscar laudo: $e'),
+            backgroundColor: AppTheme.naoConforme,
           ),
         );
       }
@@ -570,27 +606,6 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Botão Buscar em Background
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: AppTheme.primary, width: 2),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed:
-                      _buscandoVeiculo ? null : _iniciarVistoriaEmBackground,
-                  icon:
-                      const Icon(Icons.speed_rounded, color: AppTheme.primary),
-                  label: const Text(
-                    'Iniciar Vistoria (Consulta Automática)',
-                    style: TextStyle(
-                        color: AppTheme.primary, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
 
               if (!_veiculoEncontrado && !_modoOffline) ...[
                 const SizedBox(height: 16),
@@ -611,7 +626,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                     icon: const Icon(Icons.cloud_off_rounded,
                         color: AppTheme.textSecondary, size: 20),
                     label: const Text(
-                      'Sistema fora do ar? Preencher Manualmente',
+                      'Preencher Manualmente / Offline',
                       style: TextStyle(
                           color: AppTheme.textSecondary,
                           decoration: TextDecoration.underline),

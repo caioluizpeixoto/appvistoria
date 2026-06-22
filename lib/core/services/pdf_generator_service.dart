@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -52,6 +53,7 @@ class PdfGeneratorService {
 
     pw.ImageProvider? carroEstruturaImage;
     pw.ImageProvider? caminhaoEstruturaImage;
+    pw.ImageProvider? carroPinturaImage;
     try {
       final bytes = await rootBundle.load('assets/images/carro_estrutura.png');
       carroEstruturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
@@ -59,6 +61,10 @@ class PdfGeneratorService {
     try {
       final bytes = await rootBundle.load('assets/images/caminhao_estrutura.png');
       caminhaoEstruturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (_) {}
+    try {
+      final bytes = await rootBundle.load('assets/images/carro_pintura.png');
+      carroPinturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (_) {}
 
     pw.ImageProvider? assinaturaImage;
@@ -74,39 +80,49 @@ class PdfGeneratorService {
     // Página 1 — Dados Gerais
     pdf.addPage(await _buildPage1(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage));
 
-    final temCroqui = vistoria.tipoVistoria?.toLowerCase().contains('cautelar') ?? false;
-    final isCaminhao = vistoria.tipoVistoria?.toLowerCase().contains('caminh') ?? false;
+    final tipoLower = vistoria.tipoVistoria?.toLowerCase() ?? '';
+    final temCroqui = tipoLower.contains('cautelar');
+    final temAvarias = tipoLower.contains('avarias') || tipoLower.contains('caminh');
+    final isCaminhao = tipoLower.contains('caminh');
     final bgImage = isCaminhao ? caminhaoEstruturaImage : carroEstruturaImage;
 
     // ── Geração de Fotos Padronizada (Item 15) ──────────────────────────────
-    final orderedFotoIds = [
-      'foto_placa',
-      'frente_esquerda',
-      'frente_direita',
-      'traseira_esquerda',
-      'traseira_direita',
-      'vidro_para_brisa',
-      'vidro_traseiro',
-      'vidro_lateral_direito',
-      'vidro_lateral_esquerdo',
-      if (wizardState != null) ...wizardState.vidrosExtrasIds,
-      'painel_hodometro',
-      'compartimento_motor',
-      'motor_gravacao',
-      'cambio_gravacao',
-      'etiqueta_vis_motor',
-      'etiqueta_vis_porta',
-      'chassi_gravacao',
-    ];
-
-    if (temCroqui) {
-      orderedFotoIds.addAll([
+    // ── Geração de Fotos Padronizada (Item 15) ──────────────────────────────
+    final Map<String, List<String>> secoesFotos = {
+      'FOTOS PRINCIPAIS - IDENTIFICAÇÃO': [
+        'foto_placa',
+        'frente_esquerda',
+        'frente_direita',
+        'traseira_esquerda',
+        'traseira_direita',
+      ],
+      'FOTOS PRINCIPAIS - VIDROS': [
+        'vidro_frontal',
+        'vidro_traseiro',
+        'vidro_dianteiro_direito',
+        'vidro_dianteiro_esquerdo',
+        'vidro_traseiro_direito',
+        'vidro_traseiro_esquerdo',
+        if (wizardState != null) ...wizardState.vidrosExtrasIds,
+      ],
+      'FOTOS PRINCIPAIS - MOTOR / CHASSI': [
+        'painel_hodometro',
+        'compartimento_motor',
+        'motor_gravacao',
+        'cambio_gravacao',
+        'etiqueta_vis_motor',
+        'etiqueta_vis_porta',
+        'chassi_gravacao',
+      ],
+      if (temCroqui) 'FOTOS - ESTRUTURAL': [
         'longarina_dianteira_esquerda',
         'longarina_dianteira_direita',
         'longarina_centro_esquerda',
         'longarina_centro_direita',
         'longarina_traseira_esquerda',
         'longarina_traseira_direita',
+      ],
+      if (temAvarias) 'FOTOS - PINTURA': [
         'peca_capo_dianteiro',
         'peca_paralama_dianteiro_esquerdo',
         'peca_porta_dianteira_esquerda',
@@ -118,46 +134,140 @@ class PdfGeneratorService {
         'peca_porta_traseira_direita',
         'peca_porta_dianteira_direita',
         'peca_paralama_dianteiro_direito',
-      ]);
-    }
+      ],
+    };
 
-    // Montar a lista completa de fotos (principais + extras)
-    final todasFotos = <Map<String, dynamic>>[];
+    bool hasAnyPhoto = false;
+    final chunkSize = 15;
+
     if (wizardState != null) {
-      for (final id in orderedFotoIds) {
-        final locals = wizardState.getFotosLocais(id);
-        // O usuário pediu "múltiplas fotos por avaria" e itens normais também
-        // Então pegamos TODAS as fotos salvas para aquele ID, não só a primeira.
-        for (final localPath in locals) {
-          final f = File(localPath);
-          if (f.existsSync()) {
-            todasFotos.add({
-              'path': localPath,
-              'label': id.replaceAll('_', ' ').toUpperCase(),
-            });
+      for (final entry in secoesFotos.entries) {
+        final tituloSecao = entry.key;
+        final orderedFotoIds = entry.value;
+
+        final fotosSecao = <Map<String, dynamic>>[];
+        for (final id in orderedFotoIds) {
+          final locals = wizardState.getFotosLocais(id);
+          for (final localPath in locals) {
+            final f = File(localPath);
+            if (f.existsSync()) {
+              var label = id.toUpperCase();
+              if (label.startsWith('PECA_') || label.startsWith('PEÇA_')) {
+                label = label.replaceFirst(RegExp(r'^PE[CÇ]A_'), '');
+              }
+              label = label.replaceAll('_', ' ');
+
+              fotosSecao.add({
+                'path': localPath,
+                'label': label,
+              });
+            }
           }
         }
+
+        if (fotosSecao.isNotEmpty) {
+          hasAnyPhoto = true;
+          for (var i = 0; i < fotosSecao.length; i += chunkSize) {
+            final end = (i + chunkSize < fotosSecao.length) ? i + chunkSize : fotosSecao.length;
+            final chunk = fotosSecao.sublist(i, end);
+            pdf.addPage(_buildPageFotosGrid(
+              titulo: i == 0 ? tituloSecao : '$tituloSecao (CONT.)',
+              fotos: chunk,
+              vistoria: vistoria,
+              styles: styles,
+              logo: logoImage,
+              assinatura: assinaturaImage,
+            ));
+          }
+        }
+
+        // Inserir croqui logo após as fotos da seção correspondente
+        if (tituloSecao == 'FOTOS - ESTRUTURAL' && temCroqui) {
+          pdf.addPage(_buildPageAnalise(
+            titulo: 'ANÁLISE ESTRUTURAL',
+            itens: const [
+              'longarina_dianteira_direita', 'longarina_dianteira_esquerda',
+              'longarina_centro_direita', 'longarina_centro_esquerda',
+              'longarina_traseira_direita', 'longarina_traseira_esquerda',
+              'painel_frontal', 'painel_traseiro', 'assoalho', 'caixa_roda',
+            ],
+            labels: const {
+              'longarina_dianteira_direita': 'Longarina Dianteira Direita',
+              'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
+              'longarina_centro_direita': 'Longarina Centro Direita',
+              'longarina_centro_esquerda': 'Longarina Centro Esquerda',
+              'longarina_traseira_direita': 'Longarina Traseira Direita',
+              'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
+              'painel_frontal': 'Painel Frontal',
+              'painel_traseiro': 'Painel Traseiro',
+              'assoalho': 'Assoalho',
+              'caixa_roda': 'Caixa de Roda',
+            },
+            state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
+          ));
+        } else if (tituloSecao == 'FOTOS - PINTURA' && temAvarias) {
+          pdf.addPage(_buildPageAnalise(
+            titulo: 'ANÁLISE DE PINTURA',
+            itens: const [
+              'peca_capo_dianteiro', 'peca_paralama_dianteiro_direito',
+              'peca_paralama_dianteiro_esquerdo', 'peca_porta_dianteira_direita',
+              'peca_porta_dianteira_esquerda', 'peca_porta_traseira_direita',
+              'peca_porta_traseira_esquerda', 'peca_lateral_traseira_direita',
+              'peca_lateral_traseira_esquerda', 'peca_teto', 'peca_tampa_traseira',
+            ],
+            labels: const {
+              'peca_capo_dianteiro': 'Capô Dianteiro',
+              'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
+              'peca_paralama_dianteiro_esquerdo': 'Para-lama Dianteiro Esquerdo',
+              'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
+              'peca_porta_dianteira_esquerda': 'Porta Dianteira Esquerda',
+              'peca_porta_traseira_direita': 'Porta Traseira Direita',
+              'peca_porta_traseira_esquerda': 'Porta Traseira Esquerda',
+              'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
+              'peca_lateral_traseira_esquerda': 'Lateral Traseira Esquerda',
+              'peca_teto': 'Teto',
+              'peca_tampa_traseira': 'Tampa Traseira',
+            },
+            isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroPinturaImage ?? bgImage, assinatura: assinaturaImage,
+          ));
+        }
       }
-      
+
       // Adicionar Fotos Extras (T2)
+      final fotosExtrasList = <Map<String, dynamic>>[];
       for (final extra in wizardState.fotosExtras) {
         final path = extra['pathLocal'] as String?;
         final titulo = extra['titulo'] as String? ?? 'FOTO EXTRA';
         if (path != null && path.isNotEmpty) {
           final f = File(path);
           if (f.existsSync()) {
-            todasFotos.add({
+            fotosExtrasList.add({
               'path': path,
               'label': titulo.toUpperCase(),
             });
           }
         }
       }
+
+      if (fotosExtrasList.isNotEmpty) {
+        hasAnyPhoto = true;
+        for (var i = 0; i < fotosExtrasList.length; i += chunkSize) {
+          final end = (i + chunkSize < fotosExtrasList.length) ? i + chunkSize : fotosExtrasList.length;
+          final chunk = fotosExtrasList.sublist(i, end);
+          pdf.addPage(_buildPageFotosGrid(
+            titulo: i == 0 ? 'FOTOS EXTRAS' : 'FOTOS EXTRAS (CONT.)',
+            fotos: chunk,
+            vistoria: vistoria,
+            styles: styles,
+            logo: logoImage,
+            assinatura: assinaturaImage,
+            state: wizardState,
+          ));
+        }
+      }
     }
 
-    // Dividir em chunks de 15 fotos por página (3x5)
-    final chunkSize = 15;
-    if (todasFotos.isEmpty) {
+    if (!hasAnyPhoto) {
       pdf.addPage(_buildPageFotosGrid(
         titulo: 'FOTOS DA VISTORIA',
         fotos: [],
@@ -165,71 +275,7 @@ class PdfGeneratorService {
         styles: styles,
         logo: logoImage,
         assinatura: assinaturaImage,
-      ));
-    } else {
-      for (var i = 0; i < todasFotos.length; i += chunkSize) {
-        final end = (i + chunkSize < todasFotos.length) ? i + chunkSize : todasFotos.length;
-        final chunk = todasFotos.sublist(i, end);
-        pdf.addPage(_buildPageFotosGrid(
-          titulo: i == 0 ? 'FOTOS PRINCIPAIS' : 'FOTOS PRINCIPAIS (CONT.)',
-          fotos: chunk,
-          vistoria: vistoria,
-          styles: styles,
-          logo: logoImage,
-          assinatura: assinaturaImage,
-        ));
-      }
-    }
-
-    if (temCroqui) {
-      // Página 4 — Análise Estrutural (Tabela até ter o Croqui)
-      pdf.addPage(_buildPageAnalise(
-        titulo: 'ANÁLISE ESTRUTURAL',
-        itens: const [
-          'longarina_dianteira_direita', 'longarina_dianteira_esquerda',
-          'longarina_centro_direita', 'longarina_centro_esquerda',
-          'longarina_traseira_direita', 'longarina_traseira_esquerda',
-          'painel_frontal', 'painel_traseiro', 'assoalho', 'caixa_roda',
-        ],
-        labels: const {
-          'longarina_dianteira_direita': 'Longarina Dianteira Direita',
-          'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
-          'longarina_centro_direita': 'Longarina Centro Direita',
-          'longarina_centro_esquerda': 'Longarina Centro Esquerda',
-          'longarina_traseira_direita': 'Longarina Traseira Direita',
-          'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
-          'painel_frontal': 'Painel Frontal',
-          'painel_traseiro': 'Painel Traseiro',
-          'assoalho': 'Assoalho',
-          'caixa_roda': 'Caixa de Roda',
-        },
-        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
-      ));
-
-      // Página 5 — Análise de Pintura (Tabela até ter o Croqui)
-      pdf.addPage(_buildPageAnalise(
-        titulo: 'ANÁLISE DE PINTURA',
-        itens: const [
-          'peca_capo_dianteiro', 'peca_paralama_dianteiro_direito',
-          'peca_paralama_dianteiro_esquerdo', 'peca_porta_dianteira_direita',
-          'peca_porta_dianteira_esquerda', 'peca_porta_traseira_direita',
-          'peca_porta_traseira_esquerda', 'peca_lateral_traseira_direita',
-          'peca_lateral_traseira_esquerda', 'peca_teto', 'peca_tampa_traseira',
-        ],
-        labels: const {
-          'peca_capo_dianteiro': 'Capô Dianteiro',
-          'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
-          'peca_paralama_dianteiro_esquerdo': 'Para-lama Dianteiro Esquerdo',
-          'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
-          'peca_porta_dianteira_esquerda': 'Porta Dianteira Esquerda',
-          'peca_porta_traseira_direita': 'Porta Traseira Direita',
-          'peca_porta_traseira_esquerda': 'Porta Traseira Esquerda',
-          'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
-          'peca_lateral_traseira_esquerda': 'Lateral Traseira Esquerda',
-          'peca_teto': 'Teto',
-          'peca_tampa_traseira': 'Tampa Traseira',
-        },
-        isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, assinatura: assinaturaImage,
+        state: wizardState,
       ));
     }
 
@@ -244,9 +290,16 @@ class PdfGeneratorService {
 
   // ── Seções Compartilhadas ────────────────────────────────────────────────
 
-  pw.Widget _buildHeader(Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo) {
-    final statusFinal = vistoria.statusFinal ?? 'CONFORME';
-    final isConforme = statusFinal.toUpperCase() == 'CONFORME';
+  pw.Widget _buildHeader(Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo, {VistoriaWizardState? state}) {
+    String statusFinal = vistoria.statusFinal ?? 'CONFORME';
+    if (state != null) {
+      if (state.resultadoFinal.isNotEmpty) {
+        statusFinal = state.resultadoFinal;
+      } else if (state.statusSugerido.isNotEmpty) {
+        statusFinal = state.statusSugerido;
+      }
+    }
+    final isConforme = statusFinal.toUpperCase().contains('CONFORME');
 
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 8),
@@ -285,8 +338,6 @@ class PdfGeneratorService {
             ),
             child: pw.Row(
               children: [
-                // Car icon placeholder using text for now, or just empty
-                pw.Text('🚗 ', style: pw.TextStyle(fontSize: 12)),
                 pw.Text(statusFinal.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 12, color: _kWhite)),
               ],
             ),
@@ -388,7 +439,7 @@ class PdfGeneratorService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildHeader(vistoria, styles, logo),
+            _buildHeader(vistoria, styles, logo, state: state),
             _buildBlackBar('VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
             
             // Dados Gerais
@@ -577,15 +628,7 @@ class PdfGeneratorService {
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Expanded(child: pw.Text(labels[id]!, style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack))),
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                decoration: pw.BoxDecoration(
-                  color: PdfColor(color.red, color.green, color.blue, 0.1),
-                  borderRadius: pw.BorderRadius.circular(2),
-                  border: pw.Border.all(color: color, width: 0.5),
-                ),
-                child: pw.Text(status.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 5, color: color)),
-              ),
+              pw.Text(status.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack)),
             ],
           ),
         );
@@ -602,6 +645,7 @@ class PdfGeneratorService {
     required _PdfStyles styles,
     pw.ImageProvider? logo,
     pw.ImageProvider? assinatura,
+    VistoriaWizardState? state,
   }) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -610,53 +654,57 @@ class PdfGeneratorService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildHeader(vistoria, styles, logo),
+            _buildHeader(vistoria, styles, logo, state: state),
             _buildBlackBar('VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
+            _buildBlackBar(titulo, styles),
             
             pw.SizedBox(height: 8),
             if (fotos.isEmpty)
               pw.Center(child: pw.Text('Nenhuma foto capturada.', style: pw.TextStyle(color: _kGreyDark, fontSize: 10)))
             else
               pw.Expanded(
-                child: pw.GridView(
-                  crossAxisCount: 3,
-                  childAspectRatio: 1.1,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  children: fotos.map((f) {
-                    try {
-                      final bytes = File(f['path']).readAsBytesSync();
-                      final img = pw.MemoryImage(bytes);
-                      return pw.Container(
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border.all(color: PdfColors.grey300),
-                          borderRadius: pw.BorderRadius.circular(4),
-                          color: _kWhite,
-                        ),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-                          children: [
-                            pw.Expanded(
-                              child: pw.ClipRRect(
-                                horizontalRadius: 4, verticalRadius: 4,
-                                child: pw.Image(img, fit: pw.BoxFit.cover),
+                child: pw.Align(
+                  alignment: pw.Alignment.topCenter,
+                  child: pw.GridView(
+                    crossAxisCount: 3,
+                    childAspectRatio: 1.1,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    children: fotos.map((f) {
+                      try {
+                        final bytes = File(f['path']).readAsBytesSync();
+                        final img = pw.MemoryImage(bytes);
+                        return pw.Container(
+                          decoration: pw.BoxDecoration(
+                            border: pw.Border.all(color: PdfColors.grey300),
+                            borderRadius: pw.BorderRadius.circular(4),
+                            color: _kWhite,
+                          ),
+                          child: pw.Column(
+                            crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                            children: [
+                              pw.Expanded(
+                                child: pw.ClipRRect(
+                                  horizontalRadius: 4, verticalRadius: 4,
+                                  child: pw.Image(img, fit: pw.BoxFit.cover),
+                                ),
                               ),
-                            ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(vertical: 4),
-                              child: pw.Text(
-                                f['label'],
-                                style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack),
-                                textAlign: pw.TextAlign.center,
+                              pw.Container(
+                                padding: const pw.EdgeInsets.symmetric(vertical: 4),
+                                child: pw.Text(
+                                  f['label'],
+                                  style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack),
+                                  textAlign: pw.TextAlign.center,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    } catch (_) {
-                      return pw.Container();
-                    }
-                  }).toList(),
+                            ],
+                          ),
+                        );
+                      } catch (_) {
+                        return pw.Container();
+                      }
+                    }).toList(),
+                  ),
                 ),
               ),
             
@@ -688,7 +736,7 @@ class PdfGeneratorService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildHeader(vistoria, styles, logo),
+            _buildHeader(vistoria, styles, logo, state: state),
             _buildBlackBar('VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
             _buildBlackBar(titulo, styles),
             
@@ -698,6 +746,10 @@ class PdfGeneratorService {
             if (!isPintura && backgroundImage != null)
               pw.Expanded(
                 child: _buildDiagramaEstrutural(backgroundImage, state, styles),
+              )
+            else if (isPintura && backgroundImage != null)
+              pw.Expanded(
+                child: _buildDiagramaPintura(backgroundImage, state, styles),
               )
             else
               // Tabela provisória
@@ -733,6 +785,74 @@ class PdfGeneratorService {
     );
   }
 
+  pw.Widget _buildDiagramaPintura(pw.ImageProvider backgroundImage, VistoriaWizardState? state, _PdfStyles styles) {
+    const double boxWidth = 95;
+    
+    return pw.Center(
+      child: pw.Stack(
+        children: [
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 40, bottom: 40),
+            child: pw.Image(backgroundImage, fit: pw.BoxFit.contain),
+          ),
+          
+          // CAPÔ (Ponta Esquerda)
+          pw.Positioned(
+            left: 10, top: 155,
+            child: _buildPinturaStatus('CAPÔ DIANTEIRO', state?.getStatus('peca_capo_dianteiro') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+          // TAMPA TRASEIRA (Ponta Direita)
+          pw.Positioned(
+            right: 5, top: 215,
+            child: _buildPinturaStatus('TAMPA TRASEIRA', state?.getStatus('peca_tampa_traseira') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+
+          // TETO (Topo, Centro)
+          pw.Positioned(
+            left: 244, top: 20,
+            child: _buildPinturaStatus('TETO', state?.getStatus('peca_teto') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+
+          // Lado Direito (Topo da tela)
+          pw.Positioned(
+            left: 25, top: 50,
+            child: _buildPinturaStatus('PARA-LAMA DIANTEIRO DIREITO', state?.getStatus('peca_paralama_dianteiro_direito') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+          pw.Positioned(
+            left: 130, top: 55,
+            child: _buildPinturaStatus('PORTA DIANTEIRA DIREITA', state?.getStatus('peca_porta_dianteira_direita') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+          pw.Positioned(
+            right: 135, top: 55,
+            child: _buildPinturaStatus('PORTA TRASEIRA DIREITA', state?.getStatus('peca_porta_traseira_direita') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+          pw.Positioned(
+            right: 35, top: 30,
+            child: _buildPinturaStatus('LATERAL TRASEIRA DIREITA', state?.getStatus('peca_lateral_traseira_direita') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: true),
+          ),
+
+          // Lado Esquerdo (Base da tela)
+          pw.Positioned(
+            left: 30, bottom: 40,
+            child: _buildPinturaStatus('PARA-LAMA DIANTEIRO ESQUERDO', state?.getStatus('peca_paralama_dianteiro_esquerdo') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: false),
+          ),
+          pw.Positioned(
+            left: 145, bottom: 30,
+            child: _buildPinturaStatus('PORTA DIANTEIRA ESQUERDA', state?.getStatus('peca_porta_dianteira_esquerda') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: false),
+          ),
+          pw.Positioned(
+            right: 135, bottom: 35,
+            child: _buildPinturaStatus('PORTA TRASEIRA ESQUERDA', state?.getStatus('peca_porta_traseira_esquerda') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: false),
+          ),
+          pw.Positioned(
+            right: 25, bottom: 40,
+            child: _buildPinturaStatus('LATERAL TRASEIRA ESQUERDA', state?.getStatus('peca_lateral_traseira_esquerda') ?? 'NÃO ANALISADO', styles, width: boxWidth, tagOnTop: false),
+          ),
+        ],
+      ),
+    );
+  }
+
   pw.Widget _buildDiagramaEstrutural(pw.ImageProvider backgroundImage, VistoriaWizardState? state, _PdfStyles styles) {
     return pw.Center(
       child: pw.Stack(
@@ -742,87 +862,121 @@ class PdfGeneratorService {
             child: pw.Image(backgroundImage, fit: pw.BoxFit.contain),
           ),
           pw.Positioned(
-            top: 35, left: 5,
-            child: _buildCaixaStatus('LONGARINA DIANTEIRA DIREITA', state?.getStatus('longarina_dianteira_direita') ?? 'NÃO ANALISADO', styles),
+            top: 0, left: 10,
+            child: _buildCaixaStatus('LONGARINA DIANTEIRA DIREITA', state?.getStatus('longarina_dianteira_direita') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: true),
           ),
           pw.Positioned(
-            top: 15, left: 200,
-            child: _buildCaixaStatus('LONGARINA CENTRO DIREITA', state?.getStatus('longarina_centro_direita') ?? 'NÃO ANALISADO', styles),
+            top: 0, left: 215,
+            child: _buildCaixaStatus('LONGARINA CENTRO DIREITA', state?.getStatus('longarina_centro_direita') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: true),
           ),
           pw.Positioned(
-            top: 25, right: 40,
-            child: _buildCaixaStatus('LONGARINA TRASEIRA DIREITA', state?.getStatus('longarina_traseira_direita') ?? 'NÃO ANALISADO', styles),
+            top: 0, right: 15,
+            child: _buildCaixaStatus('LONGARINA TRASEIRA DIREITA', state?.getStatus('longarina_traseira_direita') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: true),
           ),
           pw.Positioned(
-            bottom: 55, left: 20,
-            child: _buildCaixaStatus('LONGARINA DIANTEIRA ESQUERDA', state?.getStatus('longarina_dianteira_esquerda') ?? 'NÃO ANALISADO', styles),
+            bottom: 20, left: 5,
+            child: _buildCaixaStatus('LONGARINA DIANTEIRA ESQUERDA', state?.getStatus('longarina_dianteira_esquerda') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: false),
           ),
           pw.Positioned(
-            bottom: 50, left: 205,
-            child: _buildCaixaStatus('LONGARINA CENTRO ESQUERDA', state?.getStatus('longarina_centro_esquerda') ?? 'NÃO ANALISADO', styles),
+            bottom: 20, left: 225,
+            child: _buildCaixaStatus('LONGARINA CENTRO ESQUERDA', state?.getStatus('longarina_centro_esquerda') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: false),
           ),
           pw.Positioned(
-            bottom: 45, right: 30,
-            child: _buildCaixaStatus('LONGARINA TRASEIRA ESQUERDA', state?.getStatus('longarina_traseira_esquerda') ?? 'NÃO ANALISADO', styles),
+            bottom: 20, right: 15,
+            child: _buildCaixaStatus('LONGARINA TRASEIRA ESQUERDA', state?.getStatus('longarina_traseira_esquerda') ?? 'NÃO ANALISADO', styles, width: 95, tagOnTop: false),
           ),
         ],
       ),
     );
   }
 
-  pw.Widget _buildCaixaStatus(String titulo, String status, _PdfStyles styles) {
+  PdfColor _getPinturaColor(String status) {
+    status = status.toUpperCase();
+    if (status.contains('ORIGINAL') || status.contains('CONFORME')) {
+      return _kGreen;
+    } else if (status.contains('REPINTURA E/OU MASSA') || status.contains('SUBSTITUÍDO') || status.contains('DANIFICADO') || status.contains('REPROVADO') || status.contains('NÃO CONFORME')) {
+      return _kRed;
+    } else if (status.contains('REPINTURA') || status.contains('ENVELOPADO') || status.contains('RISCADO') || status.contains('REPARO')) {
+      return _kOrange;
+    }
+    return _kGreyDark;
+  }
+
+  pw.Widget _buildPinturaStatus(String titulo, String status, _PdfStyles styles, {double width = 90, bool tagOnTop = true}) {
+    status = status.toUpperCase();
+    PdfColor color = _getPinturaColor(status);
+
+    final titleWidget = pw.Text(
+      titulo,
+      style: pw.TextStyle(font: styles.bold, fontSize: 8, color: _kBlack),
+      textAlign: pw.TextAlign.center,
+    );
+    
+    final tagWidget = pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: pw.BoxDecoration(
+        color: color,
+        borderRadius: pw.BorderRadius.circular(2),
+      ),
+      child: pw.Text(
+        status,
+        style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: _kWhite),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+
+    return pw.Container(
+      width: width,
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        mainAxisSize: pw.MainAxisSize.min,
+        children: tagOnTop 
+            ? [tagWidget, pw.SizedBox(height: 2), titleWidget]
+            : [titleWidget, pw.SizedBox(height: 2), tagWidget],
+      ),
+    );
+  }
+
+  pw.Widget _buildCaixaStatus(String titulo, String status, _PdfStyles styles, {double width = 95, bool tagOnTop = true}) {
     status = status.toUpperCase();
     PdfColor color = _kGreyDark;
     
-    // Simplificando verificação de status
-    if (status.contains('CONFORME') || status.contains('SEM REPARO')) {
+    // Verificação de status estrutural
+    if (status.contains('CONFORME') || status.contains('SEM REPARO') || status.contains('ORIGINAL')) {
       color = _kGreen;
-    } else if (status.contains('OBSERVAÇÕES') || status.contains('COM REPARO')) {
-      color = _kOrange;
-    } else if (status.contains('NÃO CONFORME') || status.contains('REPROVADO')) {
+    } else if (status.contains('SUBSTITUÍDO') || status.contains('SOLDADO') || status.contains('NÃO CONFORME') || status.contains('REPROVADO') || status.contains('TRINCADO') || status.contains('CORTADO') || status.contains('DANIFICADO')) {
       color = _kRed;
+    } else if (status.contains('REPARO') || status.contains('OBSERVAÇÕES') || status.contains('AMASSADO')) {
+      color = _kOrange;
     }
 
-    return pw.Container(
-      width: 120,
+    final titleWidget = pw.Text(
+      titulo,
+      style: pw.TextStyle(font: styles.bold, fontSize: 8, color: _kBlack),
+      textAlign: pw.TextAlign.center,
+    );
+    
+    final tagWidget = pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: color, width: 1.5),
-        borderRadius: pw.BorderRadius.circular(4),
-        color: _kWhite,
+        color: color,
+        borderRadius: pw.BorderRadius.circular(2),
       ),
+      child: pw.Text(
+        status,
+        style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: _kWhite),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+
+    return pw.Container(
+      width: width,
       child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         mainAxisSize: pw.MainAxisSize.min,
-        children: [
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(vertical: 3, horizontal: 4),
-            decoration: pw.BoxDecoration(
-              color: color,
-              borderRadius: const pw.BorderRadius.only(topLeft: pw.Radius.circular(2.5), topRight: pw.Radius.circular(2.5)),
-            ),
-            child: pw.Text(titulo, style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kWhite), textAlign: pw.TextAlign.center),
-          ),
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              children: [
-                pw.Container(
-                  width: 8, height: 8,
-                  decoration: pw.BoxDecoration(shape: pw.BoxShape.circle, color: color),
-                  child: pw.Center(
-                    child: pw.Text(
-                      color == _kGreen ? '✓' : (color == _kRed ? '✗' : '!'),
-                      style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kWhite),
-                    ),
-                  ),
-                ),
-                pw.SizedBox(width: 4),
-                pw.Text(status, style: pw.TextStyle(font: styles.bold, fontSize: 6, color: _kBlack)),
-              ],
-            ),
-          ),
-        ],
+        children: tagOnTop 
+            ? [tagWidget, pw.SizedBox(height: 2), titleWidget]
+            : [titleWidget, pw.SizedBox(height: 2), tagWidget],
       ),
     );
   }

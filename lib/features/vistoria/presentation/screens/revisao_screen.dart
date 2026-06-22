@@ -62,6 +62,17 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
         );
 
         if (mounted && pdfPath != null) {
+          // Atualiza status para concluído e salva o PDF
+          await _dao.atualizarConclusao(
+            id: widget.vistoriaId,
+            statusFinal: state.resultadoFinal,
+            parecerTecnico: state.parecerTecnico,
+            assinaturaPath: state.assinaturaPath,
+            vistoriadorNome: state.vistoriadorNome,
+            vistoriadorCpf: state.vistoriadorCpf,
+            pdfUrl: pdfPath,
+          );
+
           context.push('/pdf-preview/${widget.vistoriaId}?path=$pdfPath');
         }
       }

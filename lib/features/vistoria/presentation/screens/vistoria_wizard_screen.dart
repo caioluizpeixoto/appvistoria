@@ -44,7 +44,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   bool _isSaving = false;
 
   List<_StepInfo> get _activeSteps {
-    final temCroqui = _wizardState.tipoVistoria.toLowerCase().contains('cautelar');
+    final tipoLower = _wizardState.tipoVistoria.toLowerCase();
+    final temCroqui = tipoLower.contains('cautelar');
+    final temAvarias = tipoLower.contains('avarias') || tipoLower.contains('caminh');
+    
     return [
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
       const _StepInfo(titulo: 'Fotos Externas', icone: Icons.photo_camera_rounded),
@@ -53,7 +56,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       const _StepInfo(titulo: 'Motor e Câmbio', icone: Icons.settings_rounded),
       const _StepInfo(titulo: 'Etiquetas e Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui) const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
-      if (temCroqui) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
+      if (temAvarias) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
       const _StepInfo(titulo: 'Observações', icone: Icons.notes_rounded),
       const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
       const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
@@ -74,11 +77,14 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
   Future<void> _carregarEtapaAnterior() async {
     final vistoria = await _dao.buscarPorId(widget.vistoriaId);
-    if (vistoria != null && vistoria.tipoVistoria != null) {
-      if (vistoria.tipoVistoria == 'cautelar_carro') {
-        _wizardState.tipoVistoria = 'Vistoria Cautelar Automotiva';
-      } else {
-        _wizardState.tipoVistoria = vistoria.tipoVistoria!;
+    if (vistoria != null) {
+      _wizardState.numeroLaudo = vistoria.numeroLaudo;
+      if (vistoria.tipoVistoria != null) {
+        if (vistoria.tipoVistoria == 'cautelar_carro') {
+          _wizardState.tipoVistoria = 'Vistoria Cautelar Automotiva';
+        } else {
+          _wizardState.tipoVistoria = vistoria.tipoVistoria!;
+        }
       }
     }
     
@@ -470,7 +476,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       const StepMotorCambio(),
                       const StepEtiquetasChassi(),
                       if (_wizardState.tipoVistoria.toLowerCase().contains('cautelar')) const StepEstrutura(),
-                      if (_wizardState.tipoVistoria.toLowerCase().contains('cautelar')) const StepPintura(),
+                      if (_wizardState.tipoVistoria.toLowerCase().contains('avarias') || _wizardState.tipoVistoria.toLowerCase().contains('caminh')) const StepPintura(),
                       const StepObservacoes(),
                       const StepFotosExtras(),
                       const StepDadosVeiculo(),

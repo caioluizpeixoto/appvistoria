@@ -6,8 +6,27 @@ import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
 
-class HistoricoVistoriasScreen extends StatelessWidget {
+class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
+
+  @override
+  State<HistoricoVistoriasScreen> createState() => _HistoricoVistoriasScreenState();
+}
+
+class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
+  late Future<List<Map<String, dynamic>>> _futureHistorico;
+
+  @override
+  void initState() {
+    super.initState();
+    _futureHistorico = _carregarHistorico();
+  }
+
+  void _recarregar() {
+    setState(() {
+      _futureHistorico = _carregarHistorico();
+    });
+  }
 
   Future<List<Map<String, dynamic>>> _carregarHistorico() async {
     final dao = sl<VistoriaDao>();
@@ -31,7 +50,7 @@ class HistoricoVistoriasScreen extends StatelessWidget {
         title: const Text('Histórico de Vistorias'),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _carregarHistorico(),
+        future: _futureHistorico,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -50,7 +69,10 @@ class HistoricoVistoriasScreen extends StatelessWidget {
             itemCount: itens.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
-              return _VistoriaCard(item: itens[index]);
+              return _VistoriaCard(
+                item: itens[index],
+                onDelete: _recarregar,
+              );
             },
           );
         },
@@ -61,8 +83,9 @@ class HistoricoVistoriasScreen extends StatelessWidget {
 
 class _VistoriaCard extends StatelessWidget {
   final Map<String, dynamic> item;
+  final VoidCallback onDelete;
 
-  const _VistoriaCard({required this.item});
+  const _VistoriaCard({required this.item, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +123,49 @@ class _VistoriaCard extends StatelessWidget {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () => context.push('/vistoria-wizard/${vistoria.id}'),
+            onTap: () {
+              if (vistoria.status == 'concluido') {
+                final diff = DateTime.now().difference(vistoria.updatedAt);
+                if (diff.inHours <= 72) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Retificar Laudo'),
+                      content: Text('Este laudo foi concluído. Você tem ${72 - diff.inHours}h restantes para retificá-lo. Deseja reabrir a edição?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            context.push('/vistoria-wizard/${vistoria.id}');
+                          },
+                          child: const Text('Retificar'),
+                        ),
+                      ],
+                    ),
+                  );
+                } else {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Prazo Expirado'),
+                      content: const Text('Este laudo foi concluído há mais de 72h e não pode mais ser alterado.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Fechar'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+              } else {
+                context.push('/vistoria-wizard/${vistoria.id}');
+              }
+            },
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
@@ -155,7 +220,43 @@ class _VistoriaCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppTheme.textHint),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.naoConforme),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Excluir Laudo?'),
+                          content: const Text('Tem certeza que deseja excluir esta vistoria? Esta ação não pode ser desfeita.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancelar'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
+                              onPressed: () async {
+                                Navigator.pop(ctx);
+                                final dao = sl<VistoriaDao>();
+                                await dao.excluirVistoriaCompleta(vistoria.id);
+                                onDelete();
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Vistoria excluída com sucesso.'),
+                                      backgroundColor: AppTheme.conforme,
+                                    ),
+                                  );
+                                }
+                              },
+                              child: const Text('Excluir'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),

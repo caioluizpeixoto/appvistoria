@@ -29,6 +29,24 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
   Future<Vistoria?> buscarPorId(String id) =>
       (select(vistorias)..where((t) => t.id.equals(id))).getSingleOrNull();
 
+  Future<Vistoria?> buscarPorNumeroLaudoOuId(String termo) async {
+    // 1. Busca exata por numeroLaudo
+    final porLaudo = await (select(vistorias)..where((t) => t.numeroLaudo.equals(termo))).getSingleOrNull();
+    if (porLaudo != null) return porLaudo;
+
+    // 2. Fallback: o app gerava códigos a partir do ID (ex: Timestamp). 
+    // Se digitou VST-17818265, buscamos se o ID começa com 17818265
+    String termoId = termo;
+    if (termo.startsWith('VST-')) {
+      termoId = termo.substring(4);
+    }
+    
+    final porId = await (select(vistorias)..where((t) => t.id.like('$termoId%'))).get();
+    if (porId.isNotEmpty) return porId.first;
+
+    return null;
+  }
+
   Future<int> inserirVistoria(VistoriasCompanion v) =>
       into(vistorias).insert(v);
 
@@ -39,6 +57,18 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<int> deletarVistoria(String id) =>
       (delete(vistorias)..where((t) => t.id.equals(id))).go();
+
+  Future<void> excluirVistoriaCompleta(String vistoriaId) async {
+    return transaction(() async {
+      await (delete(fotosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(itensVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(itensPintura)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(itensEstrutura)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(vidrosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(vistorias)..where((t) => t.id.equals(vistoriaId))).go();
+    });
+  }
 
   Future<void> marcarSincronizado(String id) =>
       (update(vistorias)..where((t) => t.id.equals(id)))
@@ -61,6 +91,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
     String? assinaturaPath,
     String? vistoriadorNome,
     String? vistoriadorCpf,
+    String? pdfUrl,
   }) =>
       (update(vistorias)..where((t) => t.id.equals(id))).write(
         VistoriasCompanion(
@@ -69,6 +100,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
           assinaturaPath: Value(assinaturaPath),
           vistoriadorNome: Value(vistoriadorNome),
           vistoriadorCpf: Value(vistoriadorCpf),
+          pdfUrl: Value(pdfUrl),
           status: const Value('concluido'),
           updatedAt: Value(DateTime.now()),
         ),

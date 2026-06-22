@@ -43,6 +43,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   final _obsController = TextEditingController();
   final _codigoController = TextEditingController();
   bool _uploading = false;
+  bool _isEditingCodigo = false;
 
   @override
   void initState() {
@@ -52,11 +53,27 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
       _obsController.text = state.getObs(widget.itemId);
       
       var cod = state.getCodigo(widget.itemId);
-      if (cod.isEmpty && widget.itemId == 'foto_placa') {
-        cod = state.placa;
-        state.setCodigo(widget.itemId, cod);
+      if (cod.isEmpty) {
+        if (widget.itemId == 'foto_placa') {
+          cod = state.placa;
+        } else if (widget.itemId == 'chassi_gravacao') {
+          cod = state.chassiBin.isNotEmpty ? state.chassiBin : state.chassiVeiculo;
+        } else if (widget.itemId == 'motor_gravacao') {
+          cod = state.motorBin.isNotEmpty ? state.motorBin : state.motorVeiculo;
+        } else if (widget.itemId == 'cambio_gravacao') {
+          cod = state.cambioBin.isNotEmpty ? state.cambioBin : state.cambioVeiculo;
+        }
+        
+        if (cod.isNotEmpty) {
+          state.setCodigo(widget.itemId, cod);
+        }
       }
+      
       _codigoController.text = cod;
+      if (cod.isEmpty) {
+        _isEditingCodigo = true; // Se vazio, já começa liberado para digitar
+      }
+      setState(() {});
     });
   }
 
@@ -374,12 +391,26 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
               child: TextFormField(
                 controller: _codigoController,
+                readOnly: !_isEditingCodigo,
                 textCapitalization: TextCapitalization.characters,
+                style: TextStyle(
+                  color: !_isEditingCodigo ? AppTheme.textSecondary : AppTheme.textPrimary,
+                  fontWeight: !_isEditingCodigo ? FontWeight.w600 : FontWeight.normal,
+                ),
                 decoration: InputDecoration(
                   labelText: widget.codigoLabel ?? 'Código encontrado',
                   hintText: widget.codigoHint,
+                  filled: !_isEditingCodigo,
+                  fillColor: !_isEditingCodigo ? AppTheme.surfaceVariant : AppTheme.surface,
                   prefixIcon:
-                      const Icon(Icons.qr_code_rounded, size: 18),
+                      Icon(Icons.qr_code_rounded, size: 18, color: !_isEditingCodigo ? AppTheme.textSecondary : AppTheme.primary),
+                  suffixIcon: !_isEditingCodigo
+                      ? IconButton(
+                          icon: const Icon(Icons.edit_rounded, size: 20, color: AppTheme.primary),
+                          tooltip: 'Editar ${widget.codigoLabel ?? "código"}',
+                          onPressed: () => setState(() => _isEditingCodigo = true),
+                        )
+                      : null,
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 12),
                 ),

@@ -18,12 +18,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
   final _vistoriadorNomeCtrl = TextEditingController();
   final _vistoriadorCpfCtrl = TextEditingController();
 
-  final List<String> _tiposVistoria = [
-    'Vistoria Cautelar Automotiva',
-    'Vistoria Cautelar Caminhão',
-    'Vistoria Cautelar com Croqui',
-    'Vistoria Simples',
-  ];
+
 
   @override
   void initState() {
@@ -68,7 +63,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               _InfoRow(
                   icon: Icons.tag_rounded,
                   label: 'Número do Laudo',
-                  value: 'VST-${state.vistoriaId.substring(0, 8).toUpperCase()}'),
+                  value: state.numeroLaudo.isNotEmpty ? state.numeroLaudo : 'Carregando...'),
               const Divider(height: 1),
               _InfoRow(
                 icon: Icons.access_time_rounded,
@@ -82,30 +77,13 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
                 value: state.status,
                 valueColor: AppTheme.emAndamento,
               ),
+              const Divider(height: 1),
+              _InfoRow(
+                icon: Icons.category_rounded,
+                label: 'Tipo de Vistoria',
+                value: state.tipoVistoria,
+              ),
             ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Tipo de vistoria ─────────────────────────────────────────────
-          DropdownButtonFormField<String>(
-            value: _tiposVistoria.contains(state.tipoVistoria)
-                ? state.tipoVistoria
-                : _tiposVistoria.first,
-            decoration: const InputDecoration(
-              labelText: 'Tipo de Vistoria',
-              prefixIcon: Icon(Icons.category_rounded, color: AppTheme.primary),
-            ),
-            items: _tiposVistoria.map((t) {
-              return DropdownMenuItem(value: t, child: Text(t));
-            }).toList(),
-            onChanged: (v) {
-              if (v != null) {
-                state.tipoVistoria = v;
-                // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
-                state.notifyListeners();
-              }
-            },
           ),
           const SizedBox(height: 14),
 

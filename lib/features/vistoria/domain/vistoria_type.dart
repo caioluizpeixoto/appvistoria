@@ -8,11 +8,11 @@ enum TipoVistoria {
   String get titulo {
     switch (this) {
       case TipoVistoria.cautelarCarro:
-        return 'Vistoria Cautelar Automotiva';
+        return 'Vistoria Cautelar Croqui';
       case TipoVistoria.cautelarCaminhao:
         return 'Vistoria Cautelar Caminhão';
       case TipoVistoria.carroComCroqui:
-        return 'Vistoria Cautelar com Croqui';
+        return 'Vistoria Cautelar Croqui + Avarias';
     }
   }
 
@@ -34,7 +34,7 @@ enum TipoVistoria {
       case TipoVistoria.cautelarCaminhao:
         return Icons.local_shipping_rounded;
       case TipoVistoria.carroComCroqui:
-        return Icons.account_tree_rounded;
+        return Icons.car_repair_rounded;
     }
   }
 
