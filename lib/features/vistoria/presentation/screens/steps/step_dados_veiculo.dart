@@ -108,37 +108,6 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Botão Vincular Cautelar / Pesquisa BIN (T16)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: () async {
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => const Center(child: CircularProgressIndicator()),
-                );
-                await Future.delayed(const Duration(seconds: 2));
-                if (mounted) {
-                  Navigator.pop(context); // fecha loading
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Pesquisa BIN atualizada e Cautelar vinculada!'),
-                      backgroundColor: AppTheme.primary,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              icon: const Icon(Icons.cloud_sync_rounded),
-              label: const Text('Vincular Cautelar / Atualizar Pesquisa BIN', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            ),
-          ),
-          const SizedBox(height: 24),
 
           _buildSection(
             icon: Icons.directions_car_rounded,

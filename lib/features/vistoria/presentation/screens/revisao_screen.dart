@@ -216,11 +216,13 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusSugerido = state?.statusSugerido ?? 'Em andamento';
+    final statusFinal = (state != null && state!.resultadoFinal.isNotEmpty)
+        ? state!.resultadoFinal
+        : (state?.statusSugerido ?? 'Em andamento');
     final totalFotos = state?.totalFotos ?? 0;
 
     Color statusColor;
-    switch (statusSugerido) {
+    switch (statusFinal) {
       case 'Conforme':
         statusColor = AppTheme.conforme;
         break;
@@ -245,13 +247,13 @@ class _StatusCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Status Sugerido',
+          const Text('Resultado Final do Laudo',
               style: TextStyle(fontSize: 12, color: Colors.white70)),
           const SizedBox(height: 4),
           Text(
-            statusSugerido,
+            statusFinal.toUpperCase(),
             style: const TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: Colors.white),
           ),

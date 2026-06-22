@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../database/app_database.dart';
+import '../../features/vistoria/domain/vistoria_type.dart';
 import '../../features/vistoria/domain/vistoria_wizard_state.dart';
 
 // ── Paleta PDF ──────────────────────────────────────────────────────────────
@@ -80,10 +81,10 @@ class PdfGeneratorService {
     // Página 1 — Dados Gerais
     pdf.addPage(await _buildPage1(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage));
 
-    final tipoLower = vistoria.tipoVistoria?.toLowerCase() ?? '';
-    final temCroqui = tipoLower.contains('cautelar');
-    final temAvarias = tipoLower.contains('avarias') || tipoLower.contains('caminh');
-    final isCaminhao = tipoLower.contains('caminh');
+    final tipoEnum = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
+    final isCaminhao = tipoEnum == TipoVistoria.cautelarCaminhao;
+    final temCroqui = tipoEnum != TipoVistoria.cautelarCaminhao;
+    final temAvarias = tipoEnum == TipoVistoria.carroComCroqui;
     final bgImage = isCaminhao ? caminhaoEstruturaImage : carroEstruturaImage;
 
     // ── Geração de Fotos Padronizada (Item 15) ──────────────────────────────
@@ -101,20 +102,22 @@ class PdfGeneratorService {
         'vidro_traseiro',
         'vidro_dianteiro_direito',
         'vidro_dianteiro_esquerdo',
-        'vidro_traseiro_direito',
-        'vidro_traseiro_esquerdo',
+        if (!isCaminhao) 'vidro_traseiro_direito',
+        if (!isCaminhao) 'vidro_traseiro_esquerdo',
+        if (isCaminhao) 'plaqueta_da_cabine',
+        if (isCaminhao) 'Plaqueta da cabine',
         if (wizardState != null) ...wizardState.vidrosExtrasIds,
       ],
       'FOTOS PRINCIPAIS - MOTOR / CHASSI': [
-        'painel_hodometro',
-        'compartimento_motor',
+        if (!isCaminhao) 'painel_hodometro',
+        if (!isCaminhao) 'compartimento_motor',
         'motor_gravacao',
         'cambio_gravacao',
-        'etiqueta_vis_motor',
-        'etiqueta_vis_porta',
+        if (!isCaminhao) 'etiqueta_vis_motor',
+        if (!isCaminhao) 'etiqueta_vis_porta',
         'chassi_gravacao',
       ],
-      if (temCroqui) 'FOTOS - ESTRUTURAL': [
+      if (temCroqui && !isCaminhao) 'FOTOS - ESTRUTURAL': [
         'longarina_dianteira_esquerda',
         'longarina_dianteira_direita',
         'longarina_centro_esquerda',
@@ -122,7 +125,7 @@ class PdfGeneratorService {
         'longarina_traseira_esquerda',
         'longarina_traseira_direita',
       ],
-      if (temAvarias) 'FOTOS - PINTURA': [
+      if (temAvarias && !isCaminhao) 'FOTOS - PINTURA': [
         'peca_capo_dianteiro',
         'peca_paralama_dianteiro_esquerdo',
         'peca_porta_dianteira_esquerda',
@@ -177,60 +180,11 @@ class PdfGeneratorService {
               styles: styles,
               logo: logoImage,
               assinatura: assinaturaImage,
+              state: wizardState,
             ));
           }
         }
-
-        // Inserir croqui logo após as fotos da seção correspondente
-        if (tituloSecao == 'FOTOS - ESTRUTURAL' && temCroqui) {
-          pdf.addPage(_buildPageAnalise(
-            titulo: 'ANÁLISE ESTRUTURAL',
-            itens: const [
-              'longarina_dianteira_direita', 'longarina_dianteira_esquerda',
-              'longarina_centro_direita', 'longarina_centro_esquerda',
-              'longarina_traseira_direita', 'longarina_traseira_esquerda',
-              'painel_frontal', 'painel_traseiro', 'assoalho', 'caixa_roda',
-            ],
-            labels: const {
-              'longarina_dianteira_direita': 'Longarina Dianteira Direita',
-              'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
-              'longarina_centro_direita': 'Longarina Centro Direita',
-              'longarina_centro_esquerda': 'Longarina Centro Esquerda',
-              'longarina_traseira_direita': 'Longarina Traseira Direita',
-              'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
-              'painel_frontal': 'Painel Frontal',
-              'painel_traseiro': 'Painel Traseiro',
-              'assoalho': 'Assoalho',
-              'caixa_roda': 'Caixa de Roda',
-            },
-            state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
-          ));
-        } else if (tituloSecao == 'FOTOS - PINTURA' && temAvarias) {
-          pdf.addPage(_buildPageAnalise(
-            titulo: 'ANÁLISE DE PINTURA',
-            itens: const [
-              'peca_capo_dianteiro', 'peca_paralama_dianteiro_direito',
-              'peca_paralama_dianteiro_esquerdo', 'peca_porta_dianteira_direita',
-              'peca_porta_dianteira_esquerda', 'peca_porta_traseira_direita',
-              'peca_porta_traseira_esquerda', 'peca_lateral_traseira_direita',
-              'peca_lateral_traseira_esquerda', 'peca_teto', 'peca_tampa_traseira',
-            ],
-            labels: const {
-              'peca_capo_dianteiro': 'Capô Dianteiro',
-              'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
-              'peca_paralama_dianteiro_esquerdo': 'Para-lama Dianteiro Esquerdo',
-              'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
-              'peca_porta_dianteira_esquerda': 'Porta Dianteira Esquerda',
-              'peca_porta_traseira_direita': 'Porta Traseira Direita',
-              'peca_porta_traseira_esquerda': 'Porta Traseira Esquerda',
-              'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
-              'peca_lateral_traseira_esquerda': 'Lateral Traseira Esquerda',
-              'peca_teto': 'Teto',
-              'peca_tampa_traseira': 'Tampa Traseira',
-            },
-            isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroPinturaImage ?? bgImage, assinatura: assinaturaImage,
-          ));
-        }
+        // Croquis foram movidos para fora deste loop para garantir geração.
       }
 
       // Adicionar Fotos Extras (T2)
@@ -267,6 +221,59 @@ class PdfGeneratorService {
       }
     }
 
+    // ── Páginas de Croqui (Sempre geradas se aplicável) ──────────────────────
+    if (temCroqui && !isCaminhao) {
+      pdf.addPage(_buildPageAnalise(
+        titulo: 'ANÁLISE ESTRUTURAL',
+        itens: const [
+          'longarina_dianteira_direita', 'longarina_dianteira_esquerda',
+          'longarina_centro_direita', 'longarina_centro_esquerda',
+          'longarina_traseira_direita', 'longarina_traseira_esquerda',
+          'painel_frontal', 'painel_traseiro', 'assoalho', 'caixa_roda',
+        ],
+        labels: const {
+          'longarina_dianteira_direita': 'Longarina Dianteira Direita',
+          'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
+          'longarina_centro_direita': 'Longarina Centro Direita',
+          'longarina_centro_esquerda': 'Longarina Centro Esquerda',
+          'longarina_traseira_direita': 'Longarina Traseira Direita',
+          'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
+          'painel_frontal': 'Painel Frontal',
+          'painel_traseiro': 'Painel Traseiro',
+          'assoalho': 'Assoalho',
+          'caixa_roda': 'Caixa de Roda',
+        },
+        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
+      ));
+    }
+
+    if (temAvarias && !isCaminhao) {
+      pdf.addPage(_buildPageAnalise(
+        titulo: 'ANÁLISE DE PINTURA',
+        itens: const [
+          'peca_capo_dianteiro', 'peca_paralama_dianteiro_direito',
+          'peca_paralama_dianteiro_esquerdo', 'peca_porta_dianteira_direita',
+          'peca_porta_dianteira_esquerda', 'peca_porta_traseira_direita',
+          'peca_porta_traseira_esquerda', 'peca_lateral_traseira_direita',
+          'peca_lateral_traseira_esquerda', 'peca_teto', 'peca_tampa_traseira',
+        ],
+        labels: const {
+          'peca_capo_dianteiro': 'Capô Dianteiro',
+          'peca_paralama_dianteiro_direito': 'Para-lama Dianteiro Direito',
+          'peca_paralama_dianteiro_esquerdo': 'Para-lama Dianteiro Esquerdo',
+          'peca_porta_dianteira_direita': 'Porta Dianteira Direita',
+          'peca_porta_dianteira_esquerda': 'Porta Dianteira Esquerda',
+          'peca_porta_traseira_direita': 'Porta Traseira Direita',
+          'peca_porta_traseira_esquerda': 'Porta Traseira Esquerda',
+          'peca_lateral_traseira_direita': 'Lateral Traseira Direita',
+          'peca_lateral_traseira_esquerda': 'Lateral Traseira Esquerda',
+          'peca_teto': 'Teto',
+          'peca_tampa_traseira': 'Tampa Traseira',
+        },
+        isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroPinturaImage ?? bgImage, assinatura: assinaturaImage,
+      ));
+    }
+
     if (!hasAnyPhoto) {
       pdf.addPage(_buildPageFotosGrid(
         titulo: 'FOTOS DA VISTORIA',
@@ -279,6 +286,15 @@ class PdfGeneratorService {
       ));
     }
 
+    // Inserir a página de Disclaimer no final
+    pdf.addPage(_buildPageDisclaimer(
+      vistoria: vistoria,
+      styles: styles,
+      logo: logoImage,
+      assinatura: assinaturaImage,
+      state: wizardState,
+    ));
+
     final bytes = await pdf.save();
     final dir = await getApplicationDocumentsDirectory();
     final fileName = 'Laudo_${vistoria.numeroLaudo}_${DateTime.now().millisecondsSinceEpoch}.pdf';
@@ -286,6 +302,68 @@ class PdfGeneratorService {
     await file.writeAsBytes(bytes);
 
     return file.path;
+  }
+
+  // ── Página de Disclaimer ─────────────────────────────────────────────────
+
+  pw.Page _buildPageDisclaimer({
+    required Vistoria vistoria,
+    required _PdfStyles styles,
+    pw.ImageProvider? logo,
+    pw.ImageProvider? assinatura,
+    VistoriaWizardState? state,
+  }) {
+    return pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(16),
+      build: (ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildHeader(vistoria, styles, logo, state: state),
+            _buildBlackBar('DISCLAIMER DE SERVIÇO', styles),
+            pw.SizedBox(height: 16),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _disclaimerText('Este laudo trata-se da vistoria cautelar do veículo, possuindo caráter informativo da análise de itens, conforme padrões estabelecidos pelos fabricantes.', styles),
+                  _disclaimerText('NÃO substituindo em nenhuma hipótese a Perícia Oficial do Instituto de Criminalística.', styles, bold: true),
+                  _disclaimerText('Cabe destacar que a unidade não se responsabiliza por quaisquer modificações nos itens do veículo contemplados nesta vistoria, posteriores à realização deste laudo, cuja validade tem sua garantia certificada no momento da realização da vistoria.', styles),
+                  _disclaimerText('O resultado do laudo técnico segue critérios de avaliação estabelecidos, podendo sofrer alterações necessárias em determinado momento, sem prévia comunicação.', styles),
+                  _disclaimerText('As informações dos veículos, obtidas através de pesquisa via base de dados dos órgãos públicos e empresas privadas, são de responsabilidade da empresa fornecedora da pesquisa, cabendo apenas reiterar os dados cadastrados nas referidas bases de consulta.', styles),
+                  _disclaimerText('Ao receber este laudo, o cliente fica ciente que as companhias de seguro possuem métodos e critérios próprios de avaliação do risco para aceitação ou não de veículos.', styles),
+                  _disclaimerText('Não obstante, o critério de avaliação bem como o resultado final da vistoria, independe da aceitação ou não da seguradora.', styles),
+                  _disclaimerText('Importante notar que NÃO são examinados itens de mecânica, elétrica, transmissão, suspensão e freios.', styles, bold: true),
+                  _disclaimerText('A análise de pintura é realizada através de medidores digitais que informam a espessura da camada de tinta, apenas em caráter informativo de retoques ou reparos expressivos em sua lataria, que não afetam a estrutura do veículo, NÃO apontamos pequenos riscos nem desgastes na pintura.', styles),
+                  _disclaimerText('NÃO nos responsabilizamos por defeitos ou fraudes em equipamentos de Air-Bag.', styles, bold: true),
+                  _disclaimerText('A verificação da numeração da caixa de câmbio somente é realizada se tal item está aparente, sem a necessidade de desmontar partes do veículo que tornem a gravação obstruída.', styles),
+                  _disclaimerText('A vistoria cautelar não afere a idoneidade da quilometragem constante no hodômetro do veículo, sendo apenas registrado em caráter informativo a quilometragem aparente em seu painel de instrumentos.', styles),
+                  _disclaimerText('Alguns itens obrigatórios e acessórios como pneus, setas, cintos e outros acessórios, são apenas informados quanto à sua existência e funcionamento mínimo, não sendo atestada calibração ou cumprimento de normas técnicas específicas.', styles),
+                  _disclaimerText('A análise proposta é particular, restrita exclusivamente aos itens analisados e não à vistoria regulamentada pelo CONTRAN ou à perícia realizada pelo Instituto de Criminalística.', styles),
+                ],
+              ),
+            ),
+            _buildFooter(vistoria, styles, ctx, assinatura),
+          ],
+        );
+      },
+    );
+  }
+
+  pw.Widget _disclaimerText(String text, _PdfStyles styles, {bool bold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 8),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          font: bold ? styles.bold : styles.regular,
+          fontSize: 9,
+          color: _kBlack,
+        ),
+        textAlign: pw.TextAlign.justify,
+      ),
+    );
   }
 
   // ── Seções Compartilhadas ────────────────────────────────────────────────
@@ -299,10 +377,27 @@ class PdfGeneratorService {
         statusFinal = state.statusSugerido;
       }
     }
-    final isConforme = statusFinal.toUpperCase().contains('CONFORME');
+    
+    PdfColor bgColor;
+    String svgIcon;
+    final lowerStatus = statusFinal.toLowerCase();
+    
+    if (lowerStatus == 'conforme') {
+      bgColor = _kGreen;
+      svgIcon = '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+    } else if (lowerStatus.contains('observaç')) {
+      bgColor = _kOrange;
+      svgIcon = '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+    } else if (lowerStatus.contains('reprovado') || lowerStatus.contains('não conforme')) {
+      bgColor = _kRed;
+      svgIcon = '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+    } else {
+      bgColor = PdfColor.fromInt(0xFF2196F3); // Azul
+      svgIcon = '<svg viewBox="0 0 24 24"><path fill="white" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/></svg>';
+    }
 
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 8),
+      margin: const pw.EdgeInsets.only(bottom: 12),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
@@ -317,32 +412,39 @@ class PdfGeneratorService {
                 ? pw.ClipOval(child: pw.Image(logo, fit: pw.BoxFit.cover))
                 : pw.Center(child: pw.Text('Logo', style: pw.TextStyle(color: _kGreyDark, fontSize: 10))),
           ),
-          pw.SizedBox(width: 20),
+          pw.SizedBox(width: 16),
           // Numero do Laudo
           pw.Expanded(
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               mainAxisAlignment: pw.MainAxisAlignment.center,
               children: [
-                pw.Text('Número do Laudo:', style: pw.TextStyle(font: styles.bold, fontSize: 10)),
-                pw.Text(vistoria.numeroLaudo, style: pw.TextStyle(font: styles.bold, fontSize: 11, color: _kRed)),
+                pw.Text('LAUDO CAUTELAR', style: pw.TextStyle(font: styles.bold, fontSize: 14, color: _kBlack)),
+                pw.SizedBox(height: 4),
+                pw.Text('Número do Laudo: ${vistoria.numeroLaudo}', style: pw.TextStyle(font: styles.bold, fontSize: 10, color: _kGreyDark)),
               ],
             ),
           ),
           // Status Pill
           pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: pw.BoxDecoration(
-              color: isConforme ? _kGreen : _kRed,
-              borderRadius: pw.BorderRadius.circular(20),
+              color: bgColor,
+              borderRadius: pw.BorderRadius.circular(8),
             ),
             child: pw.Row(
+              mainAxisSize: pw.MainAxisSize.min,
               children: [
-                pw.Text(statusFinal.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 12, color: _kWhite)),
+                pw.Container(
+                  width: 14, height: 14,
+                  child: pw.SvgImage(svg: svgIcon),
+                ),
+                pw.SizedBox(width: 8),
+                pw.Text(statusFinal.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 11, color: _kWhite)),
               ],
             ),
           ),
-          pw.SizedBox(width: 10),
+          pw.SizedBox(width: 16),
           // QR Code
           pw.BarcodeWidget(
             barcode: pw.Barcode.qrCode(),
@@ -407,16 +509,16 @@ class PdfGeneratorService {
             ],
           ),
           pw.SizedBox(height: 8),
-          pw.Text(
-            'Isenção informada: declaro ter recebido a segunda via e EXAME VISTORIA VEICULAR... [Texto de isenção placeholder]... Qualquer dúvida estamos à disposição.',
-            style: pw.TextStyle(font: styles.regular, fontSize: 5, color: _kGreyDark),
-            textAlign: pw.TextAlign.justify,
-          ),
-          pw.Container(
-            margin: const pw.EdgeInsets.only(top: 4, bottom: 2),
-            height: 1, color: _kBlack,
-          ),
-          pw.Text('NULL', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: _kGreyDark)),
+          // pw.Text(
+          //   'Isenção informada: declaro ter recebido a segunda via e EXAME VISTORIA VEICULAR... [Texto de isenção placeholder]... Qualquer dúvida estamos à disposição.',
+          //   style: pw.TextStyle(font: styles.regular, fontSize: 5, color: _kGreyDark),
+          //   textAlign: pw.TextAlign.justify,
+          // ),
+          // pw.Container(
+          //   margin: const pw.EdgeInsets.only(top: 4, bottom: 2),
+          //   height: 1, color: _kBlack,
+          // ),
+          // pw.Text('NULL', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: _kGreyDark)),
         ],
       ),
     );
@@ -432,6 +534,15 @@ class PdfGeneratorService {
     pw.ImageProvider? logo,
     pw.ImageProvider? assinatura,
   }) async {
+    String computedStatus = vistoria.statusFinal ?? 'CONFORME';
+    if (state != null) {
+      if (state.resultadoFinal.isNotEmpty) {
+        computedStatus = state.resultadoFinal;
+      } else if (state.statusSugerido.isNotEmpty) {
+        computedStatus = state.statusSugerido;
+      }
+    }
+
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(16),
@@ -451,7 +562,7 @@ class PdfGeneratorService {
                   decoration: const pw.BoxDecoration(color: _kGreyLight),
                   children: [
                     _th('DATA:', styles), _td(_formatDate(vistoria.dataHora), styles),
-                    _th('STATUS:', styles), _td(vistoria.statusFinal ?? 'CONFORME', styles),
+                    _th('STATUS:', styles), _td(computedStatus.toUpperCase(), styles),
                   ],
                 ),
                 pw.TableRow(

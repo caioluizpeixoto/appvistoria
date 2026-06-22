@@ -394,7 +394,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               await dao.buscarPorId(veiculoExistente.vistoriaId);
           if (vistoriaAnterior != null) {
             final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
-            if (diff.inHours <= 72) {
+            if (diff.inHours <= 72 && vistoriaAnterior.tipoVistoria == widget.tipo.titulo) {
               reuse = true;
             }
           }

@@ -67,7 +67,7 @@ class _StepConclusaoState extends State<StepConclusao> {
     if (imageBytes == null) return;
 
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/assinatura_${state.vistoriaId}.png');
+    final file = File('${dir.path}/assinatura_${state.vistoriaId}_${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(imageBytes);
 
     state.assinaturaPath = file.path;
@@ -125,30 +125,55 @@ class _StepConclusaoState extends State<StepConclusao> {
         children: [
           // ── Status sugerido ──────────────────────────────────────────────
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+              gradient: LinearGradient(
+                colors: [
+                  _resultadoColor(state.statusSugerido),
+                  _resultadoColor(state.statusSugerido).withValues(alpha: 0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: _resultadoColor(state.statusSugerido).withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
             ),
             child: Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded,
-                    color: AppTheme.primary, size: 20),
-                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded,
+                      color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Status Sugerido pelo Sistema',
-                          style: TextStyle(
-                              fontSize: 12, color: AppTheme.textSecondary)),
+                      const Text(
+                        'Status Sugerido pelo Sistema',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
                       Text(
                         state.statusSugerido,
-                        style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _resultadoColor(state.statusSugerido)),
+                        style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white),
                       ),
                     ],
                   ),
@@ -157,70 +182,77 @@ class _StepConclusaoState extends State<StepConclusao> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 32),
 
           // ── Resultado final ──────────────────────────────────────────────
           const Text('Resultado Final do Laudo',
               style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                   color: AppTheme.textPrimary)),
-          const SizedBox(height: 10),
-
-          ...(_resultados.map((r) {
-            final isSelected = state.resultadoFinal == r;
-            final color = _resultadoColor(r);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
+          const SizedBox(height: 16),
+          
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.05,
+            children: _resultados.map((r) {
+              final isSelected = state.resultadoFinal == r;
+              final color = _resultadoColor(r);
+              return InkWell(
                 onTap: () {
                   state.resultadoFinal = r;
                   // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
                   state.notifyListeners();
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(14),
+                borderRadius: BorderRadius.circular(16),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? color.withValues(alpha: 0.12)
-                        : AppTheme.surface,
-                    borderRadius: BorderRadius.circular(10),
+                    color: isSelected ? color : AppTheme.surface,
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: isSelected ? color : AppTheme.border,
                       width: isSelected ? 2 : 1,
                     ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: color.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            )
+                          ]
+                        : [],
                   ),
-                  child: Row(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(_resultadoIcon(r), color: color, size: 22),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(r,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                              color: isSelected ? color : AppTheme.textPrimary,
-                            )),
+                      Icon(
+                        _resultadoIcon(r),
+                        color: isSelected ? Colors.white : color,
+                        size: 38,
                       ),
-                      if (isSelected)
-                        Container(
-                          padding: const EdgeInsets.all(3),
-                          decoration: BoxDecoration(
-                            color: color,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.check_rounded,
-                              color: Colors.white, size: 14),
+                      const SizedBox(height: 12),
+                      Text(
+                        r,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isSelected ? Colors.white : AppTheme.textPrimary,
                         ),
+                      ),
                     ],
                   ),
                 ),
-              ),
-            );
-          })),
+              );
+            }).toList(),
+          ),
 
           const SizedBox(height: 20),
 
@@ -381,7 +413,12 @@ class _StepConclusaoState extends State<StepConclusao> {
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 side: const BorderSide(color: AppTheme.naoConforme),
                               ),
-                              onPressed: () => _signatureController.clear(),
+                              onPressed: () {
+                                _signatureController.clear();
+                                state.assinaturaPath = null;
+                                // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+                                state.notifyListeners();
+                              },
                               icon: const Icon(Icons.clear_rounded,
                                   color: AppTheme.naoConforme, size: 18),
                               label: const Text('Limpar',

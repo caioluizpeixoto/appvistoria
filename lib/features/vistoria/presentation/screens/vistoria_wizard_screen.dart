@@ -44,9 +44,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   bool _isSaving = false;
 
   List<_StepInfo> get _activeSteps {
-    final tipoLower = _wizardState.tipoVistoria.toLowerCase();
-    final temCroqui = tipoLower.contains('cautelar');
-    final temAvarias = tipoLower.contains('avarias') || tipoLower.contains('caminh');
+    final temCroqui = _wizardState.temCroqui;
+    final temAvarias = _wizardState.temAvarias;
     
     return [
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
@@ -276,6 +275,13 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
   }
 
+  Future<void> _salvarESair() async {
+    await _salvar();
+    if (mounted) {
+      context.go('/home');
+    }
+  }
+
   Future<void> _proximo() async {
     // Salvar automaticamente ao avançar
     await _salvar();
@@ -310,7 +316,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Sair da Vistoria?'),
+        title: Text('Vistoria: ${_wizardState.tipoVistoria}', style: const TextStyle(fontSize: 16)),
         content: const Text(
             'O progresso foi salvo. Você pode retomar depois pelo histórico.'),
         actions: [
@@ -437,8 +443,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                               color: Colors.white, strokeWidth: 2),
                         )
                       : const Icon(Icons.save_rounded),
-                  tooltip: 'Salvar',
-                  onPressed: _salvar,
+                  tooltip: 'Salvar e Sair',
+                  onPressed: _salvarESair,
                 ),
               ],
               bottom: PreferredSize(
@@ -475,8 +481,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       const StepPainelHodometro(),
                       const StepMotorCambio(),
                       const StepEtiquetasChassi(),
-                      if (_wizardState.tipoVistoria.toLowerCase().contains('cautelar')) const StepEstrutura(),
-                      if (_wizardState.tipoVistoria.toLowerCase().contains('avarias') || _wizardState.tipoVistoria.toLowerCase().contains('caminh')) const StepPintura(),
+                      if (_wizardState.temCroqui) const StepEstrutura(),
+                      if (_wizardState.temAvarias) const StepPintura(),
                       const StepObservacoes(),
                       const StepFotosExtras(),
                       const StepDadosVeiculo(),

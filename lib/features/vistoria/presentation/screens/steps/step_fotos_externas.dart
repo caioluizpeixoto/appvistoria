@@ -18,7 +18,6 @@ class StepFotosExternas extends StatelessWidget {
   ];
 
   static const List<String> _statusOpcoes = [
-    'Em perfeito estado',
     'Dentro dos padrões',
     'Possui avaria',
     'Com observação',

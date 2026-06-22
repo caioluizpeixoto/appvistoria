@@ -32,6 +32,16 @@ class StepVidros extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.watch<VistoriaWizardState>();
     final vidrosExtrasIds = state.vidrosExtrasIds;
+    final isCaminhao = state.isCaminhao;
+
+    final itensFiltrados = _itensPrincipais.where((item) {
+      if (isCaminhao) {
+        if (item['id'] == 'vidro_traseiro_direito' || item['id'] == 'vidro_traseiro_esquerdo') {
+          return false;
+        }
+      }
+      return true;
+    }).toList();
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -42,7 +52,7 @@ class StepVidros extends StatelessWidget {
           subtitle: 'Registre as gravações encontradas em cada vidro',
         ),
         const SizedBox(height: 16),
-        ..._itensPrincipais.map((item) => InspecaoItemWidget(
+        ...itensFiltrados.map((item) => InspecaoItemWidget(
               itemId: item['id']!,
               label: item['label']!,
               statusOptions: _statusOpcoes,

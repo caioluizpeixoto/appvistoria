@@ -55,4 +55,11 @@ enum TipoVistoria {
       orElse: () => TipoVistoria.cautelarCarro,
     );
   }
+
+  static TipoVistoria fromString(String val) {
+    final lower = val.toLowerCase();
+    if (lower.contains('caminh')) return TipoVistoria.cautelarCaminhao;
+    if (lower.contains('avaria') || lower.contains('pintura')) return TipoVistoria.carroComCroqui;
+    return TipoVistoria.cautelarCarro; // default fallback
+  }
 }

@@ -12,6 +12,7 @@ class StepMotorCambio extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<VistoriaWizardState>();
+    final isCaminhao = state.isCaminhao;
     final motorDivergente = state.motorBin.isNotEmpty &&
         state.motorVeiculo.isNotEmpty &&
         state.motorBin != state.motorVeiculo;
@@ -34,18 +35,18 @@ class StepMotorCambio extends StatelessWidget {
 
         const SizedBox(height: 12),
 
-        const InspecaoItemWidget(
-          itemId: 'compartimento_motor',
-          label: 'Compartimento do Motor',
-          obrigatoria: true,
-          statusOptions: [
-            'Em perfeito estado',
-            'Dentro dos padrões',
-            'Possui avaria',
-            'Com observação',
-            'Não analisado',
-          ],
-        ),
+        if (!isCaminhao)
+          const InspecaoItemWidget(
+            itemId: 'compartimento_motor',
+            label: 'Compartimento do Motor',
+            obrigatoria: true,
+            statusOptions: [
+              'Dentro dos padrões',
+              'Possui avaria',
+              'Com observação',
+              'Não analisado',
+            ],
+          ),
 
         InspecaoItemWidget(
           itemId: 'motor_gravacao',
@@ -84,20 +85,21 @@ class StepMotorCambio extends StatelessWidget {
           ],
         ),
 
-        const InspecaoItemWidget(
-          itemId: 'etiqueta_vis_motor',
-          label: 'Etiqueta VIS — Compartimento do Motor',
-          obrigatoria: true,
-          statusOptions: [
-            'Dentro dos padrões',
-            'Original',
-            'Ausente',
-            'Danificada',
-            'Divergente',
-            'Com indício de adulteração',
-            'Não localizado',
-          ],
-        ),
+        if (!isCaminhao)
+          const InspecaoItemWidget(
+            itemId: 'etiqueta_vis_motor',
+            label: 'Etiqueta VIS — Compartimento do Motor',
+            obrigatoria: true,
+            statusOptions: [
+              'Dentro dos padrões',
+              'Original',
+              'Ausente',
+              'Danificada',
+              'Divergente',
+              'Com indício de adulteração',
+              'Não localizado',
+            ],
+          ),
 
         const SizedBox(height: 32),
       ],
@@ -112,6 +114,7 @@ class StepEtiquetasChassi extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<VistoriaWizardState>();
+    final isCaminhao = state.tipoVistoria.toLowerCase().contains('caminh');
     final chaveDivergente = state.chassiBin.isNotEmpty &&
         state.chassiVeiculo.isNotEmpty &&
         state.chassiBin != state.chassiVeiculo;
@@ -119,20 +122,35 @@ class StepEtiquetasChassi extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const InspecaoItemWidget(
-          itemId: 'etiqueta_vis_porta',
-          label: 'Etiqueta VIS — Porta / Coluna',
-          obrigatoria: true,
-          statusOptions: [
-            'Dentro dos padrões',
-            'Original',
-            'Ausente',
-            'Danificada',
-            'Divergente',
-            'Com indício de adulteração',
-            'Não localizado',
-          ],
-        ),
+        if (!isCaminhao)
+          const InspecaoItemWidget(
+            itemId: 'etiqueta_vis_porta',
+            label: 'Etiqueta VIS — Porta / Coluna',
+            obrigatoria: true,
+            statusOptions: [
+              'Dentro dos padrões',
+              'Original',
+              'Ausente',
+              'Danificada',
+              'Divergente',
+              'Com indício de adulteração',
+              'Não localizado',
+            ],
+          ),
+
+        if (isCaminhao)
+          const InspecaoItemWidget(
+            itemId: 'plaqueta_da_cabine',
+            label: 'Plaqueta da cabine',
+            obrigatoria: true,
+            statusOptions: [
+              'Dentro dos padrões',
+              'Divergente',
+              'Remarcada',
+              'Não localizada',
+              'Ilegível',
+            ],
+          ),
 
         const SizedBox(height: 16),
 

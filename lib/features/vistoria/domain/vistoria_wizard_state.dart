@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'vistoria_type.dart';
 
 /// Estado compartilhado do wizard de vistoria.
 /// Mantém todos os dados temporários enquanto o vistoriador percorre as etapas.
@@ -65,6 +66,12 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Controle de loading ───────────────────────────────────────────────────
   bool isSaving = false;
 
+  // ── Flags Auxiliares ───────────────────────────────────────────────────────
+  TipoVistoria get tipoEnum => TipoVistoria.fromString(tipoVistoria);
+  bool get isCaminhao => tipoEnum == TipoVistoria.cautelarCaminhao;
+  bool get temCroqui => tipoEnum != TipoVistoria.cautelarCaminhao;
+  bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
+
   VistoriaWizardState({
     required this.vistoriaId,
     this.currentStep = 0,
@@ -72,7 +79,12 @@ class VistoriaWizardState extends ChangeNotifier {
 
   // ── Navegação ──────────────────────────────────────────────────────────────
 
-  int get totalSteps => tipoVistoria.toLowerCase().contains('cautelar') ? 12 : 10;
+  int get totalSteps {
+    int count = 10;
+    if (temCroqui) count++;
+    if (temAvarias) count++;
+    return count;
+  }
   bool get isFirstStep => currentStep == 0;
   bool get isLastStep => currentStep >= totalSteps - 1;
 
