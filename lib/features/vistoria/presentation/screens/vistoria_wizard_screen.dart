@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -5,10 +6,12 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
+import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
 import 'package:drift/drift.dart' as drift;
 
 import '../../domain/vistoria_wizard_state.dart';
+import '../../../consulta_bin/data/services/radar_service.dart';
 import 'steps/step_dados_gerais.dart';
 import 'steps/step_dados_veiculo.dart';
 import 'steps/step_fotos_externas.dart';
@@ -41,7 +44,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   late VistoriaWizardState _wizardState;
   late PageController _pageController;
   final _dao = sl<VistoriaDao>();
+  final _autocredDao = sl<AutocredDao>();
   bool _isSaving = false;
+  String _statusConsulta = 'nenhuma'; // 'pendente', 'concluida', 'erro', ou 'nenhuma'
+  StreamSubscription? _veiculoSub;
+  StreamSubscription? _consultaSub;
 
   List<_StepInfo> get _activeSteps {
     final temCroqui = _wizardState.temCroqui;
@@ -72,12 +79,189 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
     _pageController = PageController();
     _carregarEtapaAnterior();
+
+    _veiculoSub = _dao.watchVeiculoPorVistoria(widget.vistoriaId).listen((veiculo) {
+      if (veiculo != null && mounted) {
+        bool changed = false;
+        final s = _wizardState;
+        if (veiculo.placa.isNotEmpty) { s.placa = veiculo.placa; changed = true; }
+        if (veiculo.chassiVeiculo != null && veiculo.chassiVeiculo!.isNotEmpty) { s.chassiVeiculo = veiculo.chassiVeiculo!; changed = true; }
+        if (veiculo.chassiBin != null && veiculo.chassiBin!.isNotEmpty) { s.chassiBin = veiculo.chassiBin!; changed = true; }
+        if (veiculo.motorVeiculo != null && veiculo.motorVeiculo!.isNotEmpty) { s.motorVeiculo = veiculo.motorVeiculo!; changed = true; }
+        if (veiculo.motorBin != null && veiculo.motorBin!.isNotEmpty) { s.motorBin = veiculo.motorBin!; changed = true; }
+        if (veiculo.cambioVeiculo != null && veiculo.cambioVeiculo!.isNotEmpty) { s.cambioVeiculo = veiculo.cambioVeiculo!; changed = true; }
+        if (veiculo.cambioBin != null && veiculo.cambioBin!.isNotEmpty) { s.cambioBin = veiculo.cambioBin!; changed = true; }
+        if (veiculo.marca != null && veiculo.marca!.isNotEmpty) { s.marca = veiculo.marca!; changed = true; }
+        if (veiculo.modelo != null && veiculo.modelo!.isNotEmpty) { s.modelo = veiculo.modelo!; changed = true; }
+        if (veiculo.anoFabricacao != null && veiculo.anoFabricacao!.toString().isNotEmpty) { s.anoFabricacao = veiculo.anoFabricacao!.toString(); changed = true; }
+        if (veiculo.anoModelo != null && veiculo.anoModelo!.toString().isNotEmpty) { s.anoModelo = veiculo.anoModelo!.toString(); changed = true; }
+        if (veiculo.cor != null && veiculo.cor!.isNotEmpty) { s.cor = veiculo.cor!; changed = true; }
+        if (veiculo.renavam != null && veiculo.renavam!.isNotEmpty) { s.renavam = veiculo.renavam!; changed = true; }
+        if (veiculo.municipio != null && veiculo.municipio!.isNotEmpty) { s.municipio = veiculo.municipio!; changed = true; }
+        if (veiculo.uf != null && veiculo.uf!.isNotEmpty) { s.uf = veiculo.uf!; changed = true; }
+        if (veiculo.km != null && veiculo.km!.toString().isNotEmpty) { s.km = veiculo.km!.toString(); changed = true; }
+        if (veiculo.numeroGrv != null && veiculo.numeroGrv!.isNotEmpty) { s.numeroGrv = veiculo.numeroGrv!; changed = true; }
+        if (veiculo.combustivel != null && veiculo.combustivel!.isNotEmpty) { s.combustivel = veiculo.combustivel!; changed = true; }
+        if (changed) {
+          s.forceUpdate();
+        }
+      }
+    });
+
+    _consultaSub = _autocredDao.watchConsultaPorVistoria(widget.vistoriaId).listen((consulta) {
+      if (consulta != null && mounted) {
+        _wizardState.arquivoPesquisaUrl = consulta.arquivoPesquisaUrl ?? '';
+        final novoStatus = consulta.status;
+        if (_statusConsulta == 'pendente' && novoStatus == 'concluida') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Pesquisa Radar Consultas concluída! Os dados foram preenchidos.'),
+              backgroundColor: AppTheme.conforme,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        } else if (_statusConsulta == 'pendente' && novoStatus == 'erro') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ A pesquisa na Radar Consultas falhou.'),
+              backgroundColor: AppTheme.naoConforme,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        if (_statusConsulta != novoStatus) {
+          setState(() {
+            _statusConsulta = novoStatus;
+          });
+        }
+      }
+    });
   }
+
+  Future<void> _retryRadarConsulta() async {
+    final placa = _wizardState.placa;
+    if (placa.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A placa precisa estar preenchida para consultar.'), backgroundColor: AppTheme.naoConforme),
+      );
+      return;
+    }
+
+    final produto = await _showSelectProdutoDialog();
+    if (produto == null) return;
+
+    setState(() {
+      _statusConsulta = 'pendente';
+    });
+
+    try {
+      final service = sl<RadarService>();
+      final veiculoApi = await service.consultarVeiculo(
+        produto: produto,
+        param: 'placa',
+        value: placa,
+        vistoriaId: widget.vistoriaId,
+      ).timeout(const Duration(seconds: 40), onTimeout: () {
+        throw Exception("Tempo limite de pesquisa excedido.");
+      });
+      
+      // Atualizar o banco de dados com os dados retornados
+      final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
+      if (veiculoDb != null) {
+        await _dao.atualizarVeiculo(VeiculosCompanion(
+          id: drift.Value(veiculoDb.id),
+          vistoriaId: drift.Value(veiculoDb.vistoriaId),
+          placa: drift.Value(veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
+          chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
+          motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+          marca: drift.Value(veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo.split(' ')[0] : veiculoDb.marca),
+          modelo: drift.Value(veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo : veiculoDb.modelo),
+          anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
+          anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+          cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+          renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
+          chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
+          motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
+          municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
+          uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+        ));
+      }
+      
+      if (mounted) {
+        setState(() {
+          _statusConsulta = 'concluida';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('✅ Pesquisa Radar Consultas atualizada!'), backgroundColor: AppTheme.conforme),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _statusConsulta = 'erro';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Falha ao re-consultar: $e'), backgroundColor: AppTheme.naoConforme),
+        );
+      }
+    }
+  }
+
+  Future<String?> _showSelectProdutoDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Nova Consulta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Qual pesquisa deseja realizar?'),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('AUTO BIN (Simples)'),
+                onTap: () => Navigator.pop(ctx, 'auto_bin'),
+              ),
+              ListTile(
+                title: const Text('AUTO PERÍCIA'),
+                onTap: () => Navigator.pop(ctx, 'auto_pericia'),
+              ),
+              ListTile(
+                title: const Text('AUTO COMPLETA'),
+                onTap: () => Navigator.pop(ctx, 'auto_completa'),
+              ),
+              ListTile(
+                title: const Text('AUTO LEILÃO'),
+                onTap: () => Navigator.pop(ctx, 'auto_leilao'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
 
   Future<void> _carregarEtapaAnterior() async {
     final vistoria = await _dao.buscarPorId(widget.vistoriaId);
     if (vistoria != null) {
       _wizardState.numeroLaudo = vistoria.numeroLaudo;
+      _wizardState.clienteNome = vistoria.clienteNome ?? '';
+      _wizardState.vistoriadorNome = vistoria.vistoriadorNome ?? '';
+      _wizardState.vistoriadorCpf = vistoria.vistoriadorCpf ?? '';
+      _wizardState.unidade = vistoria.unidade ?? '';
+      _wizardState.assinaturaPath = vistoria.assinaturaPath;
+      _wizardState.observacoesVistoriador = vistoria.observacoesGerais ?? '';
+      _wizardState.parecerTecnico = vistoria.parecerTecnico ?? '';
+      _wizardState.resultadoFinal = vistoria.statusFinal ?? '';
+      _wizardState.status = vistoria.status;
       if (vistoria.tipoVistoria != null) {
         if (vistoria.tipoVistoria == 'cautelar_carro') {
           _wizardState.tipoVistoria = 'Vistoria Cautelar Automotiva';
@@ -100,6 +284,15 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         _wizardState.anoModelo = veiculo.anoModelo?.toString() ?? '';
         _wizardState.cor = veiculo.cor ?? '';
         _wizardState.renavam = veiculo.renavam ?? '';
+        _wizardState.chassiBin = veiculo.chassiBin ?? '';
+        _wizardState.motorBin = veiculo.motorBin ?? '';
+        _wizardState.cambioVeiculo = veiculo.cambioVeiculo ?? '';
+        _wizardState.cambioBin = veiculo.cambioBin ?? '';
+        _wizardState.km = veiculo.km?.toString() ?? '';
+        _wizardState.numeroGrv = veiculo.numeroGrv ?? '';
+        _wizardState.municipio = veiculo.municipio ?? '';
+        _wizardState.uf = veiculo.uf ?? '';
+        _wizardState.combustivel = veiculo.combustivel ?? '';
       }
     }
 
@@ -146,6 +339,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
   @override
   void dispose() {
+    _veiculoSub?.cancel();
+    _consultaSub?.cancel();
     _pageController.dispose();
     _wizardState.dispose();
     super.dispose();
@@ -230,7 +425,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
             itemId: drift.Value(itemId),
             pathLocal: drift.Value(path),
             ordem: drift.Value(i),
-            obrigatoria: drift.Value(VistoriaWizardState.fotosObrigatorias.contains(itemId)),
+            obrigatoria: drift.Value(s.fotosObrigatorias.contains(itemId)),
           ));
         }
       }
@@ -434,6 +629,53 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                 ],
               ),
               actions: [
+                if (_statusConsulta == 'pendente')
+                  const Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(right: 16),
+                      child: Tooltip(
+                        message: 'Pesquisando na base Radar Consultas...',
+                        child: SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_statusConsulta == 'concluida')
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Tooltip(
+                        message: 'Pesquisa Radar Consultas concluída. Clique para atualizar novamente.',
+                        child: InkWell(
+                          onTap: _retryRadarConsulta,
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_statusConsulta == 'erro')
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Tooltip(
+                        message: 'Erro na pesquisa Radar Consultas. Tocar para tentar novamente.',
+                        child: InkWell(
+                          onTap: _retryRadarConsulta,
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 IconButton(
                   icon: _isSaving
                       ? const SizedBox(

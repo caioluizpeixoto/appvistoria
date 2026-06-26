@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../database/app_database.dart';
+import '../../../../database/daos/autocred_dao.dart';
 
 class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
@@ -30,13 +33,46 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
 
   Future<List<Map<String, dynamic>>> _carregarHistorico() async {
     final dao = sl<VistoriaDao>();
+    final autocredDao = sl<AutocredDao>();
     final vistorias = await dao.listarVistorias();
     final lista = <Map<String, dynamic>>[];
     for (var v in vistorias) {
       final veiculo = await dao.buscarVeiculoPorVistoria(v.id);
+      var consulta = await autocredDao.buscarConsultaPorVistoria(v.id);
+      if (consulta == null && veiculo != null && veiculo.placa.isNotEmpty) {
+        final placaLimpa = veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+        consulta = await autocredDao.buscarConsultaPorPlaca(placaLimpa);
+        // Tenta também com a placa original caso tenha sido salva com traço
+        if (consulta == null) {
+          consulta = await autocredDao.buscarConsultaPorPlaca(veiculo.placa);
+        }
+      }
+      
+      String? webhookPdfUrl;
+      if (veiculo != null && veiculo.placa.isNotEmpty && (consulta == null || consulta.arquivoPesquisaUrl == null || consulta.arquivoPesquisaUrl!.isEmpty)) {
+        try {
+          final placaLimpa = veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+          final supabase = sl<SupabaseClient>();
+          final res = await supabase
+              .from('autocred_consultas')
+              .select('arquivo_pesquisa_url')
+              .eq('placa', placaLimpa)
+              .not('arquivo_pesquisa_url', 'is', null)
+              .order('created_at', ascending: false)
+              .limit(1);
+          if (res != null && (res as List).isNotEmpty) {
+            webhookPdfUrl = res.first['arquivo_pesquisa_url'] as String?;
+          }
+        } catch (e) {
+          // ignora
+        }
+      }
+
       lista.add({
         'vistoria': v,
         'veiculo': veiculo,
+        'consulta': consulta,
+        'webhookPdfUrl': webhookPdfUrl,
       });
     }
     return lista;
@@ -69,8 +105,12 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
             itemCount: itens.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
+              final item = itens[index];
               return _VistoriaCard(
-                item: itens[index],
+                vistoria: item['vistoria'],
+                veiculo: item['veiculo'],
+                consulta: item['consulta'],
+                webhookPdfUrl: item['webhookPdfUrl'] as String?,
                 onDelete: _recarregar,
               );
             },
@@ -82,16 +122,22 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
 }
 
 class _VistoriaCard extends StatelessWidget {
-  final Map<String, dynamic> item;
+  final Vistoria vistoria;
+  final dynamic veiculo;
+  final dynamic consulta;
+  final String? webhookPdfUrl;
   final VoidCallback onDelete;
 
-  const _VistoriaCard({required this.item, required this.onDelete});
+  const _VistoriaCard({
+    required this.vistoria,
+    required this.veiculo,
+    this.consulta,
+    this.webhookPdfUrl,
+    required this.onDelete,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final Vistoria vistoria = item['vistoria'];
-    final Veiculo? veiculo = item['veiculo'];
-
     final isEmAndamento = vistoria.status != 'concluido';
     final placa = (veiculo?.placa != null && veiculo!.placa.isNotEmpty) 
         ? veiculo.placa.toUpperCase() 
@@ -103,6 +149,50 @@ class _VistoriaCard extends StatelessWidget {
         return '${num.substring(0, 12).toUpperCase()}...';
       }
       return num;
+    }
+
+    void _handleEdit() {
+      if (vistoria.status == 'concluido') {
+        final diff = DateTime.now().difference(vistoria.updatedAt);
+        if (diff.inHours <= 72) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Retificar Laudo'),
+              content: Text('Este laudo foi concluído. Você tem ${72 - diff.inHours}h restantes para retificá-lo. Deseja reabrir a edição?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    context.push('/vistoria-wizard/${vistoria.id}');
+                  },
+                  child: const Text('Retificar'),
+                ),
+              ],
+            ),
+          );
+        } else {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Prazo Expirado'),
+              content: const Text('Este laudo foi concluído há mais de 72h e não pode mais ser alterado.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Fechar'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else {
+        context.push('/vistoria-wizard/${vistoria.id}');
+      }
     }
 
     return Container(
@@ -123,54 +213,11 @@ class _VistoriaCard extends StatelessWidget {
         children: [
           InkWell(
             borderRadius: BorderRadius.circular(16),
-            onTap: () {
-              if (vistoria.status == 'concluido') {
-                final diff = DateTime.now().difference(vistoria.updatedAt);
-                if (diff.inHours <= 72) {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Retificar Laudo'),
-                      content: Text('Este laudo foi concluído. Você tem ${72 - diff.inHours}h restantes para retificá-lo. Deseja reabrir a edição?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(ctx);
-                            context.push('/vistoria-wizard/${vistoria.id}');
-                          },
-                          child: const Text('Retificar'),
-                        ),
-                      ],
-                    ),
-                  );
-                } else {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: const Text('Prazo Expirado'),
-                      content: const Text('Este laudo foi concluído há mais de 72h e não pode mais ser alterado.'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Fechar'),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-              } else {
-                context.push('/vistoria-wizard/${vistoria.id}');
-              }
-            },
+            onTap: _handleEdit,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  // Ícone de status
                   Container(
                     width: 48,
                     height: 48,
@@ -185,7 +232,6 @@ class _VistoriaCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  // Dados do laudo
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -219,8 +265,14 @@ class _VistoriaCard extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
+                      vistoria.status == 'concluido' ? Icons.edit_document : Icons.edit_rounded,
+                      color: AppTheme.primary,
+                    ),
+                    tooltip: vistoria.status == 'concluido' ? 'Retificar Laudo' : 'Continuar Vistoria',
+                    onPressed: _handleEdit,
+                  ),
                   IconButton(
                     icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.naoConforme),
                     onPressed: () {
@@ -276,6 +328,42 @@ class _VistoriaCard extends StatelessWidget {
                 label: const Text('Ver Laudo em PDF', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
               ),
             ),
+          if (consulta != null || webhookPdfUrl != null) ...[
+            if ((consulta?.arquivoPesquisaUrl != null && consulta!.arquivoPesquisaUrl!.isNotEmpty) || (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.orange),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () async {
+                    final urlFinal = (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty) 
+                        ? webhookPdfUrl 
+                        : consulta?.arquivoPesquisaUrl;
+                    final uri = Uri.parse(urlFinal!);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: const Icon(Icons.cloud_download_rounded, color: Colors.orange, size: 20),
+                  label: const Text('Baixar Pesquisa Radar Consultas Original', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600)),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: null, // Desabilitado
+                  icon: const Icon(Icons.cloud_off_rounded, color: AppTheme.textHint, size: 20),
+                  label: const Text('Pesquisa Radar Consultas Sem PDF', style: TextStyle(color: AppTheme.textHint, fontWeight: FontWeight.w600)),
+                ),
+              )
+          ],
         ],
       ),
     );

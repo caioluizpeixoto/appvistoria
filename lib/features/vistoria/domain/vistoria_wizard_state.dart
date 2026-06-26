@@ -36,6 +36,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String uf = '';
   String km = '';
   String numeroGrv = '';
+  String arquivoPesquisaUrl = '';
 
   // ── Checklist de itens: status e observação por itemId ────────────────────
   // Todas as etapas de inspeção usam este mapa
@@ -213,20 +214,29 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Validação ─────────────────────────────────────────────────────────────
 
   /// Fotos obrigatórias que precisam estar preenchidas para gerar o PDF
-  static const List<String> fotosObrigatorias = [
-    'frente_direita',
-    'frente_esquerda',
-    'traseira_direita',
-    'traseira_esquerda',
-    'lateral_direita',
-    'lateral_esquerda',
-    'placa_dianteira',
-    'placa_traseira',
-    'compartimento_motor',
-    'painel_hodometro',
-    'chassi_gravacao',
-    'motor_gravacao',
-  ];
+  List<String> get fotosObrigatorias {
+    final list = [
+      'foto_placa',
+      'frente_direita',
+      'frente_esquerda',
+      'traseira_direita',
+      'traseira_esquerda',
+      'painel_hodometro',
+      'chassi_gravacao',
+      'motor_gravacao',
+      'cambio_gravacao',
+    ];
+    if (!isCaminhao) {
+      list.addAll([
+        'compartimento_motor',
+        'etiqueta_vis_motor',
+        'etiqueta_vis_porta',
+      ]);
+    } else {
+      list.add('plaqueta_da_cabine');
+    }
+    return list;
+  }
 
   List<String> get fotasObrigatoriasFaltando =>
       fotosObrigatorias.where((id) => !hasFoto(id)).toList();
@@ -269,10 +279,13 @@ class VistoriaWizardState extends ChangeNotifier {
   String get statusSugerido {
     final divs = itensDivergentes;
     if (divs.isEmpty && fotasObrigatoriasFaltando.isEmpty) {
-      final temObs = checklistStatus.values.any((s) =>
-          s.toLowerCase().contains('reparo') ||
-          s.toLowerCase().contains('observação') ||
-          s.toLowerCase().contains('repintura'));
+      final temObs = checklistStatus.values.any((s) {
+        final sl = s.toLowerCase();
+        if (sl.contains('sem reparo')) return false; // Ignorar pois é um status positivo
+        return sl.contains('reparo') ||
+               sl.contains('observação') ||
+               sl.contains('repintura');
+      });
       return temObs ? 'Conforme com observações' : 'Conforme';
     }
     if (divs.isNotEmpty) {

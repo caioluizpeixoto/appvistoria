@@ -331,7 +331,7 @@ class _FotosChecklist extends StatelessWidget {
     return _Card(
       title: 'Fotos Obrigatórias',
       icon: Icons.camera_alt_rounded,
-      children: VistoriaWizardState.fotosObrigatorias.map((id) {
+      children: state.fotosObrigatorias.map((id) {
         final has = state.hasFoto(id);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 5),

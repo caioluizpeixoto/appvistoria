@@ -5,8 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
-import '../../data/services/autocred_service.dart';
-import '../../domain/entities/autocred_historico.dart';
+import '../../data/services/radar_service.dart';
+import '../../domain/entities/radar_historico.dart';
 
 class HistoricoConsultasScreen extends StatefulWidget {
   const HistoricoConsultasScreen({super.key});
@@ -16,7 +16,7 @@ class HistoricoConsultasScreen extends StatefulWidget {
 }
 
 class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
-  List<AutoCredHistorico> _historico = [];
+  List<RadarHistorico> _historico = [];
   bool _isLoading = true;
 
   @override
@@ -28,7 +28,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
   Future<void> _carregarHistorico() async {
     setState(() => _isLoading = true);
     try {
-      final data = await sl<AutoCredService>().getHistorico();
+      final data = await sl<RadarService>().getHistorico();
       if (mounted) {
         setState(() {
           _historico = data;
@@ -45,7 +45,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
     }
   }
 
-  void _retificarConsulta(AutoCredHistorico item) {
+  void _retificarConsulta(RadarHistorico item) {
     if (!item.permiteRetificacao) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -165,7 +165,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                       Icon(Icons.picture_as_pdf_rounded, size: 16, color: AppTheme.conforme),
                                       SizedBox(width: 6),
                                       Text(
-                                        'Ver Relatório AutoCredCar',
+                                        'Ver Relatório Radar Consultas',
                                         style: TextStyle(
                                           color: AppTheme.conforme,
                                           fontWeight: FontWeight.w600,

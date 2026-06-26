@@ -6,8 +6,8 @@ import 'database/app_database.dart';
 import 'database/daos/vistoria_dao.dart';
 import 'database/daos/bin_dao.dart';
 import 'database/daos/autocred_dao.dart';
-import 'features/consulta_bin/data/repositories/autocred_repository.dart';
-import 'features/consulta_bin/data/services/autocred_service.dart';
+import 'features/consulta_bin/data/repositories/radar_repository.dart';
+import 'features/consulta_bin/data/services/radar_service.dart';
 import 'core/services/image_service.dart';
 import 'core/services/ocr_service.dart';
 import 'core/services/pdf_generator_service.dart';
@@ -15,6 +15,7 @@ import 'core/services/pdf_generator_service.dart';
 final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
+  await sl.reset();
   // ── Supabase ───────────────────────────────────────────────────────────────
   sl.registerLazySingleton<SupabaseClient>(
     () => Supabase.instance.client,
@@ -35,12 +36,12 @@ Future<void> initDependencies() async {
     () => sl<AppDatabase>().autocredDao,
   );
 
-  // ── AutoCredCar ───────────────────────────────────────────────────────────
-  sl.registerLazySingleton<AutoCredRepository>(
-    () => AutoCredRepository(supabase: sl<SupabaseClient>(), localDao: sl<AutocredDao>()),
+  // ── Radar Consultas ───────────────────────────────────────────────────────
+  sl.registerLazySingleton<RadarRepository>(
+    () => RadarRepository(supabase: sl<SupabaseClient>(), localDao: sl<AutocredDao>()),
   );
-  sl.registerLazySingleton<AutoCredService>(
-    () => AutoCredService(supabase: sl<SupabaseClient>(), repository: sl<AutoCredRepository>()),
+  sl.registerLazySingleton<RadarService>(
+    () => RadarService(supabase: sl<SupabaseClient>(), repository: sl<RadarRepository>()),
   );
 
   // ── Mock ──────────────────────────────────────────────────────────────────

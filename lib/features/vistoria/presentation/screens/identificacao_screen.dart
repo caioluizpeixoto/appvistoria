@@ -8,7 +8,7 @@ import '../../domain/vistoria_type.dart';
 import 'placa_camera_screen.dart';
 
 import '../../../../injection_container.dart';
-import '../../../../features/consulta_bin/data/services/autocred_service.dart';
+import '../../../../features/consulta_bin/data/services/radar_service.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
 import 'package:drift/drift.dart' as drift;
@@ -59,17 +59,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   // Modo de entrada da busca: 'placa', 'chassi', ou 'motor'
   String _modoEntrada = 'placa';
 
-  // Tipos de consulta disponíveis
+  // Tipos de consulta disponíveis (Radar Consultas)
   final List<Map<String, dynamic>> _tiposConsulta = [
-    {'nome': 'AUTO BIN AUTOMÁTICA', 'codigo': 26},
-    {'nome': 'AUTO BIN COMPLETA', 'codigo': 1},
-    {'nome': 'AUTO BASE ESTADUAL', 'codigo': 4},
-    {'nome': 'AUTO BIN + LEILÃO', 'codigo': 7},
-    {'nome': 'AUTO BIN', 'codigo': 42},
-    {'nome': 'AUTO GRAVAME COMPLETO', 'codigo': 126},
-    {'nome': 'DECODIFICADOR + FIPE', 'codigo': 148},
+    {'nome': 'AUTO BIN', 'codigo': 'auto_bin'},
+    {'nome': 'AUTO PERÍCIA', 'codigo': 'auto_pericia'},
+    {'nome': 'AUTO COMPLETA', 'codigo': 'auto_completa'},
+    {'nome': 'AUTO LEILÃO', 'codigo': 'auto_leilao'},
+    {'nome': 'AUTO BASE ESTADUAL', 'codigo': 'auto_base_estadual'},
+    {'nome': 'AUTO DÉBITOS E RECALL', 'codigo': 'auto_debitos_recall'},
   ];
-  int _codigoSelecionado = 26;
+  String _produtoSelecionado = 'auto_bin';
 
   @override
   void initState() {
@@ -142,11 +141,11 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     });
 
     try {
-      final service = sl<AutoCredService>();
+      final service = sl<RadarService>();
       final veiculo = await service.consultarVeiculo(
-        codigoConsulta: _codigoSelecionado,
-        tipoConsulta: _modoEntrada,
-        valorConsulta: valor,
+        produto: _produtoSelecionado,
+        param: _modoEntrada,
+        value: valor,
         vistoriaId: '', // Ainda não temos vistoriaId
       );
 
@@ -157,19 +156,23 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
           // Pré-preencher os campos editáveis
           _placaEditCtrl.text = veiculo.placa;
-          _chassiEditCtrl.text = veiculo.chassi ?? '';
-          _motorEditCtrl.text = veiculo.motor ?? '';
-          _marcaEditCtrl.text = veiculo.marca ?? '';
-          _modeloEditCtrl.text = veiculo.modelo ?? '';
-          _anoFabEditCtrl.text = veiculo.anoFabricacao ?? '';
-          _anoModEditCtrl.text = veiculo.anoModelo ?? '';
-          _corEditCtrl.text = veiculo.cor ?? '';
-          _renavamEditCtrl.text = veiculo.renavam ?? '';
-          _municipioEditCtrl.text = veiculo.municipio ?? '';
-          _ufEditCtrl.text = veiculo.uf ?? '';
-          _restricoesEditCtrl.text = veiculo.restricoes ?? '';
-          _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
-          _situacaoVeiculo = veiculo.dadosExtras['situacao'];
+          _chassiEditCtrl.text = veiculo.chassi;
+          _motorEditCtrl.text = veiculo.motor;
+          
+          // Radar retorna marcaModelo junto. Tentamos separar:
+          final mm = veiculo.marcaModelo.split('/');
+          _marcaEditCtrl.text = mm.isNotEmpty ? mm[0].trim() : '';
+          _modeloEditCtrl.text = mm.length > 1 ? mm[1].trim() : '';
+          
+          _anoFabEditCtrl.text = veiculo.anoFabricacao;
+          _anoModEditCtrl.text = veiculo.anoModelo;
+          _corEditCtrl.text = veiculo.cor;
+          _renavamEditCtrl.text = veiculo.renavam;
+          _municipioEditCtrl.text = veiculo.municipio;
+          _ufEditCtrl.text = veiculo.estado;
+          _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty ? veiculo.restricoes1 : veiculo.informacoesRelevantes;
+          _arquivoPesquisaUrl = null;
+          _situacaoVeiculo = veiculo.situacao;
         });
       }
     } catch (e) {
@@ -429,17 +432,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       }
 
       // Inicia consulta em segundo plano sem await
-      final service = sl<AutoCredService>();
+      final service = sl<RadarService>();
       service
           .consultarVeiculo(
-        codigoConsulta: _codigoSelecionado,
-        tipoConsulta: _modoEntrada,
-        valorConsulta: valor,
+        produto: _produtoSelecionado,
+        param: _modoEntrada,
+        value: valor,
         vistoriaId: vistoriaId,
       )
           .then((veiculoApi) async {
         final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
         if (veiculoDb != null) {
+          final mm = veiculoApi.marcaModelo.split('/');
+          final marca = mm.isNotEmpty ? mm[0].trim() : '';
+          final modelo = mm.length > 1 ? mm[1].trim() : '';
+          
           await dao.atualizarVeiculo(VeiculosCompanion(
             id: drift.Value(veiculoDb.id),
             vistoriaId: drift.Value(veiculoDb.vistoriaId),
@@ -447,18 +454,20 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 ? veiculoApi.placa
                 : veiculoDb.placa),
             chassiVeiculo:
-                drift.Value(veiculoApi.chassi ?? veiculoDb.chassiVeiculo),
+                drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
             motorVeiculo:
-                drift.Value(veiculoApi.motor ?? veiculoDb.motorVeiculo),
-            marca: drift.Value(veiculoApi.marca ?? veiculoDb.marca),
-            modelo: drift.Value(veiculoApi.modelo ?? veiculoDb.modelo),
+                drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+            marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
+            modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
             anoFabricacao: drift.Value(
-                int.tryParse(veiculoApi.anoFabricacao ?? '') ??
-                    veiculoDb.anoFabricacao),
-            anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo ?? '') ??
-                veiculoDb.anoModelo),
-            cor: drift.Value(veiculoApi.cor ?? veiculoDb.cor),
-            renavam: drift.Value(veiculoApi.renavam ?? veiculoDb.renavam),
+                int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
+            anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+            cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+            renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
+            chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
+            motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
+            municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
+            uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
           ));
         }
       }).catchError((_) {
@@ -516,21 +525,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Dropdown Tipo de Consulta
-              DropdownButtonFormField<int>(
-                initialValue: _codigoSelecionado,
+              DropdownButtonFormField<String>(
+                initialValue: _produtoSelecionado,
                 decoration: const InputDecoration(
                   labelText: 'Tipo de Consulta',
                   prefixIcon: Icon(Icons.api_rounded, color: AppTheme.primary),
                 ),
                 items: _tiposConsulta.map((tipo) {
-                  return DropdownMenuItem<int>(
+                  return DropdownMenuItem<String>(
                     value: tipo['codigo'],
-                    child: Text('${tipo['nome']} (Cod. ${tipo['codigo']})',
+                    child: Text('${tipo['nome']}',
                         style: const TextStyle(fontSize: 14)),
                   );
                 }).toList(),
                 onChanged: (val) {
-                  if (val != null) setState(() => _codigoSelecionado = val);
+                  if (val != null) setState(() => _produtoSelecionado = val);
                 },
               ),
               const SizedBox(height: 14),
@@ -586,11 +595,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Botão Buscar
+              // Botão Iniciar
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _buscandoVeiculo ? null : _buscarVeiculo,
+                  onPressed: _buscandoVeiculo ? null : () async {
+                    setState(() => _buscandoVeiculo = true);
+                    await _iniciarVistoriaEmBackground();
+                    if (mounted) setState(() => _buscandoVeiculo = false);
+                  },
                   icon: _buscandoVeiculo
                       ? const SizedBox(
                           width: 18,
@@ -598,10 +611,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.cloud_download_rounded),
+                      : const Icon(Icons.play_arrow_rounded),
                   label: Text(_buscandoVeiculo
-                      ? _mensagemCarregamento
-                      : 'Consultar Veículo'),
+                      ? 'Iniciando Vistoria...'
+                      : 'Consultar Veículo e Iniciar'),
                 ),
               ),
               const SizedBox(height: 12),

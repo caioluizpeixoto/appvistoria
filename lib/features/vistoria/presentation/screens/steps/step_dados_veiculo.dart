@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Step 2 — Dados do Veículo
 class StepDadosVeiculo extends StatefulWidget {
@@ -96,6 +97,27 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<VistoriaWizardState>();
+    
+    // Auto-preenchimento assíncrono caso o campo esteja vazio e o estado tenha o dado
+    if (_placaCtrl.text.isEmpty && state.placa.isNotEmpty) _placaCtrl.text = state.placa;
+    if (_marcaCtrl.text.isEmpty && state.marca.isNotEmpty) _marcaCtrl.text = state.marca;
+    if (_modeloCtrl.text.isEmpty && state.modelo.isNotEmpty) _modeloCtrl.text = state.modelo;
+    if (_anoFabCtrl.text.isEmpty && state.anoFabricacao.isNotEmpty) _anoFabCtrl.text = state.anoFabricacao;
+    if (_anoModCtrl.text.isEmpty && state.anoModelo.isNotEmpty) _anoModCtrl.text = state.anoModelo;
+    if (_corCtrl.text.isEmpty && state.cor.isNotEmpty) _corCtrl.text = state.cor;
+    if (_combustivelCtrl.text.isEmpty && state.combustivel.isNotEmpty) _combustivelCtrl.text = state.combustivel;
+    if (_municipioCtrl.text.isEmpty && state.municipio.isNotEmpty) _municipioCtrl.text = state.municipio;
+    if (_ufCtrl.text.isEmpty && state.uf.isNotEmpty) _ufCtrl.text = state.uf;
+    if (_renavamCtrl.text.isEmpty && state.renavam.isNotEmpty) _renavamCtrl.text = state.renavam;
+    if (_kmCtrl.text.isEmpty && state.km.isNotEmpty) _kmCtrl.text = state.km;
+    if (_numeroGrvCtrl.text.isEmpty && state.numeroGrv.isNotEmpty) _numeroGrvCtrl.text = state.numeroGrv;
+    if (_chassiBinCtrl.text.isEmpty && state.chassiBin.isNotEmpty) _chassiBinCtrl.text = state.chassiBin;
+    if (_chassiVeiculoCtrl.text.isEmpty && state.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = state.chassiVeiculo;
+    if (_motorBinCtrl.text.isEmpty && state.motorBin.isNotEmpty) _motorBinCtrl.text = state.motorBin;
+    if (_motorVeiculoCtrl.text.isEmpty && state.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = state.motorVeiculo;
+    if (_cambioBinCtrl.text.isEmpty && state.cambioBin.isNotEmpty) _cambioBinCtrl.text = state.cambioBin;
+    if (_cambioVeiculoCtrl.text.isEmpty && state.cambioVeiculo.isNotEmpty) _cambioVeiculoCtrl.text = state.cambioVeiculo;
+
     final chassiDivergente = _chassiBinCtrl.text.isNotEmpty &&
         _chassiVeiculoCtrl.text.isNotEmpty &&
         _chassiBinCtrl.text != _chassiVeiculoCtrl.text;
@@ -108,6 +130,73 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: AppTheme.primary),
+              ),
+              onPressed: () {
+                setState(() {
+                  if (state.placa.isNotEmpty) _placaCtrl.text = state.placa;
+                  if (state.marca.isNotEmpty) _marcaCtrl.text = state.marca;
+                  if (state.modelo.isNotEmpty) _modeloCtrl.text = state.modelo;
+                  if (state.anoFabricacao.isNotEmpty) _anoFabCtrl.text = state.anoFabricacao;
+                  if (state.anoModelo.isNotEmpty) _anoModCtrl.text = state.anoModelo;
+                  if (state.cor.isNotEmpty) _corCtrl.text = state.cor;
+                  if (state.combustivel.isNotEmpty) _combustivelCtrl.text = state.combustivel;
+                  if (state.municipio.isNotEmpty) _municipioCtrl.text = state.municipio;
+                  if (state.uf.isNotEmpty) _ufCtrl.text = state.uf;
+                  if (state.renavam.isNotEmpty) _renavamCtrl.text = state.renavam;
+                  if (state.km.isNotEmpty) _kmCtrl.text = state.km;
+                  if (state.numeroGrv.isNotEmpty) _numeroGrvCtrl.text = state.numeroGrv;
+                  if (state.chassiBin.isNotEmpty) _chassiBinCtrl.text = state.chassiBin;
+                  if (state.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = state.chassiVeiculo;
+                  if (state.motorBin.isNotEmpty) _motorBinCtrl.text = state.motorBin;
+                  if (state.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = state.motorVeiculo;
+                  if (state.cambioBin.isNotEmpty) _cambioBinCtrl.text = state.cambioBin;
+                  if (state.cambioVeiculo.isNotEmpty) _cambioVeiculoCtrl.text = state.cambioVeiculo;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Formulário atualizado com os últimos dados pesquisados/salvos!'),
+                    backgroundColor: AppTheme.primary,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.sync_rounded),
+              label: const Text('Atualizar / Preencher Formulario'),
+            ),
+          ),
+          
+          if (state.arquivoPesquisaUrl.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: AppTheme.conforme,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () async {
+                  final uri = Uri.parse(state.arquivoPesquisaUrl);
+                  try {
+                    await launchUrl(uri, mode: LaunchMode.externalApplication);
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível abrir o link.')));
+                    }
+                  }
+                },
+                icon: const Icon(Icons.picture_as_pdf_rounded),
+                label: const Text('Ver Laudo Original Radar Consultas'),
+              ),
+            ),
+          ],
+          
+          const SizedBox(height: 24),
 
           _buildSection(
             icon: Icons.directions_car_rounded,

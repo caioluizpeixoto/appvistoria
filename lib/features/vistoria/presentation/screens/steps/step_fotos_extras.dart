@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:provider/provider.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
@@ -24,12 +27,35 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
     );
     if (xFile == null || !mounted) return;
 
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: xFile.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Editar Foto',
+          toolbarColor: AppTheme.primary,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+        ),
+        IOSUiSettings(
+          title: 'Editar Foto',
+        ),
+      ],
+    );
+    if (croppedFile == null || !mounted) return;
+
+    // Copia para diretório persistente
+    final tempFile = File(croppedFile.path);
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = 'vistoria_img_extra_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
+    final savedFile = await tempFile.copy('${appDir.path}/$fileName');
+
     // Pede título e categoria
-    final result = await _showFotoDialog(xFile.path);
+    final result = await _showFotoDialog(savedFile.path);
     if (result == null) return;
 
     state.addFotoExtra(
-      pathLocal: xFile.path,
+      pathLocal: savedFile.path,
       titulo: result['titulo']!,
       categoria: result['categoria']!,
     );
@@ -51,8 +77,18 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                 // Preview da foto
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.file(File(path),
-                      height: 150, width: double.infinity, fit: BoxFit.cover),
+                  child: Image.file(
+                    File(path),
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 150,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 14),
                 TextField(
@@ -204,6 +240,12 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                       width: 90,
                       height: 90,
                       fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        width: 90,
+                        height: 90,
+                        color: Colors.grey[200],
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),

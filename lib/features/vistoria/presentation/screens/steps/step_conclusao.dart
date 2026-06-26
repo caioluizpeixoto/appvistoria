@@ -375,6 +375,12 @@ class _StepConclusaoState extends State<StepConclusao> {
                         height: 100,
                         width: double.infinity,
                         fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 100,
+                          width: double.infinity,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
                       ),
                     ),
                   ),

@@ -4,11 +4,12 @@ import 'package:uuid/uuid.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../../../database/app_database.dart';
 import '../../../../database/daos/autocred_dao.dart';
-class AutoCredRepository {
+
+class RadarRepository {
   final SupabaseClient supabase;
   final AutocredDao localDao;
 
-  AutoCredRepository({required this.supabase, required this.localDao});
+  RadarRepository({required this.supabase, required this.localDao});
 
   Future<void> salvarConsulta({
     String? vistoriaId,
@@ -16,14 +17,14 @@ class AutoCredRepository {
     String? chassi,
     String? motor,
     required int codigoConsulta,
-    required String idPesquisaAutocred,
+    required String idPesquisaRadar,
     required String status,
     required String retornoBruto,
     required Map<String, dynamic> dadosTratados,
     String? arquivoPesquisaUrl,
   }) async {
     try {
-      // Salvamento local (offline first)
+      // Salvamento local (offline first) usando a mesma tabela de consultas
       final localId = const Uuid().v4();
       
       await localDao.inserirOuAtualizarConsulta(ConsultasAutocredCompanion.insert(
@@ -33,7 +34,7 @@ class AutoCredRepository {
         chassi: drift.Value(chassi),
         motor: drift.Value(motor),
         codigoConsulta: codigoConsulta,
-        idPesquisaAutocred: drift.Value(idPesquisaAutocred),
+        idPesquisaAutocred: drift.Value(idPesquisaRadar),
         status: drift.Value(status),
         retornoBruto: drift.Value(retornoBruto),
         dadosTratadosJson: drift.Value(jsonEncode(dadosTratados)),
@@ -43,7 +44,6 @@ class AutoCredRepository {
       // Salvamento na nuvem (Supabase)
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) {
-        // Retorna sem erro pois salvou localmente!
         return;
       }
       
@@ -54,26 +54,20 @@ class AutoCredRepository {
         'chassi': chassi,
         'motor': motor,
         'codigo_consulta': codigoConsulta,
-        'id_pesquisa_autocred': idPesquisaAutocred,
+        'id_pesquisa_autocred': idPesquisaRadar,
         'status': status,
         'retorno_bruto': retornoBruto,
         'dados_tratados': dadosTratados,
         if (arquivoPesquisaUrl != null) 'arquivo_pesquisa_url': arquivoPesquisaUrl,
       });
-    } on PostgrestException catch (e) {
-      print('Erro no banco de dados ao salvar consulta: ${e.message}');
-      throw Exception('Erro no banco de dados. Contate o suporte. (${e.message})');
     } catch (e) {
-      if (e is Exception && e.toString().contains('Usuário não autenticado')) {
-        rethrow;
-      }
       print('Erro ao salvar histórico de consulta: $e');
       throw Exception('Erro interno ao salvar histórico: $e');
     }
   }
 
   Future<void> atualizarConsulta({
-    required String idPesquisaAutocred,
+    required String idPesquisaRadar,
     String? status,
     String? retornoBruto,
     Map<String, dynamic>? dadosTratados,
@@ -81,7 +75,7 @@ class AutoCredRepository {
   }) async {
     try {
       // Atualiza localmente
-      final localItem = await localDao.buscarConsultaPorIdPesquisa(idPesquisaAutocred);
+      final localItem = await localDao.buscarConsultaPorIdPesquisa(idPesquisaRadar);
       if (localItem != null) {
         await localDao.inserirOuAtualizarConsulta(
           ConsultasAutocredCompanion.insert(
@@ -91,7 +85,7 @@ class AutoCredRepository {
             chassi: drift.Value(localItem.chassi),
             motor: drift.Value(localItem.motor),
             codigoConsulta: localItem.codigoConsulta,
-            idPesquisaAutocred: drift.Value(idPesquisaAutocred),
+            idPesquisaAutocred: drift.Value(idPesquisaRadar),
             status: status != null ? drift.Value(status) : drift.Value(localItem.status),
             retornoBruto: retornoBruto != null ? drift.Value(retornoBruto) : drift.Value(localItem.retornoBruto),
             dadosTratadosJson: dadosTratados != null ? drift.Value(jsonEncode(dadosTratados)) : drift.Value(localItem.dadosTratadosJson),
@@ -116,15 +110,9 @@ class AutoCredRepository {
       await supabase
           .from('autocred_consultas')
           .update(updates)
-          .eq('id_pesquisa_autocred', idPesquisaAutocred)
+          .eq('id_pesquisa_autocred', idPesquisaRadar)
           .eq('user_id', userId);
-    } on PostgrestException catch (e) {
-      print('Erro no banco de dados ao atualizar consulta: ${e.message}');
-      throw Exception('Erro no banco de dados. Contate o suporte. (${e.message})');
     } catch (e) {
-      if (e is Exception && e.toString().contains('Usuário não autenticado')) {
-        rethrow;
-      }
       print('Erro ao atualizar consulta: $e');
       throw Exception('Erro interno ao atualizar histórico: $e');
     }
@@ -132,7 +120,6 @@ class AutoCredRepository {
 
   Future<List<Map<String, dynamic>>> buscarHistoricoConsultas() async {
     try {
-      // Busca do banco local (offline)
       final locais = await localDao.listarConsultas();
       return locais.map((c) {
         Map<String, dynamic> dados = {};
@@ -148,7 +135,7 @@ class AutoCredRepository {
           'chassi': c.chassi,
           'motor': c.motor,
           'codigo_consulta': c.codigoConsulta,
-          'id_pesquisa_autocred': c.idPesquisaAutocred,
+          'id_pesquisa_radar': c.idPesquisaAutocred,
           'status': c.status,
           'retorno_bruto': c.retornoBruto,
           'dados_tratados': dados,

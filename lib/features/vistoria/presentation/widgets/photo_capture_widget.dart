@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
 import '../../../../core/theme/app_theme.dart';
 
 class PhotoCaptureWidget extends StatefulWidget {
@@ -49,10 +52,31 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
       );
 
       if (image != null) {
-        final file = File(image.path);
-        setState(() => _currentPhoto = file);
-        if (widget.onPhotoCaptured != null) {
-          widget.onPhotoCaptured!(file);
+        final croppedFile = await ImageCropper().cropImage(
+          sourcePath: image.path,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Editar Foto',
+              toolbarColor: AppTheme.primary,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: false,
+            ),
+            IOSUiSettings(
+              title: 'Editar Foto',
+            ),
+          ],
+        );
+        if (croppedFile != null) {
+          final tempFile = File(croppedFile.path);
+          final appDir = await getApplicationDocumentsDirectory();
+          final fileName = 'vistoria_img_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
+          final savedFile = await tempFile.copy('${appDir.path}/$fileName');
+
+          setState(() => _currentPhoto = savedFile);
+          if (widget.onPhotoCaptured != null) {
+            widget.onPhotoCaptured!(savedFile);
+          }
         }
       }
     } catch (e) {
@@ -152,6 +176,12 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
             height: 200,
             width: double.infinity,
             fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(
+              height: 200,
+              width: double.infinity,
+              color: Colors.grey[200],
+              child: const Icon(Icons.broken_image, color: Colors.grey),
+            ),
           ),
         ),
         const SizedBox(height: 12),

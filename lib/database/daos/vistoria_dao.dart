@@ -112,6 +112,10 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
       (select(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .getSingleOrNull();
 
+  Stream<Veiculo?> watchVeiculoPorVistoria(String vistoriaId) =>
+      (select(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .watchSingleOrNull();
+
   Future<Veiculo?> buscarVeiculoPorPlaca(String placa) async {
     final results = await (select(veiculos)..where((t) => t.placa.equals(placa))).get();
     if (results.isEmpty) return null;

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/image_service.dart';
@@ -92,11 +93,28 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     );
     if (xFile == null || !mounted) return;
 
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: xFile.path,
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Editar Foto',
+          toolbarColor: AppTheme.primary,
+          toolbarWidgetColor: Colors.white,
+          initAspectRatio: CropAspectRatioPreset.original,
+          lockAspectRatio: false,
+        ),
+        IOSUiSettings(
+          title: 'Editar Foto',
+        ),
+      ],
+    );
+    if (croppedFile == null || !mounted) return;
+
     final state = context.read<VistoriaWizardState>();
-    final file = File(xFile.path);
+    final file = File(croppedFile.path);
 
     // Adiciona localmente de imediato para feedback rápido
-    state.addFotoLocal(widget.itemId, xFile.path);
+    state.addFotoLocal(widget.itemId, croppedFile.path);
 
     // Upload em background
     setState(() => _uploading = true);
@@ -308,6 +326,12 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                             width: 100,
                             height: 120,
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 100,
+                              height: 120,
+                              color: Colors.grey[200],
+                              child: const Icon(Icons.broken_image, color: Colors.grey),
+                            ),
                           ),
                         ),
                         Positioned(
