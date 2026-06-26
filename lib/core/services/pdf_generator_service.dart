@@ -321,382 +321,7 @@ class PdfGeneratorService {
       // Continua gerando o PDF normalmente
     }
 
-    final autocredDao = sl<AutocredDao>();
-    final consulta = await autocredDao.buscarConsultaPorVistoria(vistoria.id);
 
-    if (consulta != null && consulta.dadosTratadosJson != null && consulta.dadosTratadosJson!.isNotEmpty) {
-      Map<String, dynamic> radarData = {};
-      Map<String, dynamic> rawFull = {};
-      String? radarUrl;
-      try {
-        radarData = jsonDecode(consulta.dadosTratadosJson!);
-        if (radarData['resultadoCompleto'] != null) {
-          rawFull = radarData['resultadoCompleto'];
-        } else {
-          rawFull = radarData;
-        }
-        
-        if (radarData['view'] != null && radarData['view']['full'] != null) {
-          radarUrl = radarData['view']['full']?.toString();
-        } else if (rawFull['view'] != null && rawFull['view']['full'] != null) {
-          radarUrl = rawFull['view']['full']?.toString();
-        } else if (radarData['resultados'] != null && radarData['resultados'].isNotEmpty) {
-          if (radarData['resultados'][0]['view'] != null) {
-            radarUrl = radarData['resultados'][0]['view']['full']?.toString();
-          }
-        }
-      } catch (_) {}
-
-            // ── Buscar logo da marca ──
-            pw.MemoryImage? marcaLogoImage;
-            String marcaStr = '';
-            if (radarData['marcaModelo'] != null) {
-              String mm = radarData['marcaModelo'].toString().toLowerCase();
-              if (mm.startsWith('i/')) mm = mm.substring(2);
-              marcaStr = mm.split('/').first.split(' ').first.trim();
-              
-              final domainMap = {
-                'vw': 'vw.com', 'volkswagen': 'vw.com', 'chevrolet': 'chevrolet.com',
-                'fiat': 'fiat.com', 'ford': 'ford.com', 'honda': 'honda.com',
-                'toyota': 'toyota.com', 'hyundai': 'hyundai.com', 'jeep': 'jeep.com',
-                'nissan': 'nissan.com', 'peugeot': 'peugeot.com', 'citroen': 'citroen.com',
-                'renault': 'renault.com', 'mitsubishi': 'mitsubishi-motors.com',
-                'bmw': 'bmw.com', 'audi': 'audi.com', 'kia': 'kia.com', 'mercedes': 'mercedes-benz.com'
-              };
-              
-              String domain = domainMap[marcaStr] ?? '$marcaStr.com';
-              try {
-                final res = await Dio().get<List<int>>(
-                  'https://logo.clearbit.com/$domain',
-                  options: Options(responseType: ResponseType.bytes, validateStatus: (status) => true),
-                ).timeout(const Duration(seconds: 4));
-                if (res.statusCode == 200 && res.data != null) {
-                  marcaLogoImage = pw.MemoryImage(Uint8List.fromList(res.data!));
-                }
-              } catch (_) {}
-            }
-
-            pdf.addPage(
-              pw.MultiPage(
-                pageFormat: PdfPageFormat.a4,
-                margin: const pw.EdgeInsets.all(16),
-                header: (ctx) => _buildHeader(vistoria, styles, logoImage, state: wizardState),
-                footer: (ctx) => _buildFooter(vistoria, styles, ctx, assinaturaImage),
-                build: (ctx) {
-
-            final cDarkBlue = PdfColor.fromHex('#215b8b');
-            final cGreyBg = PdfColor.fromHex('#f5f5f5');
-            final cBorder = PdfColors.grey300;
-            
-            String safeStr(dynamic val) {
-              if (val == null || val.toString().trim().isEmpty || val.toString() == 'null / null' || val.toString() == 'null') return 'Não Informado';
-              return val.toString();
-            }
-
-            pw.Widget buildTopCard(String label, String? val) {
-              return pw.Container(
-                width: 110,
-                margin: const pw.EdgeInsets.only(bottom: 4, left: 4),
-                padding: const pw.EdgeInsets.all(6),
-                decoration: const pw.BoxDecoration(color: PdfColors.white),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text(label, style: pw.TextStyle(font: styles.regular, fontSize: 7, color: PdfColors.grey600)),
-                    pw.SizedBox(height: 2),
-                    pw.Text(safeStr(val), style: pw.TextStyle(font: styles.regular, fontSize: 9, color: PdfColors.black)),
-                  ]
-                )
-              );
-            }
-
-            int rowIndex = 0;
-            pw.Widget buildGridRow(String label1, String? val1, String label2, String? val2, {bool isAlert1 = false, bool isAlert2 = false}) {
-              rowIndex++;
-              bool isEven = rowIndex % 2 == 0;
-              
-              pw.Widget renderVal(String? val, bool alert) {
-                final text = safeStr(val);
-                PdfColor color = PdfColors.grey900;
-                if (alert) {
-                  if (text.toUpperCase() == 'EM CIRCULAÇÃO' || text.toUpperCase() == 'NORMAL') color = PdfColors.teal700; 
-                  else if (text.toUpperCase() == 'NÃO' || text.toUpperCase() == 'NADA CONSTA') color = PdfColors.orange700; 
-                  else if (text == 'Não Informado') color = PdfColors.grey800;
-                  else color = PdfColors.red700;
-                }
-                return pw.Text(text, style: pw.TextStyle(font: alert && text != 'Não Informado' ? styles.bold : styles.regular, fontSize: 8, color: color));
-              }
-
-              return pw.Container(
-                decoration: pw.BoxDecoration(
-                  color: isEven ? PdfColors.white : PdfColor.fromHex('#f7fbff'),
-                  border: pw.Border(
-                    bottom: pw.BorderSide(color: PdfColor.fromHex('#e1e8ed'), width: 0.5),
-                    left: pw.BorderSide(color: PdfColor.fromHex('#e1e8ed'), width: 0.5),
-                    right: pw.BorderSide(color: PdfColor.fromHex('#e1e8ed'), width: 0.5),
-                  )
-                ),
-                padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(flex: 2, child: pw.Text(label1, style: pw.TextStyle(font: styles.bold, fontSize: 8, color: cDarkBlue))),
-                    pw.Expanded(flex: 3, child: renderVal(val1, isAlert1)),
-                    pw.Expanded(flex: 2, child: pw.Text(label2, style: pw.TextStyle(font: styles.bold, fontSize: 8, color: cDarkBlue))),
-                    pw.Expanded(flex: 3, child: renderVal(val2, isAlert2)),
-                  ]
-                )
-              );
-            }
-
-            final queixaRoubo = safeStr(rawFull['rouboefurto'] ?? rawFull['roubofurto']);
-
-            return [
-              // Header top
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: pw.BoxDecoration(
-                  color: cDarkBlue,
-                  borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(4))
-                ),
-                child: pw.Text('Bin **', style: pw.TextStyle(color: PdfColors.white, font: styles.bold, fontSize: 10)),
-              ),
-              
-              // Gray area
-              pw.Container(
-                color: cGreyBg,
-                padding: const pw.EdgeInsets.all(8),
-                child: pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    // Logo box
-                    pw.Container(
-                      width: 80, height: 80,
-                      color: PdfColors.white,
-                      child: pw.Column(
-                        mainAxisAlignment: pw.MainAxisAlignment.center,
-                        children: [
-                          if (marcaLogoImage != null)
-                            pw.Image(marcaLogoImage, width: 45, height: 45, fit: pw.BoxFit.contain),
-                          if (marcaLogoImage != null) pw.SizedBox(height: 4),
-                          pw.Text(
-                            marcaStr.toUpperCase().isNotEmpty ? marcaStr.toUpperCase() : safeStr(radarData['marcaModelo']).split(' ').first, 
-                            style: pw.TextStyle(font: styles.bold, fontSize: 8, color: PdfColors.black)
-                          ),
-                        ]
-                      )
-                    ),
-                    pw.SizedBox(width: 8),
-                    // Globe box
-                    pw.Expanded(
-                      child: pw.Container(
-                        height: 80,
-                        color: PdfColors.white,
-                        child: pw.Center(child: pw.Text('NAO INFORMADO', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.grey)))
-                      )
-                    ),
-                    pw.SizedBox(width: 8),
-                    // Right cards
-                    pw.Column(
-                      children: [
-                        pw.Row(children: [ buildTopCard('PLACA', radarData['placa']), buildTopCard('RENAVAM', radarData['renavam']) ]),
-                        pw.Row(children: [ buildTopCard('CHASSI', radarData['chassi']), buildTopCard('ESTADO', radarData['estado']) ]),
-                      ]
-                    )
-                  ]
-                )
-              ),
-              
-              // Tabela Principal
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  border: pw.Border(left: pw.BorderSide(color: cBorder), right: pw.BorderSide(color: cBorder))
-                ),
-                child: pw.Column(
-                  children: [
-                    buildGridRow('Placa', radarData['placa'], 'Procedência', rawFull['procedencia']),
-                    buildGridRow('Chassi', radarData['chassi'], 'Numero do Motor', radarData['motor'], isAlert1: true),
-                    buildGridRow('Renavam', radarData['renavam'], 'Montagem', rawFull['montagem']),
-                    buildGridRow('Cor', radarData['cor'], 'Ano Modelo', radarData['anoModelo']?.toString()),
-                    buildGridRow('Ano Fabricação', radarData['anoFabricacao']?.toString(), 'Marca/Modelo', radarData['marcaModelo']),
-                    buildGridRow('Municipio', radarData['municipio'], 'UF', radarData['estado']),
-                    buildGridRow('Capacidade de passageiros', rawFull['capacidadepassageiro']?.toString(), 'Combustível', radarData['combustivel']),
-                    buildGridRow('Potência', rawFull['potencia']?.toString(), 'Especie', rawFull['especie']),
-                    buildGridRow('Carroceria', rawFull['carroceria'], 'Nº Câmbio', rawFull['cambio']),
-                    buildGridRow('Capacidade de Carga', rawFull['capacidadecarga']?.toString(), 'Cilindradas', rawFull['cilindradas']?.toString()),
-                    buildGridRow('Remarcação do Chassi', rawFull['remarcacaochassi'] ?? rawFull['remarcacaobase'], 'Tipo', rawFull['tipo']),
-                    buildGridRow('Situação', radarData['situacao'], 'Data última Atualização', rawFull['dataatualizacao'], isAlert1: true),
-                    
-                    // Tratamento flexível para capturar a FIPE independente do formato da Radar
-                    (){
-                      String fipeCod = '';
-                      String fipeVal = '';
-                      if (rawFull['fipe'] != null) {
-                        if (rawFull['fipe'] is List && rawFull['fipe'].isNotEmpty) {
-                          fipeCod = (rawFull['fipe'][0]['codigo'] ?? rawFull['fipe'][0]['codigoFipe'] ?? rawFull['fipe'][0]['fipe_codigo'] ?? '').toString();
-                          fipeVal = (rawFull['fipe'][0]['valor'] ?? rawFull['fipe'][0]['valorFipe'] ?? rawFull['fipe'][0]['fipe_valor'] ?? '').toString();
-                        } else if (rawFull['fipe'] is Map) {
-                          fipeCod = (rawFull['fipe']['codigo'] ?? rawFull['fipe']['codigoFipe'] ?? rawFull['fipe']['fipe_codigo'] ?? '').toString();
-                          fipeVal = (rawFull['fipe']['valor'] ?? rawFull['fipe']['valorFipe'] ?? rawFull['fipe']['fipe_valor'] ?? '').toString();
-                        } else {
-                          fipeCod = rawFull['fipe'].toString();
-                        }
-                      }
-                      if (fipeCod.isEmpty || fipeCod == 'null') fipeCod = safeStr(rawFull['codigofipe'] ?? rawFull['codigo_fipe'] ?? rawFull['fipe_codigo']);
-                      if (fipeVal.isEmpty || fipeVal == 'null') fipeVal = safeStr(rawFull['valorfipe'] ?? rawFull['valor_fipe'] ?? rawFull['fipe_valor'] ?? rawFull['valor']);
-
-                      return pw.Column(
-                        children: [
-                          buildGridRow('Emplacamento Eletrônico', rawFull['emplacamentoeletronico'], 'Código FIPE', fipeCod.isNotEmpty ? fipeCod : null),
-                          buildGridRow('Valor FIPE', fipeVal.isNotEmpty ? fipeVal : null, '', ''),
-                        ]
-                      );
-                    }()
-                  ]
-                )
-              ),
-
-              // Tratamento inteligente para Informações Relevantes
-              (){
-                var info = radarData['informacoesRelevantes'];
-                pw.Widget? contentWidget;
-                
-                if (info is Map) {
-                  List<pw.Widget> bullets = [];
-                  info.forEach((key, value) {
-                    final valStr = value.toString().trim();
-                    final valLower = valStr.toLowerCase();
-                    if (valStr.isEmpty || valLower == 'não informado' || valLower == 'nada consta' || valLower == 'null' || valStr == '[]' || valStr.contains('NADA CONSTA, NADA CONSTA')) return;
-                    
-                    bullets.add(
-                      pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 4),
-                        child: pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text('• ', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: cDarkBlue)),
-                            pw.Expanded(
-                              child: pw.RichText(
-                                text: pw.TextSpan(
-                                  children: [
-                                    pw.TextSpan(text: '$key: ', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: PdfColors.grey900)),
-                                    pw.TextSpan(text: valStr, style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.grey800)),
-                                  ]
-                                )
-                              )
-                            )
-                          ]
-                        )
-                      )
-                    );
-                  });
-                  if (bullets.isNotEmpty) {
-                    contentWidget = pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: bullets);
-                  }
-                } else if (info is List && info.isNotEmpty) {
-                  List<pw.Widget> bullets = [];
-                  for (var item in info) {
-                    final valStr = item.toString().trim();
-                    if (valStr.isEmpty || valStr.toLowerCase() == 'nada consta' || valStr.toLowerCase() == 'não informado') continue;
-                    bullets.add(pw.Text('• $valStr', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.grey800)));
-                  }
-                  if (bullets.isNotEmpty) {
-                    contentWidget = pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: bullets);
-                  }
-                } else if (info != null && info.toString().trim().isNotEmpty && info.toString().toLowerCase() != 'não informado') {
-                  contentWidget = pw.Text(info.toString(), style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.grey800));
-                }
-
-                if (contentWidget == null) return pw.SizedBox();
-
-                return pw.Column(
-                  children: [
-                    pw.Container(
-                      width: double.infinity,
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      color: PdfColor.fromHex('#fff3cd'),
-                      child: pw.Text('Informações Relevantes', style: pw.TextStyle(color: PdfColor.fromHex('#856404'), font: styles.bold, fontSize: 9)),
-                    ),
-                    pw.Container(
-                      width: double.infinity,
-                      padding: const pw.EdgeInsets.all(8),
-                      decoration: pw.BoxDecoration(
-                        color: PdfColors.white,
-                        border: pw.Border.all(color: cBorder)
-                      ),
-                      child: contentWidget,
-                    )
-                  ]
-                );
-              }(),
-
-              // Roubo / Furto
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                decoration: pw.BoxDecoration(border: pw.Border.all(color: cBorder)),
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(flex: 2, child: pw.Text('Queixa de Roubo e/ou Furto', style: pw.TextStyle(font: styles.bold, fontSize: 8))),
-                    pw.Expanded(flex: 8, child: pw.Text(
-                      queixaRoubo == 'Não Informado' ? 'VEICULO NÃO POSSUI RESTRIÇÃO DE ROUBO/FURTO' : queixaRoubo, 
-                      style: pw.TextStyle(font: styles.bold, fontSize: 9, color: queixaRoubo == 'Não Informado' ? PdfColors.green : PdfColors.red)
-                    )),
-                  ]
-                )
-              ),
-              
-              pw.SizedBox(height: 8),
-
-              // Tabela Restrições
-              pw.Container(
-                decoration: pw.BoxDecoration(border: pw.Border.all(color: cBorder)),
-                child: pw.Column(
-                  children: [
-                    buildGridRow('Situação', radarData['situacao'], 'Recall', rawFull['recall'], isAlert1: true),
-                    buildGridRow('Ind. Restrições', rawFull['indicadorrestricoes'], 'Restrição Renajud', rawFull['restricaorenajud'] ?? 'NÃO', isAlert2: true),
-                    buildGridRow('Restrição RFB', rawFull['restricaorfb'] ?? 'NÃO', 'Restrição01', radarData['restricoes1'] ?? 'NADA CONSTA', isAlert1: true, isAlert2: true),
-                    buildGridRow('Restrição02', radarData['restricoes2'] ?? 'NADA CONSTA', 'Restrição03', radarData['restricoes3'] ?? 'NADA CONSTA', isAlert1: true, isAlert2: true),
-                    buildGridRow('Restrição04', radarData['restricoes4'] ?? 'NADA CONSTA', 'Data Limite Restrição Tributária', rawFull['datalimiterestricaotributaria'], isAlert1: true),
-                    buildGridRow('Placa Mercosul', rawFull['placamercosul'], '', ''),
-                  ]
-                )
-              ),
-              
-              pw.SizedBox(height: 16),
-
-              if (radarUrl != null && radarUrl.isNotEmpty)
-                pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 12),
-                  child: pw.UrlLink(
-                    destination: radarUrl,
-                    child: pw.Text(
-                      '🔗 Clique aqui para visualizar o Laudo Original no portal da Radar Consultas', 
-                      style: pw.TextStyle(
-                        color: PdfColors.blue900,
-                        decoration: pw.TextDecoration.underline,
-                        font: styles.bold,
-                        fontSize: 9,
-                      )
-                    )
-                  )
-                ),
-              
-              // Disclaimer final
-              pw.Container(
-                padding: const pw.EdgeInsets.all(8),
-                color: cGreyBg,
-                child: pw.Text(
-                  'Estas informações são confidencias e deverão ser utilizadas exclusivamente para a orientação das transações comerciais do CNPJ/CPF: 24.868.718/0001-62, responsabilizando-se civil e criminalmente por danos que ocasionar a terceiros, quando utilizadas em desacordo com a legislação em vigor. A responsabilidade da contratada limita-se a transmitir fielmente as informações oriundas das bases de Negativação, Protesto Cartoriais e sobre veículos automotores registrados em base de Dados públicas e privadas detentoras das informações. As informações exibidas nesta consulta são as que se encontram disponíveis na data e hora da consulta nas Bases de Dados públicas ou privadas, cabendo ao CNPJ/CPF: 24.868.718/0001-62. Em caso de dúvida ou divergência, consulta diretamente o órgão competente. O CNPJ/CPF: 24.868.718/0001-62, declara ter ciência que todas as informações prestadas no corpo desta consulta visam exclusivamente colaborar com o processo de averiguação de procedência do veículo, servindo apenas como uma ferramenta de análise prévia e não como elemento de decisão única para vistoria ou comercialização do veículo. O levantamento das informações veiculares via consulta eletrônica jamais pode substituir a consulta do órgão oficial especialmente pelo fato de que as informações podem ser acrescidas, modificadas ou retiradas de forma "on-line" pelos órgãos públicos, instituições financeiras e seguradoras. Devido as informações DPVAT (Histórico de Proprietários), que ficou indisponível desde 12/07/2018 no mercado de informações veiculares e o Sinistro de Indenização Integral fornecido pela FENASEG/CNSEG desde 18/07/2018, não há como a empresa vistoriadora e fornecedor da consulta, se responsabilizar por informações de Sinistro de Indenização Integral.',
-                  style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey700),
-                  textAlign: pw.TextAlign.justify,
-                )
-              )
-            ];
-          },
-        ),
-      );
-    }
 
     // Inserir a página de Disclaimer no final do nosso PDF local
     pdf.addPage(_buildPageDisclaimer(
@@ -1589,6 +1214,40 @@ class PdfGeneratorService {
     pw.ImageProvider? assinatura,
     VistoriaWizardState? state,
   ) {
+    final themeRed = PdfColor.fromHex('#d32f2f'); // Vermelho principal
+    final lightRed = PdfColor.fromHex('#ffebee'); // Fundo clarinho
+    final borderRed = PdfColor.fromHex('#ffcdd2'); // Borda suave
+    final textDark = PdfColor.fromHex('#333333');
+    final textMuted = PdfColor.fromHex('#666666');
+
+    pw.Widget buildRedBar(String text) {
+      return pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+        margin: const pw.EdgeInsets.only(bottom: 8, top: 8),
+        decoration: pw.BoxDecoration(
+          color: themeRed,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+        ),
+        child: pw.Text(text, style: pw.TextStyle(font: styles.bold, fontSize: 9, color: PdfColors.white)),
+      );
+    }
+
+    pw.Widget buildSoftTh(String text) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(6),
+        color: lightRed,
+        child: pw.Text(text, style: pw.TextStyle(font: styles.bold, fontSize: 8, color: themeRed)),
+      );
+    }
+
+    pw.Widget buildSoftTd(String text) {
+      return pw.Container(
+        padding: const pw.EdgeInsets.all(6),
+        child: pw.Text(text, style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textDark)),
+      );
+    }
+
     // Especificações e Manutenção
     pdf.addPage(
       pw.Page(
@@ -1599,36 +1258,60 @@ class PdfGeneratorService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               _buildHeader(vistoria, styles, logo, state: state),
-              _buildBlackBar('FICHA TÉCNICA DO VEÍCULO', styles),
+              
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(
+                  color: lightRed,
+                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+                  border: pw.Border.all(color: themeRed, width: 1)
+                ),
+                child: pw.Center(
+                  child: pw.Text('FICHA TÉCNICA INTELIGENTE DO VEÍCULO', style: pw.TextStyle(font: styles.bold, fontSize: 12, color: themeRed)),
+                )
+              ),
               
               pw.SizedBox(height: 8),
-              _buildBlackBar('ESPECIFICAÇÕES TÉCNICAS', styles),
+              buildRedBar('ESPECIFICAÇÕES TÉCNICAS'),
               if (data['especificacoes_tecnicas'] != null)
-                pw.Table(
-                  border: pw.TableBorder.all(color: _kBlack, width: 0.5),
-                  children: (data['especificacoes_tecnicas'] as Map<String, dynamic>).entries.map((e) {
-                    return pw.TableRow(
-                      children: [
-                        _th(e.key.replaceAll('_', ' ').toUpperCase(), styles),
-                        _td(e.value.toString(), styles),
-                      ]
-                    );
-                  }).toList(),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    border: pw.Border.all(color: borderRed, width: 1),
+                  ),
+                  child: pw.Table(
+                    border: pw.TableBorder.symmetric(inside: pw.BorderSide(color: borderRed, width: 0.5)),
+                    children: (data['especificacoes_tecnicas'] as Map<String, dynamic>).entries.map((e) {
+                      return pw.TableRow(
+                        children: [
+                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
+                          buildSoftTd(e.value.toString()),
+                        ]
+                      );
+                    }).toList(),
+                  ),
                 ),
 
               pw.SizedBox(height: 8),
-              _buildBlackBar('MANUTENÇÃO RECOMENDADA', styles),
+              buildRedBar('MANUTENÇÃO RECOMENDADA'),
               if (data['manutencao'] != null)
-                pw.Table(
-                  border: pw.TableBorder.all(color: _kBlack, width: 0.5),
-                  children: (data['manutencao'] as Map<String, dynamic>).entries.map((e) {
-                    return pw.TableRow(
-                      children: [
-                        _th(e.key.replaceAll('_', ' ').toUpperCase(), styles),
-                        _td(e.value.toString(), styles),
-                      ]
-                    );
-                  }).toList(),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    border: pw.Border.all(color: borderRed, width: 1),
+                  ),
+                  child: pw.Table(
+                    border: pw.TableBorder.symmetric(inside: pw.BorderSide(color: borderRed, width: 0.5)),
+                    children: (data['manutencao'] as Map<String, dynamic>).entries.map((e) {
+                      return pw.TableRow(
+                        children: [
+                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
+                          buildSoftTd(e.value.toString()),
+                        ]
+                      );
+                    }).toList(),
+                  ),
                 ),
 
               pw.Spacer(),
@@ -1649,47 +1332,65 @@ class PdfGeneratorService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               _buildHeader(vistoria, styles, logo, state: state),
-              _buildBlackBar('PONTOS DE ATENÇÃO (HISTÓRICO DO MODELO)', styles),
+              buildRedBar('PONTOS DE ATENÇÃO (HISTÓRICO DO MODELO)'),
               if (data['problemas_comuns'] != null && data['problemas_comuns'] is List)
                 ...((data['problemas_comuns'] as List).map((item) {
                   return pw.Container(
                     margin: const pw.EdgeInsets.only(bottom: 6),
-                    padding: const pw.EdgeInsets.all(4),
-                    decoration: pw.BoxDecoration(border: pw.Border.all(color: _kBlack, width: 0.5)),
+                    padding: const pw.EdgeInsets.all(8),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.white,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      border: pw.Border.all(color: borderRed, width: 1)
+                    ),
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('${item['item']}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                        pw.Text('${item['sintomas']}', style: pw.TextStyle(font: styles.regular, fontSize: 8)),
-                        pw.Text('Ponto de Atenção: ${item['observacao_vistoria']}', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: _kGreyDark)),
+                        pw.Row(
+                          children: [
+                            pw.Icon(const pw.IconData(0xe002), color: themeRed, size: 10), // Warning icon if supported, else just colored text
+                            pw.SizedBox(width: 4),
+                            pw.Text('${item['item']}', style: pw.TextStyle(font: styles.bold, fontSize: 9, color: themeRed)),
+                          ]
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text('${item['sintomas']}', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textDark)),
+                        pw.SizedBox(height: 2),
+                        pw.Text('Ponto de Atenção: ${item['observacao_vistoria']}', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textMuted)),
                       ],
                     ),
                   );
                 }).toList()),
 
               pw.SizedBox(height: 8),
-              _buildBlackBar('PEÇAS DE DESGASTE', styles),
+              buildRedBar('PEÇAS DE DESGASTE'),
               if (data['pecas_desgaste'] != null && data['pecas_desgaste'] is List)
-                pw.Table(
-                  border: pw.TableBorder.all(color: _kBlack, width: 0.5),
-                  children: [
-                    pw.TableRow(
-                      decoration: const pw.BoxDecoration(color: _kGreyLight),
-                      children: [
-                        _th('PEÇA', styles), _th('VIDA ÚTIL', styles), _th('VALOR PEÇA', styles), _th('MÃO DE OBRA', styles)
-                      ]
-                    ),
-                    ...((data['pecas_desgaste'] as List).map((item) {
-                      return pw.TableRow(
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    border: pw.Border.all(color: borderRed, width: 1),
+                  ),
+                  child: pw.Table(
+                    border: pw.TableBorder.symmetric(inside: pw.BorderSide(color: borderRed, width: 0.5)),
+                    children: [
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(color: lightRed),
                         children: [
-                          _td(item['peca']?.toString() ?? '', styles),
-                          _td(item['vida_util_media']?.toString() ?? '', styles),
-                          _td(item['valor_peca_estimado']?.toString() ?? '', styles),
-                          _td('${item['valor_mao_de_obra_estimado']} (${item['tempo_mao_de_obra_estimado']})', styles),
+                          buildSoftTh('PEÇA'), buildSoftTh('VIDA ÚTIL'), buildSoftTh('VALOR PEÇA'), buildSoftTh('MÃO DE OBRA')
                         ]
-                      );
-                    }).toList()),
-                  ],
+                      ),
+                      ...((data['pecas_desgaste'] as List).map((item) {
+                        return pw.TableRow(
+                          children: [
+                            buildSoftTd(item['peca']?.toString() ?? ''),
+                            buildSoftTd(item['vida_util_media']?.toString() ?? ''),
+                            buildSoftTd(item['valor_peca_estimado']?.toString() ?? ''),
+                            buildSoftTd('${item['valor_mao_de_obra_estimado']} (${item['tempo_mao_de_obra_estimado']})'),
+                          ]
+                        );
+                      }).toList()),
+                    ],
+                  ),
                 ),
 
               pw.Spacer(),
@@ -1711,32 +1412,56 @@ class PdfGeneratorService {
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 _buildHeader(vistoria, styles, logo, state: state),
-                _buildBlackBar('RECOMENDAÇÕES DE REVISÃO (HISTÓRICO DO MODELO)', styles),
+                buildRedBar('RECOMENDAÇÕES DE REVISÃO (HISTÓRICO DO MODELO)'),
                 ...((data['dicas_vistoria'] as List).map((item) {
                   return pw.Container(
                     margin: const pw.EdgeInsets.only(bottom: 6),
-                    padding: const pw.EdgeInsets.all(4),
-                    decoration: pw.BoxDecoration(border: pw.Border.all(color: _kBlack, width: 0.5)),
+                    padding: const pw.EdgeInsets.all(8),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.white,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      border: pw.Border.all(color: borderRed, width: 1)
+                    ),
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
-                        pw.Text('Área: ${item['area']}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                        pw.Text('Verificar: ${item['o_que_verificar']}', style: pw.TextStyle(font: styles.regular, fontSize: 8)),
-                        pw.Text('Recomendação: ${item['sinal_de_alerta']}', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: _kGreyDark)),
+                        pw.Text('Área: ${item['area']}', style: pw.TextStyle(font: styles.bold, fontSize: 9, color: themeRed)),
+                        pw.SizedBox(height: 2),
+                        pw.Text('Verificar: ${item['o_que_verificar']}', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textDark)),
+                        pw.SizedBox(height: 2),
+                        pw.Text('Recomendação: ${item['sinal_de_alerta']}', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textMuted)),
                       ],
                     ),
                   );
                 }).toList()),
 
                 pw.SizedBox(height: 8),
-                _buildBlackBar('OBSERVAÇÕES', styles),
-                if (data['observacoes'] != null && data['observacoes'] is List)
-                  ...((data['observacoes'] as List).map((obs) {
-                    return pw.Padding(
-                      padding: const pw.EdgeInsets.only(bottom: 4),
-                      child: pw.Text('- $obs', style: pw.TextStyle(font: styles.regular, fontSize: 8))
-                    );
-                  }).toList()),
+                if (data['observacoes'] != null && data['observacoes'] is List && (data['observacoes'] as List).isNotEmpty) ...[
+                  buildRedBar('OBSERVAÇÕES ADICIONAIS'),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(8),
+                    decoration: pw.BoxDecoration(
+                      color: lightRed,
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                      border: pw.Border.all(color: borderRed, width: 1)
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: ((data['observacoes'] as List).map((obs) {
+                        return pw.Padding(
+                          padding: const pw.EdgeInsets.only(bottom: 4),
+                          child: pw.Row(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.Text('• ', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: themeRed)),
+                              pw.Expanded(child: pw.Text('$obs', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textDark))),
+                            ]
+                          )
+                        );
+                      }).toList()),
+                    )
+                  )
+                ],
 
                 pw.Spacer(),
                 _buildFooter(vistoria, styles, ctx, assinatura),

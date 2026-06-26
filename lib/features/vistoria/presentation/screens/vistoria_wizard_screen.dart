@@ -122,10 +122,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           );
         } else if (_statusConsulta == 'pendente' && novoStatus == 'erro') {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('❌ A pesquisa na Radar Consultas falhou.'),
+            SnackBar(
+              content: Text('❌ Radar: ${consulta.retornoBruto ?? "Falha na pesquisa"}'),
               backgroundColor: AppTheme.naoConforme,
-              duration: Duration(seconds: 4),
+              duration: const Duration(seconds: 6),
             ),
           );
         }
@@ -161,7 +161,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         param: 'placa',
         value: placa,
         vistoriaId: widget.vistoriaId,
-      ).timeout(const Duration(seconds: 40), onTimeout: () {
+        forcarNova: true,
+      ).timeout(const Duration(seconds: 90), onTimeout: () {
         throw Exception("Tempo limite de pesquisa excedido.");
       });
       

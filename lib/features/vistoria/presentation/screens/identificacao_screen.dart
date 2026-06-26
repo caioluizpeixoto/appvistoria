@@ -146,7 +146,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         produto: _produtoSelecionado,
         param: _modoEntrada,
         value: valor,
-        vistoriaId: '', // Ainda não temos vistoriaId
+        vistoriaId: '',
+        forcarNova: true,
       );
 
       if (mounted) {
@@ -439,6 +440,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         param: _modoEntrada,
         value: valor,
         vistoriaId: vistoriaId,
+        forcarNova: true,
       )
           .then((veiculoApi) async {
         final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);

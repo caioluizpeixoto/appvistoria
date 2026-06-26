@@ -17,6 +17,7 @@ class RadarService {
     required String value,   // ex: "ABC1234"
     String vistoriaId = '',
     int codigoConsulta = 0,
+    bool forcarNova = false,
   }) async {
     final idPesquisa = const Uuid().v4();
 
@@ -39,6 +40,7 @@ class RadarService {
           'produto': produto,
           'param': param,
           'value': value,
+          'forcarNova': forcarNova,
         },
       );
 

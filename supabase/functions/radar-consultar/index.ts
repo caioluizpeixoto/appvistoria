@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { produto, param, value } = await req.json();
+    const { produto, param, value, forcarNova } = await req.json();
 
     if (!produto || !param || !value) {
       throw new Error("Parâmetros 'produto', 'param' e 'value' são obrigatórios.");
@@ -46,6 +46,10 @@ serve(async (req) => {
     bodyParams.append("param", param);
     bodyParams.append("value", value);
     bodyParams.append("aguardar-retorno", "true");
+    
+    if (forcarNova) {
+      bodyParams.append("forcar-nova", "true");
+    }
 
     const response = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultar", {
       method: "POST",
@@ -61,6 +65,10 @@ serve(async (req) => {
 
     if (data?.erro) {
       throw new Error(data.erro);
+    }
+
+    if (data?.result === 0 && data?.message) {
+      throw new Error(data.message);
     }
 
     // extrair dados
@@ -107,7 +115,7 @@ serve(async (req) => {
 
   } catch (error: any) {
     return new Response(JSON.stringify({ sucesso: false, error: error.message }), {
-      status: 400,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
