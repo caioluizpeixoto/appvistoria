@@ -147,8 +147,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       return;
     }
 
-    final produto = await _showSelectProdutoDialog();
-    if (produto == null) return;
+    final result = await _showSelectProdutoDialog();
+    if (result == null) return;
+
+    final produto = result['produto'] as String;
+    final forcarNova = result['forcarNova'] as bool;
 
     setState(() {
       _statusConsulta = 'pendente';
@@ -161,7 +164,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         param: 'placa',
         value: placa,
         vistoriaId: widget.vistoriaId,
-        forcarNova: true,
+        forcarNova: forcarNova,
       ).timeout(const Duration(seconds: 90), onTimeout: () {
         throw Exception("Tempo limite de pesquisa excedido.");
       });
@@ -201,48 +204,78 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         setState(() {
           _statusConsulta = 'erro';
         });
+        
+        String cleanError = e.toString().replaceAll('Exception: ', '').trim();
+        if (cleanError.startsWith('Erro na consulta: ')) {
+          cleanError = cleanError.replaceAll('Erro na consulta: ', '');
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Falha ao re-consultar: $e'), backgroundColor: AppTheme.naoConforme),
+          SnackBar(
+            content: Text(cleanError), 
+            backgroundColor: cleanError.contains('já está em andamento') ? Colors.orange[800] : AppTheme.naoConforme,
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
     }
   }
 
-  Future<String?> _showSelectProdutoDialog() async {
-    return showDialog<String>(
+  Future<Map<String, dynamic>?> _showSelectProdutoDialog() async {
+    bool forcarNova = false;
+    return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Nova Consulta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('Qual pesquisa deseja realizar?'),
-              const SizedBox(height: 16),
-              ListTile(
-                title: const Text('AUTO BIN (Simples)'),
-                onTap: () => Navigator.pop(ctx, 'auto_bin'),
+        return StatefulBuilder(
+          builder: (context, setStateBuilder) {
+            return AlertDialog(
+              title: const Text('Consultar Radar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Dica: Para apenas atualizar/puxar o resultado de uma consulta demorada, deixe a caixa abaixo DESMARCADA.', 
+                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    title: const Text('AUTO BIN (Simples)'),
+                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_bin', 'forcarNova': forcarNova}),
+                  ),
+                  ListTile(
+                    title: const Text('AUTO PERÍCIA'),
+                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_pericia', 'forcarNova': forcarNova}),
+                  ),
+                  ListTile(
+                    title: const Text('AUTO COMPLETA'),
+                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_completa', 'forcarNova': forcarNova}),
+                  ),
+                  ListTile(
+                    title: const Text('AUTO LEILÃO'),
+                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_leilao', 'forcarNova': forcarNova}),
+                  ),
+                  const Divider(),
+                  CheckboxListTile(
+                    title: const Text('Forçar NOVA consulta', style: TextStyle(fontSize: 14)),
+                    subtitle: const Text('Faz uma nova busca na base (Pode demorar mais)', style: TextStyle(fontSize: 11)),
+                    value: forcarNova,
+                    onChanged: (val) {
+                      setStateBuilder(() {
+                        forcarNova = val ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
               ),
-              ListTile(
-                title: const Text('AUTO PERÍCIA'),
-                onTap: () => Navigator.pop(ctx, 'auto_pericia'),
-              ),
-              ListTile(
-                title: const Text('AUTO COMPLETA'),
-                onTap: () => Navigator.pop(ctx, 'auto_completa'),
-              ),
-              ListTile(
-                title: const Text('AUTO LEILÃO'),
-                onTap: () => Navigator.pop(ctx, 'auto_leilao'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancelar'),
+                ),
+              ],
+            );
+          }
         );
       },
     );

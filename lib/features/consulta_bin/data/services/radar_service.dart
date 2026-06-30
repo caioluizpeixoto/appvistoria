@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -42,7 +43,7 @@ class RadarService {
           'value': value,
           'forcarNova': forcarNova,
         },
-      );
+      ).timeout(const Duration(minutes: 15));
 
       if (response.data is Map<String, dynamic> && response.data['sucesso'] == false) {
         throw Exception(response.data['error'] ?? 'Erro desconhecido na Radar Consultas');
@@ -71,15 +72,23 @@ class RadarService {
       );
 
       String mensagemErro = e.toString();
-      if (e is FunctionException) {
+      
+      if (e is TimeoutException) {
+        mensagemErro = 'A consulta demorou muito para responder. Verifique sua conexão ou tente novamente.';
+      } else if (mensagemErro.contains('ClientSoftware caused connection abort') || 
+                 mensagemErro.contains('SocketException') || 
+                 mensagemErro.contains('Failed host lookup')) {
+        mensagemErro = 'Falha de conexão. Verifique sua internet e tente novamente.';
+      } else if (e is FunctionException) {
         final details = e.details;
         if (details is Map && details.containsKey('error')) {
           mensagemErro = details['error'].toString();
         }
+      } else {
+        mensagemErro = mensagemErro.replaceAll('Exception: ', '').replaceAll('Erro na consulta: ', '');
       }
 
-      mensagemErro = mensagemErro.replaceAll('Exception: ', '').replaceAll('Erro na consulta: ', '');
-      throw Exception('Erro na consulta: $mensagemErro');
+      throw Exception(mensagemErro);
     }
   }
 
