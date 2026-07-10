@@ -21,6 +21,7 @@ class RadarVeiculo {
   final String restricoes3;
   final String restricoes4;
   final String informacoesRelevantes;
+  final String? arquivoPesquisaUrl;
   final Map<String, dynamic> resultadoCompleto;
 
   RadarVeiculo({
@@ -46,6 +47,7 @@ class RadarVeiculo {
     required this.restricoes3,
     required this.restricoes4,
     required this.informacoesRelevantes,
+    this.arquivoPesquisaUrl,
     required this.resultadoCompleto,
   });
 
@@ -73,6 +75,7 @@ class RadarVeiculo {
       restricoes3: json['restricoes3']?.toString() ?? '',
       restricoes4: json['restricoes4']?.toString() ?? '',
       informacoesRelevantes: json['informacoesRelevantes']?.toString() ?? '',
+      arquivoPesquisaUrl: json['radar_pdf_url']?.toString(),
       resultadoCompleto: json['resultadoCompleto'] != null 
           ? Map<String, dynamic>.from(json['resultadoCompleto'])
           : {},

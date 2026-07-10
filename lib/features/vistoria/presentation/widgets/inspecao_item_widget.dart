@@ -543,14 +543,14 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     // NÃO CONFORME (Vermelho)
     if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
         s.contains('não original') || s.contains('substituído') || s.contains('ausente') ||
-        s.contains('danificado') || s.contains('colisão')) {
+        s.contains('danificad') || s.contains('colisão')) {
       return AppTheme.naoConforme;
     }
     
     // COM OBSERVAÇÃO (Laranja/Amarelo)
     if (s.contains('reparo') || s.contains('repintura') || s.contains('observação') || 
         s.contains('envelopado') || s.contains('amassado') || s.contains('riscado') ||
-        s.contains('soldado') || s.contains('avaria') || s.contains('massa')) {
+        s.contains('soldado') || s.contains('avaria') || s.contains('massa') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso')) {
       return AppTheme.comObs;
     }
     
@@ -560,7 +560,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
       return AppTheme.conforme;
     }
     
-    // NEUTRO (Cinza) - "Não analisado" ou outros
+    // NEUTRO (Cinza) - outros
     return AppTheme.textSecondary;
   }
 
@@ -576,8 +576,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     if (s.contains('substituído')) {
       return Icons.swap_horizontal_circle_rounded;
     }
-    if (s.contains('danificado')) {
-      return Icons.broken_image_rounded;
+    if (s.contains('danificad')) {
+      return Icons.cancel_rounded;
     }
 
     // COM OBSERVAÇÃO
@@ -587,7 +587,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     if (s.contains('repintura') || s.contains('massa') || s.contains('envelopado')) {
       return Icons.format_paint_rounded;
     }
-    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado')) {
+    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso')) {
       return Icons.warning_rounded;
     }
 
@@ -598,10 +598,6 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     }
 
     // NEUTRO
-    if (s.contains('não analisado')) {
-      return Icons.remove_circle_outline_rounded;
-    }
-    
     return Icons.radio_button_unchecked_rounded;
   }
 }

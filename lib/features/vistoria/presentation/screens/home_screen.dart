@@ -16,7 +16,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: const Text('VistoriaPro'),
+        title: const Text('Home Auto'),
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu_rounded),
@@ -42,7 +42,7 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
-                    'Selecione o tipo de vistoria',
+                    'Selecione a pesquisa',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
@@ -51,7 +51,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Escolha a modalidade para iniciar o laudo',
+                    'Escolha o tipo de pesquisa antes do laudo',
                     style: TextStyle(
                       fontSize: 13,
                       color: AppTheme.textSecondary,
@@ -64,9 +64,12 @@ class HomeScreen extends StatelessWidget {
 
           SliverList(
             delegate: SliverChildListDelegate([
-              _VistoriaCard(tipo: TipoVistoria.carroComCroqui),
-              _VistoriaCard(tipo: TipoVistoria.cautelarCarro),
-              _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao),
+              _RadarCard(nome: 'AUTO BIN', codigo: 'auto_bin'),
+              _RadarCard(nome: 'AUTO PERÍCIA', codigo: 'auto_pericia'),
+              _RadarCard(nome: 'AUTO COMPLETA', codigo: 'auto_completa'),
+              _RadarCard(nome: 'AUTO LEILÃO', codigo: 'auto_leilao'),
+              _RadarCard(nome: 'AUTO BASE ESTADUAL', codigo: 'auto_base_estadual'),
+              _RadarCard(nome: 'AUTO DÉBITOS E RECALL', codigo: 'auto_debitos_recall'),
               const SizedBox(height: 32),
             ]),
           ),
@@ -145,8 +148,9 @@ class _WelcomeBanner extends StatelessWidget {
 
 class _VistoriaCard extends StatelessWidget {
   final TipoVistoria tipo;
+  final String? codigoRadar;
 
-  const _VistoriaCard({required this.tipo});
+  const _VistoriaCard({required this.tipo, this.codigoRadar});
 
   // Cores de destaque por tipo
   Color get _accentColor {
@@ -181,7 +185,15 @@ class _VistoriaCard extends StatelessWidget {
         elevation: 0,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () => context.push('/identificacao/${tipo.slug}'),
+          onTap: () {
+            if (codigoRadar != null) {
+              Navigator.of(context).pop(); // fecha o modal
+            }
+            context.push('/identificacao/${tipo.slug}',
+                extra: codigoRadar != null
+                    ? {'produtoSelecionado': codigoRadar}
+                    : null);
+          },
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -231,6 +243,101 @@ class _VistoriaCard extends StatelessWidget {
                   Icons.arrow_forward_ios_rounded,
                   size: 16,
                   color: _accentColor,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Card de Pesquisa ────────────────────────────────────────────────────────
+
+class _RadarCard extends StatelessWidget {
+  final String nome;
+  final String codigo;
+
+  const _RadarCard({required this.nome, required this.codigo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Material(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              backgroundColor: AppTheme.background,
+              isScrollControlled: true,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              builder: (ctx) => SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'Selecione o tipo de vistoria',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                      ),
+                      _VistoriaCard(tipo: TipoVistoria.carroComCroqui, codigoRadar: codigo),
+                      _VistoriaCard(tipo: TipoVistoria.cautelarCarro, codigoRadar: codigo),
+                      _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao, codigoRadar: codigo),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    nome,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: AppTheme.primary,
                 ),
               ],
             ),

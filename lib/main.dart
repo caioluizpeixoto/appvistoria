@@ -52,7 +52,7 @@ class _CautelarAppState extends State<CautelarApp> {
     return BlocProvider.value(
       value: _authBloc,
       child: MaterialApp.router(
-        title: 'Vistorias',
+        title: 'Home Auto',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         routerConfig: _router,

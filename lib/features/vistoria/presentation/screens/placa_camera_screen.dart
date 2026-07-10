@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -44,7 +46,9 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
       _controller = CameraController(
         camera,
         ResolutionPreset.high,
-        imageFormatGroup: ImageFormatGroup.nv21,
+        imageFormatGroup: Platform.isAndroid
+            ? ImageFormatGroup.nv21
+            : ImageFormatGroup.bgra8888,
         enableAudio: false,
       );
 
@@ -65,33 +69,34 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
   Future<void> _processFrame(CameraImage image) async {
     if (_isProcessing) return;
 
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
-      _isProcessing = true;
-      try {
-        final inputImage = _buildInputImage(image);
-        if (inputImage == null) return;
+    _isProcessing = true;
 
-        final recognizedText = await _textRecognizer.processImage(inputImage);
+    try {
+      final inputImage = _buildInputImage(image);
+      if (inputImage == null) return;
 
-        final placa = _extrairPlaca(recognizedText.text);
+      final recognizedText = await _textRecognizer.processImage(inputImage);
 
-        if (placa != null && mounted) {
-          setState(() {
-            _placaDetectada = placa;
-            _statusMsg = 'Placa detectada! ✓';
-          });
-          // Para o stream e retorna automaticamente após 500ms
-          await _controller?.stopImageStream();
-          await Future.delayed(const Duration(milliseconds: 600));
-          if (mounted) Navigator.of(context).pop(placa);
-        }
-      } catch (_) {
-        // Ignora erros de frame individual
-      } finally {
-        _isProcessing = false;
+      final placa = _extrairPlaca(recognizedText.text);
+
+      if (placa != null && mounted) {
+        setState(() {
+          _placaDetectada = placa;
+          _statusMsg = 'Placa detectada! ✓';
+        });
+        // Para o stream e retorna automaticamente após 500ms
+        await _controller?.stopImageStream();
+        await Future.delayed(const Duration(milliseconds: 600));
+        if (mounted) Navigator.of(context).pop(placa);
       }
-    });
+    } catch (_) {
+      // Ignora erros de frame individual
+    } finally {
+      // Throttle: aguarda 400ms antes de liberar o processamento do próximo frame
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) _isProcessing = false;
+      });
+    }
   }
 
   InputImage? _buildInputImage(CameraImage image) {

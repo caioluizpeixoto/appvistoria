@@ -18,6 +18,7 @@ class StepConclusao extends StatefulWidget {
 class _StepConclusaoState extends State<StepConclusao> {
   final _parecerCtrl = TextEditingController();
   late SignatureController _signatureController;
+  late SignatureController _signatureControllerCliente;
 
   final List<String> _resultados = [
     'Conforme',
@@ -30,6 +31,11 @@ class _StepConclusaoState extends State<StepConclusao> {
   void initState() {
     super.initState();
     _signatureController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: AppTheme.textPrimary,
+      exportBackgroundColor: Colors.white,
+    );
+    _signatureControllerCliente = SignatureController(
       penStrokeWidth: 3,
       penColor: AppTheme.textPrimary,
       exportBackgroundColor: Colors.white,
@@ -49,11 +55,13 @@ class _StepConclusaoState extends State<StepConclusao> {
   void dispose() {
     _parecerCtrl.dispose();
     _signatureController.dispose();
+    _signatureControllerCliente.dispose();
     super.dispose();
   }
 
-  Future<void> _salvarAssinatura(VistoriaWizardState state) async {
-    if (_signatureController.isEmpty) {
+  Future<void> _salvarAssinatura(VistoriaWizardState state, {required bool isCliente}) async {
+    final controller = isCliente ? _signatureControllerCliente : _signatureController;
+    if (controller.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Por favor, assine no campo abaixo antes de salvar.'),
@@ -63,21 +71,26 @@ class _StepConclusaoState extends State<StepConclusao> {
       return;
     }
 
-    final Uint8List? imageBytes = await _signatureController.toPngBytes();
+    final Uint8List? imageBytes = await controller.toPngBytes();
     if (imageBytes == null) return;
 
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/assinatura_${state.vistoriaId}_${DateTime.now().millisecondsSinceEpoch}.png');
+    final tipo = isCliente ? 'cliente' : 'vistoriador';
+    final file = File('${dir.path}/assinatura_${tipo}_${state.vistoriaId}_${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(imageBytes);
 
-    state.assinaturaPath = file.path;
+    if (isCliente) {
+      state.assinaturaClientePath = file.path;
+    } else {
+      state.assinaturaPath = file.path;
+    }
     // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
     state.notifyListeners();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Assinatura salva com sucesso!'),
+        SnackBar(
+          content: Text('✅ Assinatura do ${isCliente ? 'Cliente' : 'Responsável Técnico'} salva com sucesso!'),
           backgroundColor: AppTheme.conforme,
         ),
       );
@@ -334,7 +347,7 @@ class _StepConclusaoState extends State<StepConclusao> {
                       Text(
                         state.assinaturaPath != null
                             ? 'Assinatura Digital ✅'
-                            : 'Assinatura Digital (obrigatória)',
+                            : 'Assinatura Digital',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -385,13 +398,13 @@ class _StepConclusaoState extends State<StepConclusao> {
                     ),
                   ),
 
-                // Canvas de assinatura
+                // Canvas de assinatura (Responsável Técnico)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Assine abaixo:',
+                      const Text('Assine abaixo (Responsável Técnico):',
                           style: TextStyle(
                               fontSize: 12, color: AppTheme.textSecondary)),
                       const SizedBox(height: 8),
@@ -438,7 +451,141 @@ class _StepConclusaoState extends State<StepConclusao> {
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 backgroundColor: AppTheme.conforme,
                               ),
-                              onPressed: () => _salvarAssinatura(state),
+                              onPressed: () => _salvarAssinatura(state, isCliente: false),
+                              icon: const Icon(Icons.check_rounded, size: 18),
+                              label: const Text('Confirmar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // ── Assinatura digital do Cliente ──────────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: state.assinaturaClientePath != null
+                    ? AppTheme.conforme
+                    : AppTheme.border,
+                width: state.assinaturaClientePath != null ? 2 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        state.assinaturaClientePath != null
+                            ? Icons.verified_rounded
+                            : Icons.draw_rounded,
+                        color: state.assinaturaClientePath != null
+                            ? AppTheme.conforme
+                            : AppTheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        state.assinaturaClientePath != null
+                            ? 'Assinatura Cliente ✅'
+                            : 'Assinatura Cliente',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: state.assinaturaClientePath != null
+                              ? AppTheme.conforme
+                              : AppTheme.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (state.assinaturaClientePath != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.file(
+                        File(state.assinaturaClientePath!),
+                        height: 100,
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 100,
+                          width: double.infinity,
+                          color: Colors.grey[200],
+                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Assine abaixo (Cliente):',
+                          style: TextStyle(
+                              fontSize: 12, color: AppTheme.textSecondary)),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 160,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppTheme.border),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Signature(
+                            controller: _signatureControllerCliente,
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                side: const BorderSide(color: AppTheme.naoConforme),
+                              ),
+                              onPressed: () {
+                                _signatureControllerCliente.clear();
+                                state.assinaturaClientePath = null;
+                                // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+                                state.notifyListeners();
+                              },
+                              icon: const Icon(Icons.clear_rounded,
+                                  color: AppTheme.naoConforme, size: 18),
+                              label: const Text('Limpar',
+                                  style: TextStyle(color: AppTheme.naoConforme)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                backgroundColor: AppTheme.conforme,
+                              ),
+                              onPressed: () => _salvarAssinatura(state, isCliente: true),
                               icon: const Icon(Icons.check_rounded, size: 18),
                               label: const Text('Confirmar'),
                             ),

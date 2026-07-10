@@ -21,7 +21,6 @@ import 'steps/step_etiquetas_vidros_placas.dart';
 import 'steps/step_estrutura.dart';
 import 'steps/step_pintura.dart';
 import 'steps/step_fotos_extras.dart';
-import 'steps/step_observacoes.dart';
 import 'steps/step_conclusao.dart';
 
 /// Tela principal do wizard de Vistoria Cautelar Automotiva.
@@ -63,7 +62,6 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       const _StepInfo(titulo: 'Etiquetas e Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui) const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
       if (temAvarias) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
-      const _StepInfo(titulo: 'Observações', icone: Icons.notes_rounded),
       const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
       const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
       const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
@@ -759,7 +757,6 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       const StepEtiquetasChassi(),
                       if (_wizardState.temCroqui) const StepEstrutura(),
                       if (_wizardState.temAvarias) const StepPintura(),
-                      const StepObservacoes(),
                       const StepFotosExtras(),
                       const StepDadosVeiculo(),
                       const StepConclusao(),

@@ -10,22 +10,23 @@ class StepVidros extends StatelessWidget {
   const StepVidros({super.key});
 
   static const List<Map<String, String>> _itensPrincipais = [
-    {'id': 'vidro_dianteiro_direito', 'label': 'Vidro Dianteiro Direito'},
-    {'id': 'vidro_dianteiro_esquerdo', 'label': 'Vidro Dianteiro Esquerdo'},
     {'id': 'vidro_frontal', 'label': 'Vidro Frontal (Parabrisa)'},
+    {'id': 'vidro_dianteiro_esquerdo', 'label': 'Vidro Dianteiro Esquerdo'},
+    {'id': 'vidro_traseiro_esquerdo', 'label': 'Vidro Traseiro Esquerdo'},
     {'id': 'vidro_traseiro', 'label': 'Vidro Traseiro (Vigia)'},
     {'id': 'vidro_traseiro_direito', 'label': 'Vidro Traseiro Direito'},
-    {'id': 'vidro_traseiro_esquerdo', 'label': 'Vidro Traseiro Esquerdo'},
+    {'id': 'vidro_dianteiro_direito', 'label': 'Vidro Dianteiro Direito'},
   ];
 
   static const List<String> _statusOpcoes = [
     'Original',
     'Dentro dos padrões',
     'Não original',
-    'Substituído',
+    'Vidro não original com gravação',
+    'Inexistente',
     'Gravação ausente',
     'Divergente',
-    'Não analisado',
+    'Vestígios de adulteração nos vidros',
   ];
 
   @override

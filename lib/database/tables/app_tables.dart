@@ -30,6 +30,7 @@ class Vistorias extends Table {
   TextColumn get statusFinal => text().nullable()();
   // Novo: path da assinatura digital (salvo localmente)
   TextColumn get assinaturaPath => text().nullable()();
+  TextColumn get assinaturaClientePath => text().nullable()();
   DateTimeColumn get dataHora => dateTime().withDefault(currentDateAndTime)();
   TextColumn get vistoriadorId => text()();
   TextColumn get vistoriadorNome => text().nullable()();

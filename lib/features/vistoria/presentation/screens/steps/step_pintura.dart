@@ -46,11 +46,11 @@ class StepPintura extends StatelessWidget {
     'Danificado',
     'Amassado',
     'Riscado',
-    'Não analisado',
+    'Original sem reparo',
   ];
 
   Color _statusColor(String status) {
-    if (status.isEmpty || status == 'Não analisado') return AppTheme.naoAplicavel;
+    if (status.isEmpty) return AppTheme.naoAplicavel;
     final s = status.toLowerCase();
     if (s.contains('original')) return AppTheme.conforme;
     if (s.contains('repintura') || s.contains('amassado') || s.contains('riscado') || s.contains('envelopado')) return AppTheme.comObs;

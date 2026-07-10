@@ -57,8 +57,14 @@ class PdfGeneratorService {
     // Carregar logo se existir (senão usa placeholder)
     pw.ImageProvider? logoImage;
     try {
-      final logoBytes = await rootBundle.load('assets/images/app_icon.png');
+      final logoBytes = await rootBundle.load('assets/images/logo.pdf.png');
       logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
+    } catch (_) {}
+
+    pw.ImageProvider? marcaImage;
+    try {
+      final marcaBytes = await rootBundle.load('assets/images/marca.png');
+      marcaImage = pw.MemoryImage(marcaBytes.buffer.asUint8List());
     } catch (_) {}
 
     pw.ImageProvider? carroEstruturaImage;
@@ -87,8 +93,18 @@ class PdfGeneratorService {
       } catch (_) {}
     }
 
+    pw.ImageProvider? assinaturaClienteImage;
+    if (wizardState?.assinaturaClientePath != null) {
+      try {
+        final file = File(wizardState!.assinaturaClientePath!);
+        if (file.existsSync()) {
+          assinaturaClienteImage = pw.MemoryImage(file.readAsBytesSync());
+        }
+      } catch (_) {}
+    }
+
     // Página 1 — Dados Gerais
-    pdf.addPage(await _buildPage1(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage));
+    pdf.addPage(await _buildPage1(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage, assinaturaCliente: assinaturaClienteImage, marcaAgua: marcaImage));
 
     final tipoEnum = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
     final isCaminhao = tipoEnum == TipoVistoria.cautelarCaminhao;
@@ -108,7 +124,7 @@ class PdfGeneratorService {
       ],
       'FOTOS PRINCIPAIS - VIDROS': [
         'vidro_frontal',
-        'vidro_traseiro',
+        if (wizardState?.getStatus('vidro_traseiro').toUpperCase() != 'INEXISTENTE') 'vidro_traseiro',
         'vidro_dianteiro_direito',
         'vidro_dianteiro_esquerdo',
         if (!isCaminhao) 'vidro_traseiro_direito',
@@ -127,12 +143,32 @@ class PdfGeneratorService {
         'chassi_gravacao',
       ],
       if (temCroqui && !isCaminhao) 'FOTOS - ESTRUTURAL': [
+        'painel_frontal',
+        'painel_corta_fogo',
+        'torre_amortecedor_esquerda',
         'longarina_dianteira_esquerda',
-        'longarina_dianteira_direita',
+        'caixa_roda_dianteira_esquerda',
+        'coluna_dianteira_esquerda',
+        'caixa_ar_esquerda',
+        'assoalho_esquerdo',
+        'coluna_central_esquerda',
         'longarina_centro_esquerda',
-        'longarina_centro_direita',
+        'coluna_traseira_esquerda',
+        'caixa_roda_traseira_esquerda',
         'longarina_traseira_esquerda',
+        'painel_traseiro',
+        'caixa_estepe',
         'longarina_traseira_direita',
+        'caixa_roda_traseira_direita',
+        'coluna_traseira_direita',
+        'longarina_centro_direita',
+        'coluna_central_direita',
+        'assoalho_direito',
+        'caixa_ar_direita',
+        'coluna_dianteira_direita',
+        'caixa_roda_dianteira_direita',
+        'longarina_dianteira_direita',
+        'torre_amortecedor_direita',
       ],
       if (temAvarias && !isCaminhao) 'FOTOS - PINTURA': [
         'peca_capo_dianteiro',
@@ -235,10 +271,16 @@ class PdfGeneratorService {
       pdf.addPage(_buildPageAnalise(
         titulo: 'ANÁLISE ESTRUTURAL',
         itens: const [
-          'longarina_dianteira_direita', 'longarina_dianteira_esquerda',
-          'longarina_centro_direita', 'longarina_centro_esquerda',
-          'longarina_traseira_direita', 'longarina_traseira_esquerda',
-          'painel_frontal', 'painel_traseiro', 'assoalho', 'caixa_roda',
+          'painel_frontal', 'painel_corta_fogo',
+          'torre_amortecedor_esquerda', 'longarina_dianteira_esquerda', 'caixa_roda_dianteira_esquerda',
+          'coluna_dianteira_esquerda', 'caixa_ar_esquerda', 'assoalho_esquerdo', 'coluna_central_esquerda',
+          'longarina_centro_esquerda', 'coluna_traseira_esquerda',
+          'caixa_roda_traseira_esquerda', 'longarina_traseira_esquerda',
+          'painel_traseiro', 'caixa_estepe',
+          'longarina_traseira_direita', 'caixa_roda_traseira_direita',
+          'coluna_traseira_direita', 'longarina_centro_direita', 'coluna_central_direita',
+          'assoalho_direito', 'caixa_ar_direita', 'coluna_dianteira_direita',
+          'caixa_roda_dianteira_direita', 'longarina_dianteira_direita', 'torre_amortecedor_direita',
         ],
         labels: const {
           'longarina_dianteira_direita': 'Longarina Dianteira Direita',
@@ -249,10 +291,26 @@ class PdfGeneratorService {
           'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
           'painel_frontal': 'Painel Frontal',
           'painel_traseiro': 'Painel Traseiro',
-          'assoalho': 'Assoalho',
-          'caixa_roda': 'Caixa de Roda',
+          'assoalho_esquerdo': 'Assoalho Esquerdo',
+          'assoalho_direito': 'Assoalho Direito',
+          'caixa_ar_esquerda': 'Caixa de Ar Esquerda',
+          'caixa_ar_direita': 'Caixa de Ar Direita',
+          'caixa_estepe': 'Caixa do Estepe',
+          'caixa_roda_dianteira_esquerda': 'Caixa de Roda Dianteira Esquerda',
+          'caixa_roda_dianteira_direita': 'Caixa de Roda Dianteira Direita',
+          'caixa_roda_traseira_esquerda': 'Caixa de Roda Traseira Esquerda',
+          'caixa_roda_traseira_direita': 'Caixa de Roda Traseira Direita',
+          'coluna_dianteira_esquerda': 'Coluna Dianteira Esquerda',
+          'coluna_dianteira_direita': 'Coluna Dianteira Direita',
+          'coluna_central_esquerda': 'Coluna Central Esquerda',
+          'coluna_central_direita': 'Coluna Central Direita',
+          'coluna_traseira_esquerda': 'Coluna Traseira Esquerda',
+          'coluna_traseira_direita': 'Coluna Traseira Direita',
+          'torre_amortecedor_esquerda': 'Torre de Amortecedor Esquerda',
+          'torre_amortecedor_direita': 'Torre de Amortecedor Direita',
+          'painel_corta_fogo': 'Painel Corta Fogo',
         },
-        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage,
+        state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: bgImage, assinatura: assinaturaImage, assinaturaCliente: assinaturaClienteImage, showSignatures: true,
       ));
     }
 
@@ -279,7 +337,7 @@ class PdfGeneratorService {
           'peca_teto': 'Teto',
           'peca_tampa_traseira': 'Tampa Traseira',
         },
-        isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroPinturaImage ?? bgImage, assinatura: assinaturaImage,
+        isPintura: true, state: wizardState, vistoria: vistoria, styles: styles, logo: logoImage, backgroundImage: carroPinturaImage ?? bgImage, assinatura: assinaturaImage, assinaturaCliente: assinaturaClienteImage, showSignatures: false,
       ));
     }
 
@@ -298,6 +356,17 @@ class PdfGeneratorService {
 
     // ── Ficha Técnica Inteligente (Gemini) ──────────────────────────────────
     try {
+      List<String> apontamentosList = [];
+      if (wizardState != null) {
+        apontamentosList = wizardState.checklistStatus.entries
+            .where((e) => e.value != 'CONFORME' && e.value != 'NÃO ANALISADO' && !e.value.toUpperCase().contains('ORIGINAL'))
+            .map((e) {
+              final nomeLimpo = e.key.replaceAll('_', ' ').toUpperCase();
+              final obs = wizardState.checklistObs[e.key] ?? '';
+              return '$nomeLimpo: ${e.value}${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
+            }).toList();
+      }
+
       final resFicha = await Supabase.instance.client.functions.invoke(
         'gerar-ficha-veiculo',
         body: {
@@ -307,6 +376,7 @@ class PdfGeneratorService {
           'version': veiculo.modelo ?? '',
           'fuel': veiculo.combustivel ?? '',
           'engine': veiculo.motorVeiculo ?? '',
+          if (apontamentosList.isNotEmpty) 'apontamentos': apontamentosList,
         },
       ).timeout(const Duration(seconds: 20));
 
@@ -329,6 +399,7 @@ class PdfGeneratorService {
       styles: styles,
       logo: logoImage,
       assinatura: assinaturaImage,
+      assinaturaCliente: assinaturaClienteImage,
       state: wizardState,
     ));
 
@@ -338,6 +409,17 @@ class PdfGeneratorService {
     final fileName = 'Laudo_${vistoria.numeroLaudo}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(finalBytes);
+
+    try {
+      final storagePath = '${vistoria.id}/${vistoria.numeroLaudo}.pdf';
+      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+        storagePath,
+        finalBytes,
+        fileOptions: const FileOptions(upsert: true, contentType: 'application/pdf'),
+      );
+    } catch (e) {
+      print('Erro ao fazer upload do PDF para o Supabase: $e');
+    }
 
     return file.path;
   }
@@ -349,6 +431,7 @@ class PdfGeneratorService {
     required _PdfStyles styles,
     pw.ImageProvider? logo,
     pw.ImageProvider? assinatura,
+    pw.ImageProvider? assinaturaCliente,
     VistoriaWizardState? state,
   }) {
     return pw.Page(
@@ -379,10 +462,12 @@ class PdfGeneratorService {
                   _disclaimerText('A vistoria cautelar não afere a idoneidade da quilometragem constante no hodômetro do veículo, sendo apenas registrado em caráter informativo a quilometragem aparente em seu painel de instrumentos.', styles),
                   _disclaimerText('Alguns itens obrigatórios e acessórios como pneus, setas, cintos e outros acessórios, são apenas informados quanto à sua existência e funcionamento mínimo, não sendo atestada calibração ou cumprimento de normas técnicas específicas.', styles),
                   _disclaimerText('A análise proposta é particular, restrita exclusivamente aos itens analisados e não à vistoria regulamentada pelo CONTRAN ou à perícia realizada pelo Instituto de Criminalística.', styles),
+                  if (vistoria.tipoVistoria.toLowerCase().contains('caminh'))
+                    _disclaimerText('ATENÇÃO (VEÍCULO DE CARGA): As modificações nas dimensões do chassi (alongamento ou encurtamento) estão sujeitas à regulamentação específica (Resolução CONTRAN nº 292/2008 e atualizações como a Res. 916/2022). Este laudo aponta apenas as condições aparentes da estrutura para fins de vistoria cautelar, não suprindo a exigência legal do Certificado de Segurança Veicular (CSV) nem garantindo a regularização das modificações perante o DETRAN.', styles, bold: true),
                 ],
               ),
             ),
-            _buildFooter(vistoria, styles, ctx, assinatura),
+            _buildFooter(vistoria, styles, ctx, assinatura, assinaturaCliente: assinaturaCliente, showSignatures: true),
           ],
         );
       },
@@ -442,12 +527,8 @@ class PdfGeneratorService {
           // Logo
           pw.Container(
             width: 70, height: 70,
-            decoration: pw.BoxDecoration(
-              shape: pw.BoxShape.circle,
-              color: _kGreyLight,
-            ),
             child: logo != null 
-                ? pw.ClipOval(child: pw.Image(logo, fit: pw.BoxFit.cover))
+                ? pw.Image(logo, fit: pw.BoxFit.contain)
                 : pw.Center(child: pw.Text('Logo', style: pw.TextStyle(color: _kGreyDark, fontSize: 10))),
           ),
           pw.SizedBox(width: 16),
@@ -486,7 +567,7 @@ class PdfGeneratorService {
           // QR Code
           pw.BarcodeWidget(
             barcode: pw.Barcode.qrCode(),
-            data: 'https://vistorias.com.br/laudo/${vistoria.numeroLaudo}',
+            data: Supabase.instance.client.storage.from('laudos-pdf').getPublicUrl('${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
             width: 50, height: 50,
           ),
         ],
@@ -504,7 +585,9 @@ class PdfGeneratorService {
     );
   }
 
-  pw.Widget _buildFooter(Vistoria vistoria, _PdfStyles styles, pw.Context ctx, pw.ImageProvider? assinatura) {
+  pw.Widget _buildFooter(Vistoria vistoria, _PdfStyles styles, pw.Context ctx, pw.ImageProvider? assinatura, {pw.ImageProvider? assinaturaCliente, bool showSignatures = false}) {
+    if (!showSignatures) return pw.SizedBox.shrink();
+    
     return pw.Container(
       margin: const pw.EdgeInsets.only(top: 16),
       child: pw.Column(
@@ -523,40 +606,29 @@ class PdfGeneratorService {
                     pw.SizedBox(height: 30),
                   pw.Container(width: 150, height: 1, color: _kBlack),
                   pw.SizedBox(height: 4),
-                  pw.Text(vistoria.vistoriadorNome?.toUpperCase() ?? 'ANALISTA', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
+                  pw.Text(vistoria.vistoriadorNome?.toUpperCase() ?? 'VISTORIADOR', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
                   pw.Text('CPF: ${_maskCpf(vistoria.vistoriadorCpf)}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                  pw.Text('Analista', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
+                  pw.Text('Vistoriador', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
                 ],
               ),
               pw.Column(
                 children: [
-                  if (assinatura != null)
+                  if (assinaturaCliente != null)
                     pw.Container(
                       height: 30,
-                      child: pw.Image(assinatura, fit: pw.BoxFit.contain),
+                      child: pw.Image(assinaturaCliente, fit: pw.BoxFit.contain),
                     )
                   else
                     pw.SizedBox(height: 30),
                   pw.Container(width: 150, height: 1, color: _kBlack),
                   pw.SizedBox(height: 4),
-                  pw.Text(vistoria.vistoriadorNome?.toUpperCase() ?? 'EXAMINADOR', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                  pw.Text('CPF: ${_maskCpf(vistoria.vistoriadorCpf)}', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
-                  pw.Text('Examinador', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
+                  pw.Text((vistoria.clienteNome != null && vistoria.clienteNome!.trim().isNotEmpty) ? vistoria.clienteNome!.toUpperCase() : 'CLIENTE', style: pw.TextStyle(font: styles.bold, fontSize: 8)),
+                  pw.Text('Cliente', style: pw.TextStyle(font: styles.regular, fontSize: 7)),
                 ],
               ),
             ],
           ),
           pw.SizedBox(height: 8),
-          // pw.Text(
-          //   'Isenção informada: declaro ter recebido a segunda via e EXAME VISTORIA VEICULAR... [Texto de isenção placeholder]... Qualquer dúvida estamos à disposição.',
-          //   style: pw.TextStyle(font: styles.regular, fontSize: 5, color: _kGreyDark),
-          //   textAlign: pw.TextAlign.justify,
-          // ),
-          // pw.Container(
-          //   margin: const pw.EdgeInsets.only(top: 4, bottom: 2),
-          //   height: 1, color: _kBlack,
-          // ),
-          // pw.Text('NULL', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: _kGreyDark)),
         ],
       ),
     );
@@ -567,10 +639,12 @@ class PdfGeneratorService {
   Future<pw.Page> _buildPage1({
     required Vistoria vistoria,
     required Veiculo veiculo,
-    required VistoriaWizardState? state,
+    VistoriaWizardState? state,
     required _PdfStyles styles,
     pw.ImageProvider? logo,
     pw.ImageProvider? assinatura,
+    pw.ImageProvider? assinaturaCliente,
+    pw.ImageProvider? marcaAgua,
   }) async {
     String computedStatus = vistoria.statusFinal ?? 'CONFORME';
     if (state != null) {
@@ -585,9 +659,23 @@ class PdfGeneratorService {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(16),
       build: (ctx) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
+        return pw.Stack(
           children: [
+            if (marcaAgua != null || logo != null)
+              pw.Positioned.fill(
+                child: pw.Center(
+                  child: pw.Opacity(
+                    opacity: 0.15,
+                    child: pw.Container(
+                      width: 350,
+                      child: pw.Image(marcaAgua ?? logo!, fit: pw.BoxFit.contain),
+                    ),
+                  ),
+                ),
+              ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
             _buildHeader(vistoria, styles, logo, state: state),
             _buildBlackBar('VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
             
@@ -703,7 +791,9 @@ class PdfGeneratorService {
             pw.Text('VISTORIA CAUTELAR AUTOMOTIVA', style: pw.TextStyle(font: styles.bold, fontSize: 7)),
             pw.SizedBox(height: 10),
 
-            _buildFooter(vistoria, styles, ctx, assinatura),
+            _buildFooter(vistoria, styles, ctx, assinatura, assinaturaCliente: assinaturaCliente, showSignatures: true),
+              ],
+            ),
           ],
         );
       },
@@ -726,7 +816,7 @@ class PdfGeneratorService {
   }
 
   pw.Widget _buildChecklistCol(VistoriaWizardState? state, _PdfStyles styles, int colIndex) {
-    final itens = [
+    var itens = [
       'compartimento_motor', 'etiqueta_vis_motor',
       'etiqueta_vis_porta', 'frente_direita',
       'frente_esquerda', 'chassi_gravacao',
@@ -737,6 +827,22 @@ class PdfGeneratorService {
       'foto_placa', 'traseira_direita',
       'traseira_esquerda'
     ];
+    
+    final isCaminhao = state?.tipoVistoria.toLowerCase().contains('caminh') ?? false;
+    
+    if (isCaminhao) {
+      itens.remove('compartimento_motor');
+      itens.remove('etiqueta_vis_motor');
+      itens.remove('etiqueta_vis_porta');
+      itens.remove('vidro_traseiro_direito');
+      itens.remove('vidro_traseiro_esquerdo');
+    }
+    
+    itens = itens.where((id) {
+      final status = state?.getStatus(id).toUpperCase() ?? '';
+      return status != 'INEXISTENTE';
+    }).toList();
+
     
     final labels = {
       'compartimento_motor': 'COMPARTIMENTO DO MOTOR',
@@ -857,7 +963,7 @@ class PdfGeneratorService {
                 ),
               ),
             
-            _buildFooter(vistoria, styles, ctx, assinatura),
+            _buildFooter(vistoria, styles, ctx, assinatura, showSignatures: false),
           ],
         );
       },
@@ -876,7 +982,9 @@ class PdfGeneratorService {
     pw.ImageProvider? logo,
     pw.ImageProvider? backgroundImage,
     pw.ImageProvider? assinatura,
+    pw.ImageProvider? assinaturaCliente,
     bool isPintura = false,
+    bool showSignatures = false,
   }) {
     return pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -965,7 +1073,7 @@ class PdfGeneratorService {
                 ),
               ),
             
-            _buildFooter(vistoria, styles, ctx, assinatura),
+            _buildFooter(vistoria, styles, ctx, assinatura, assinaturaCliente: assinaturaCliente, showSignatures: showSignatures),
           ],
         );
       },
@@ -1214,9 +1322,9 @@ class PdfGeneratorService {
     pw.ImageProvider? assinatura,
     VistoriaWizardState? state,
   ) {
-    final themeRed = PdfColor.fromHex('#d32f2f'); // Vermelho principal
-    final lightRed = PdfColor.fromHex('#ffebee'); // Fundo clarinho
-    final borderRed = PdfColor.fromHex('#ffcdd2'); // Borda suave
+    final themeRed = PdfColor.fromHex('#0288d1'); // Azul claro principal (mantendo o nome da variavel para nao quebrar)
+    final lightRed = PdfColor.fromHex('#e1f5fe'); // Fundo azul clarinho
+    final borderRed = PdfColor.fromHex('#b3e5fc'); // Borda azul suave
     final textDark = PdfColor.fromHex('#333333');
     final textMuted = PdfColor.fromHex('#666666');
 
@@ -1315,7 +1423,7 @@ class PdfGeneratorService {
                 ),
 
               pw.Spacer(),
-              _buildFooter(vistoria, styles, ctx, assinatura),
+              _buildFooter(vistoria, styles, ctx, assinatura, showSignatures: false),
             ],
           );
         },
@@ -1393,8 +1501,40 @@ class PdfGeneratorService {
                   ),
                 ),
 
+              if (data['apontamentos_veiculo'] != null && data['apontamentos_veiculo'] is List) ...[
+                pw.SizedBox(height: 8),
+                buildRedBar('APONTAMENTOS DA VISTORIA (VALORES ESTIMADOS)'),
+                pw.Container(
+                  decoration: pw.BoxDecoration(
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    border: pw.Border.all(color: borderRed, width: 1),
+                  ),
+                  child: pw.Table(
+                    border: pw.TableBorder.symmetric(inside: pw.BorderSide(color: borderRed, width: 0.5)),
+                    children: [
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(color: lightRed),
+                        children: [
+                          buildSoftTh('PEÇA / PROBLEMA'), buildSoftTh('OBSERVAÇÃO'), buildSoftTh('VALOR PEÇA'), buildSoftTh('MÃO DE OBRA')
+                        ]
+                      ),
+                      ...((data['apontamentos_veiculo'] as List).map((item) {
+                        return pw.TableRow(
+                          children: [
+                            buildSoftTd(item['peca_ou_problema']?.toString() ?? ''),
+                            buildSoftTd(item['observacao_indicada']?.toString() ?? ''),
+                            buildSoftTd(item['valor_peca_estimado']?.toString() ?? ''),
+                            buildSoftTd(item['valor_mao_de_obra_estimado']?.toString() ?? ''),
+                          ]
+                        );
+                      }).toList()),
+                    ],
+                  ),
+                ),
+              ],
+
               pw.Spacer(),
-              _buildFooter(vistoria, styles, ctx, assinatura),
+              _buildFooter(vistoria, styles, ctx, assinatura, showSignatures: false),
             ],
           );
         },
@@ -1464,7 +1604,7 @@ class PdfGeneratorService {
                 ],
 
                 pw.Spacer(),
-                _buildFooter(vistoria, styles, ctx, assinatura),
+                _buildFooter(vistoria, styles, ctx, assinatura, showSignatures: false),
               ],
             );
           },

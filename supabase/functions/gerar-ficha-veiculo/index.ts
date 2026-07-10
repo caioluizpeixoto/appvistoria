@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    let { brand, model, year, version, fuel, engine } = body
+    let { brand, model, year, version, fuel, engine, apontamentos } = body
 
     if (!brand || !model || !year) {
       return new Response(JSON.stringify({ error: 'Marca, modelo e ano são obrigatórios.' }), {
@@ -44,32 +44,36 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Buscar no banco se já existe ficha
-    let query = supabase
-      .from('vehicle_ai_specs')
-      .select('*')
-      .eq('brand', brand)
-      .eq('model', model)
-      .eq('year', year)
+    // Buscar no banco se já existe ficha (só busca cache se não houver apontamentos dinâmicos do vistoriador)
+    const hasApontamentos = apontamentos && Array.isArray(apontamentos) && apontamentos.length > 0;
+    
+    if (!hasApontamentos) {
+      let query = supabase
+        .from('vehicle_ai_specs')
+        .select('*')
+        .eq('brand', brand)
+        .eq('model', model)
+        .eq('year', year)
 
-    if (version) query = query.eq('version', version)
-    else query = query.is('version', null)
-    if (fuel) query = query.eq('fuel', fuel)
-    else query = query.is('fuel', null)
-    if (engine) query = query.eq('engine', engine)
-    else query = query.is('engine', null)
+      if (version) query = query.eq('version', version)
+      else query = query.is('version', null)
+      if (fuel) query = query.eq('fuel', fuel)
+      else query = query.is('fuel', null)
+      if (engine) query = query.eq('engine', engine)
+      else query = query.is('engine', null)
 
-    const { data: cachedData, error: cacheError } = await query.maybeSingle()
+      const { data: cachedData, error: cacheError } = await query.maybeSingle()
 
-    if (cacheError) {
-      console.error('Erro ao buscar cache:', cacheError)
-    }
+      if (cacheError) {
+        console.error('Erro ao buscar cache:', cacheError)
+      }
 
-    if (cachedData && cachedData.data) {
-      console.log('Retornando dados do cache para:', brand, model, year)
-      return new Response(JSON.stringify({ source: 'cache', data: cachedData.data }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      if (cachedData && cachedData.data) {
+        console.log('Retornando dados do cache para:', brand, model, year)
+        return new Response(JSON.stringify({ source: 'cache', data: cachedData.data }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
     }
 
     // Se não existir, chamar Gemini
@@ -83,7 +87,14 @@ Deno.serve(async (req) => {
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`
 
-    const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados.
+    let extraPrompt = '';
+    let extraJsonSchema = '';
+    if (hasApontamentos) {
+      extraPrompt = `\nIMPORTANTE: O vistoriador apontou as seguintes DIVERGÊNCIAS/DEFEITOS reais neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}\n\nSua tarefa é ESTIMAR o valor da peça de reposição (nova ou paralela) e o custo de mão de obra para reparar ou substituir as peças citadas acima. Inclua essas estimativas no JSON de retorno sob a chave "apontamentos_veiculo".`;
+      extraJsonSchema = `,\n"apontamentos_veiculo": [\n{\n"peca_ou_problema": "",\n"observacao_indicada": "",\n"valor_peca_estimado": "",\n"valor_mao_de_obra_estimado": ""\n}\n]`;
+    }
+
+    const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados.${extraPrompt}
 
 Veículo:
 Marca: ${brand}
@@ -151,7 +162,7 @@ O JSON retornado deve seguir rigorosamente esta estrutura:
 ],
 "observacoes": [
 ""
-],
+]${extraJsonSchema},
 "aviso": "Informações geradas por IA com valores estimados. Confirmar dados técnicos, valores e recalls em fontes oficiais antes de uso comercial ou jurídico."
 }`
 
@@ -205,22 +216,23 @@ O JSON retornado deve seguir rigorosamente esta estrutura:
       })
     }
 
-    // Salvar no Supabase
-    const { error: insertError } = await supabase
-      .from('vehicle_ai_specs')
-      .insert({
-        brand,
-        model,
-        year,
-        version,
-        fuel,
-        engine,
-        data: parsedJson
-      })
+    // Salvar no Supabase apenas se não tiver apontamentos (para não cachear defeitos específicos de 1 carro para todo o modelo)
+    if (!hasApontamentos) {
+      const { error: insertError } = await supabase
+        .from('vehicle_ai_specs')
+        .insert({
+          brand,
+          model,
+          year,
+          version,
+          fuel,
+          engine,
+          data: parsedJson
+        })
 
-    if (insertError) {
-      console.error('Erro ao salvar cache:', insertError)
-      // Continuar mesmo se falhar ao salvar cache
+      if (insertError) {
+        console.error('Erro ao salvar cache:', insertError)
+      }
     }
 
     return new Response(JSON.stringify({ source: 'gemini', data: parsedJson }), {

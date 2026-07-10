@@ -68,6 +68,7 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
             statusFinal: state.resultadoFinal,
             parecerTecnico: state.parecerTecnico,
             assinaturaPath: state.assinaturaPath,
+            assinaturaClientePath: state.assinaturaClientePath,
             vistoriadorNome: state.vistoriadorNome,
             vistoriadorCpf: state.vistoriadorCpf,
             pdfUrl: pdfPath,

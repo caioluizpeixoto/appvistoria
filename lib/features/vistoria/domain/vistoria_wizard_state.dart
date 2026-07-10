@@ -63,6 +63,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String resultadoFinal = '';
   String parecerTecnico = '';
   String? assinaturaPath;
+  String? assinaturaClientePath;
 
   // ── Controle de loading ───────────────────────────────────────────────────
   bool isSaving = false;
@@ -81,7 +82,7 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Navegação ──────────────────────────────────────────────────────────────
 
   int get totalSteps {
-    int count = 10;
+    int count = 9;
     if (temCroqui) count++;
     if (temAvarias) count++;
     return count;

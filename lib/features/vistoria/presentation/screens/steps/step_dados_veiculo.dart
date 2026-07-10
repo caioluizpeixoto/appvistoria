@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import '../placa_camera_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Step 2 — Dados do Veículo
@@ -205,6 +206,22 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
               _buildRow([
                 _buildField('Placa', _placaCtrl,
                     icon: Icons.credit_card_rounded,
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.camera_alt_rounded),
+                      tooltip: 'Scanear Placa',
+                      onPressed: () async {
+                        final placa = await Navigator.of(context).push<String?>(
+                          MaterialPageRoute(builder: (_) => const PlacaCameraScreen()),
+                        );
+                        if (placa != null) {
+                          setState(() {
+                            final limpo = placa.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+                            final formatted = limpo.length >= 7 ? '${limpo.substring(0, 3)}-${limpo.substring(3, 7)}' : limpo;
+                            _placaCtrl.text = formatted;
+                          });
+                        }
+                      },
+                    ),
                     caps: TextCapitalization.characters,
                     onChanged: (_) => setState(() {})),
                 _buildField('Renavam', _renavamCtrl,
@@ -383,6 +400,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
     String label,
     TextEditingController ctrl, {
     IconData? icon,
+    Widget? suffixIcon,
     TextCapitalization caps = TextCapitalization.none,
     TextInputType? keyboard,
     ValueChanged<String>? onChanged,
@@ -394,6 +412,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        suffixIcon: suffixIcon,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),

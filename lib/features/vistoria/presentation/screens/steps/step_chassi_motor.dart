@@ -44,7 +44,6 @@ class StepMotorCambio extends StatelessWidget {
               'Dentro dos padrões',
               'Possui avaria',
               'Com observação',
-              'Não analisado',
             ],
           ),
 
@@ -79,14 +78,13 @@ class StepMotorCambio extends StatelessWidget {
             'Original',
             'Divergente',
             'Remarcado',
-            'Não localizado',
+            'Sem acesso',
             'Ilegível',
             'Com indício de adulteração',
           ],
         ),
 
-        if (!isCaminhao)
-          const InspecaoItemWidget(
+        const InspecaoItemWidget(
             itemId: 'etiqueta_vis_motor',
             label: 'Etiqueta VIS — Compartimento do Motor',
             obrigatoria: true,
@@ -97,7 +95,7 @@ class StepMotorCambio extends StatelessWidget {
               'Danificada',
               'Divergente',
               'Com indício de adulteração',
-              'Não localizado',
+              'Obstruído',
             ],
           ),
 
@@ -122,8 +120,7 @@ class StepEtiquetasChassi extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (!isCaminhao)
-          const InspecaoItemWidget(
+        const InspecaoItemWidget(
             itemId: 'etiqueta_vis_porta',
             label: 'Etiqueta VIS — Porta / Coluna',
             obrigatoria: true,
@@ -134,7 +131,7 @@ class StepEtiquetasChassi extends StatelessWidget {
               'Danificada',
               'Divergente',
               'Com indício de adulteração',
-              'Não localizado',
+              'Obstruído',
             ],
           ),
 
@@ -142,7 +139,7 @@ class StepEtiquetasChassi extends StatelessWidget {
           const InspecaoItemWidget(
             itemId: 'plaqueta_da_cabine',
             label: 'Plaqueta da cabine',
-            obrigatoria: true,
+            obrigatoria: false,
             statusOptions: [
               'Dentro dos padrões',
               'Divergente',

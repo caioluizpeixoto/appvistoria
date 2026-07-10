@@ -8,7 +8,7 @@ enum TipoVistoria {
   String get titulo {
     switch (this) {
       case TipoVistoria.cautelarCarro:
-        return 'Vistoria Cautelar Croqui';
+        return 'Vistoria Lojista';
       case TipoVistoria.cautelarCaminhao:
         return 'Vistoria Cautelar Caminhão';
       case TipoVistoria.carroComCroqui:

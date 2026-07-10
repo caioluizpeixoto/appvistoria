@@ -74,20 +74,25 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   void initState() {
     super.initState();
     if (widget.dadosIniciais != null && widget.dadosIniciais!.isNotEmpty) {
-      _veiculoEncontrado = true;
-      _placaEditCtrl.text = widget.dadosIniciais!['placa'] ?? '';
-      _chassiEditCtrl.text = widget.dadosIniciais!['chassi'] ?? '';
-      _motorEditCtrl.text = widget.dadosIniciais!['motor'] ?? '';
-      _marcaEditCtrl.text = widget.dadosIniciais!['marca'] ?? '';
-      _modeloEditCtrl.text = widget.dadosIniciais!['modelo'] ?? '';
-      _anoFabEditCtrl.text = widget.dadosIniciais!['anoFabricacao'] ?? '';
-      _anoModEditCtrl.text = widget.dadosIniciais!['anoModelo'] ?? '';
-      _corEditCtrl.text = widget.dadosIniciais!['cor'] ?? '';
-      _renavamEditCtrl.text = widget.dadosIniciais!['renavam'] ?? '';
-      _municipioEditCtrl.text = widget.dadosIniciais!['municipio'] ?? '';
-      _ufEditCtrl.text = widget.dadosIniciais!['uf'] ?? '';
-      _restricoesEditCtrl.text = widget.dadosIniciais!['restricoes'] ?? '';
-      _situacaoVeiculo = widget.dadosIniciais!['situacao'];
+      if (widget.dadosIniciais!.containsKey('produtoSelecionado')) {
+        _produtoSelecionado = widget.dadosIniciais!['produtoSelecionado'];
+      }
+      if (widget.dadosIniciais!.containsKey('placa')) {
+        _veiculoEncontrado = true;
+        _placaEditCtrl.text = widget.dadosIniciais!['placa'] ?? '';
+        _chassiEditCtrl.text = widget.dadosIniciais!['chassi'] ?? '';
+        _motorEditCtrl.text = widget.dadosIniciais!['motor'] ?? '';
+        _marcaEditCtrl.text = widget.dadosIniciais!['marca'] ?? '';
+        _modeloEditCtrl.text = widget.dadosIniciais!['modelo'] ?? '';
+        _anoFabEditCtrl.text = widget.dadosIniciais!['anoFabricacao'] ?? '';
+        _anoModEditCtrl.text = widget.dadosIniciais!['anoModelo'] ?? '';
+        _corEditCtrl.text = widget.dadosIniciais!['cor'] ?? '';
+        _renavamEditCtrl.text = widget.dadosIniciais!['renavam'] ?? '';
+        _municipioEditCtrl.text = widget.dadosIniciais!['municipio'] ?? '';
+        _ufEditCtrl.text = widget.dadosIniciais!['uf'] ?? '';
+        _restricoesEditCtrl.text = widget.dadosIniciais!['restricoes'] ?? '';
+        _situacaoVeiculo = widget.dadosIniciais!['situacao'];
+      }
     }
   }
 
@@ -172,7 +177,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           _municipioEditCtrl.text = veiculo.municipio;
           _ufEditCtrl.text = veiculo.estado;
           _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty ? veiculo.restricoes1 : veiculo.informacoesRelevantes;
-          _arquivoPesquisaUrl = null;
+          _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
           _situacaoVeiculo = veiculo.situacao;
         });
       }
@@ -665,35 +670,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 _buildFormularioEditavel(),
 
                 const SizedBox(height: 24),
-                if (_arquivoPesquisaUrl != null &&
-                    _arquivoPesquisaUrl!.isNotEmpty) ...[
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        side:
-                            const BorderSide(color: AppTheme.primary, width: 2),
-                      ),
-                      onPressed: () async {
-                        final uri = Uri.parse(_arquivoPesquisaUrl!);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        }
-                      },
-                      icon: const Icon(Icons.picture_as_pdf_rounded,
-                          color: AppTheme.primary),
-                      label: const Text(
-                        'Ver Relatório AutoCredCar',
-                        style: TextStyle(
-                            color: AppTheme.primary,
-                            fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                // Old button removed
+
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
@@ -836,6 +814,22 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       ],
                     ),
                   ),
+                  if (_arquivoPesquisaUrl != null && _arquivoPesquisaUrl!.isNotEmpty)
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () async {
+                        final uri = Uri.parse(_arquivoPesquisaUrl!);
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                      },
+                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                      label: const Text('Baixar Laudo', style: TextStyle(fontSize: 12)),
+                    ),
                 ],
               ),
             ),

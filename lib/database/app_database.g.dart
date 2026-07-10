@@ -490,6 +490,12 @@ class $VistoriasTable extends Vistorias
   late final GeneratedColumn<String> assinaturaPath = GeneratedColumn<String>(
       'assinatura_path', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _assinaturaClientePathMeta =
+      const VerificationMeta('assinaturaClientePath');
+  @override
+  late final GeneratedColumn<String> assinaturaClientePath =
+      GeneratedColumn<String>('assinatura_cliente_path', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _dataHoraMeta =
       const VerificationMeta('dataHora');
   @override
@@ -572,6 +578,7 @@ class $VistoriasTable extends Vistorias
         parecerTecnico,
         statusFinal,
         assinaturaPath,
+        assinaturaClientePath,
         dataHora,
         vistoriadorId,
         vistoriadorNome,
@@ -643,6 +650,12 @@ class $VistoriasTable extends Vistorias
           _assinaturaPathMeta,
           assinaturaPath.isAcceptableOrUnknown(
               data['assinatura_path']!, _assinaturaPathMeta));
+    }
+    if (data.containsKey('assinatura_cliente_path')) {
+      context.handle(
+          _assinaturaClientePathMeta,
+          assinaturaClientePath.isAcceptableOrUnknown(
+              data['assinatura_cliente_path']!, _assinaturaClientePathMeta));
     }
     if (data.containsKey('data_hora')) {
       context.handle(_dataHoraMeta,
@@ -725,6 +738,9 @@ class $VistoriasTable extends Vistorias
           .read(DriftSqlType.string, data['${effectivePrefix}status_final']),
       assinaturaPath: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}assinatura_path']),
+      assinaturaClientePath: attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}assinatura_cliente_path']),
       dataHora: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}data_hora'])!,
       vistoriadorId: attachedDatabase.typeMapping
@@ -764,6 +780,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   final String? parecerTecnico;
   final String? statusFinal;
   final String? assinaturaPath;
+  final String? assinaturaClientePath;
   final DateTime dataHora;
   final String vistoriadorId;
   final String? vistoriadorNome;
@@ -784,6 +801,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       this.parecerTecnico,
       this.statusFinal,
       this.assinaturaPath,
+      this.assinaturaClientePath,
       required this.dataHora,
       required this.vistoriadorId,
       this.vistoriadorNome,
@@ -815,6 +833,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
     }
     if (!nullToAbsent || assinaturaPath != null) {
       map['assinatura_path'] = Variable<String>(assinaturaPath);
+    }
+    if (!nullToAbsent || assinaturaClientePath != null) {
+      map['assinatura_cliente_path'] = Variable<String>(assinaturaClientePath);
     }
     map['data_hora'] = Variable<DateTime>(dataHora);
     map['vistoriador_id'] = Variable<String>(vistoriadorId);
@@ -858,6 +879,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       assinaturaPath: assinaturaPath == null && nullToAbsent
           ? const Value.absent()
           : Value(assinaturaPath),
+      assinaturaClientePath: assinaturaClientePath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(assinaturaClientePath),
       dataHora: Value(dataHora),
       vistoriadorId: Value(vistoriadorId),
       vistoriadorNome: vistoriadorNome == null && nullToAbsent
@@ -891,6 +915,8 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       parecerTecnico: serializer.fromJson<String?>(json['parecerTecnico']),
       statusFinal: serializer.fromJson<String?>(json['statusFinal']),
       assinaturaPath: serializer.fromJson<String?>(json['assinaturaPath']),
+      assinaturaClientePath:
+          serializer.fromJson<String?>(json['assinaturaClientePath']),
       dataHora: serializer.fromJson<DateTime>(json['dataHora']),
       vistoriadorId: serializer.fromJson<String>(json['vistoriadorId']),
       vistoriadorNome: serializer.fromJson<String?>(json['vistoriadorNome']),
@@ -917,6 +943,8 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       'parecerTecnico': serializer.toJson<String?>(parecerTecnico),
       'statusFinal': serializer.toJson<String?>(statusFinal),
       'assinaturaPath': serializer.toJson<String?>(assinaturaPath),
+      'assinaturaClientePath':
+          serializer.toJson<String?>(assinaturaClientePath),
       'dataHora': serializer.toJson<DateTime>(dataHora),
       'vistoriadorId': serializer.toJson<String>(vistoriadorId),
       'vistoriadorNome': serializer.toJson<String?>(vistoriadorNome),
@@ -940,6 +968,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           Value<String?> parecerTecnico = const Value.absent(),
           Value<String?> statusFinal = const Value.absent(),
           Value<String?> assinaturaPath = const Value.absent(),
+          Value<String?> assinaturaClientePath = const Value.absent(),
           DateTime? dataHora,
           String? vistoriadorId,
           Value<String?> vistoriadorNome = const Value.absent(),
@@ -962,6 +991,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
         statusFinal: statusFinal.present ? statusFinal.value : this.statusFinal,
         assinaturaPath:
             assinaturaPath.present ? assinaturaPath.value : this.assinaturaPath,
+        assinaturaClientePath: assinaturaClientePath.present
+            ? assinaturaClientePath.value
+            : this.assinaturaClientePath,
         dataHora: dataHora ?? this.dataHora,
         vistoriadorId: vistoriadorId ?? this.vistoriadorId,
         vistoriadorNome: vistoriadorNome.present
@@ -998,6 +1030,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       assinaturaPath: data.assinaturaPath.present
           ? data.assinaturaPath.value
           : this.assinaturaPath,
+      assinaturaClientePath: data.assinaturaClientePath.present
+          ? data.assinaturaClientePath.value
+          : this.assinaturaClientePath,
       dataHora: data.dataHora.present ? data.dataHora.value : this.dataHora,
       vistoriadorId: data.vistoriadorId.present
           ? data.vistoriadorId.value
@@ -1034,6 +1069,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           ..write('parecerTecnico: $parecerTecnico, ')
           ..write('statusFinal: $statusFinal, ')
           ..write('assinaturaPath: $assinaturaPath, ')
+          ..write('assinaturaClientePath: $assinaturaClientePath, ')
           ..write('dataHora: $dataHora, ')
           ..write('vistoriadorId: $vistoriadorId, ')
           ..write('vistoriadorNome: $vistoriadorNome, ')
@@ -1059,6 +1095,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       parecerTecnico,
       statusFinal,
       assinaturaPath,
+      assinaturaClientePath,
       dataHora,
       vistoriadorId,
       vistoriadorNome,
@@ -1082,6 +1119,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           other.parecerTecnico == this.parecerTecnico &&
           other.statusFinal == this.statusFinal &&
           other.assinaturaPath == this.assinaturaPath &&
+          other.assinaturaClientePath == this.assinaturaClientePath &&
           other.dataHora == this.dataHora &&
           other.vistoriadorId == this.vistoriadorId &&
           other.vistoriadorNome == this.vistoriadorNome &&
@@ -1104,6 +1142,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   final Value<String?> parecerTecnico;
   final Value<String?> statusFinal;
   final Value<String?> assinaturaPath;
+  final Value<String?> assinaturaClientePath;
   final Value<DateTime> dataHora;
   final Value<String> vistoriadorId;
   final Value<String?> vistoriadorNome;
@@ -1125,6 +1164,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     this.parecerTecnico = const Value.absent(),
     this.statusFinal = const Value.absent(),
     this.assinaturaPath = const Value.absent(),
+    this.assinaturaClientePath = const Value.absent(),
     this.dataHora = const Value.absent(),
     this.vistoriadorId = const Value.absent(),
     this.vistoriadorNome = const Value.absent(),
@@ -1147,6 +1187,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     this.parecerTecnico = const Value.absent(),
     this.statusFinal = const Value.absent(),
     this.assinaturaPath = const Value.absent(),
+    this.assinaturaClientePath = const Value.absent(),
     this.dataHora = const Value.absent(),
     required String vistoriadorId,
     this.vistoriadorNome = const Value.absent(),
@@ -1171,6 +1212,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     Expression<String>? parecerTecnico,
     Expression<String>? statusFinal,
     Expression<String>? assinaturaPath,
+    Expression<String>? assinaturaClientePath,
     Expression<DateTime>? dataHora,
     Expression<String>? vistoriadorId,
     Expression<String>? vistoriadorNome,
@@ -1193,6 +1235,8 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       if (parecerTecnico != null) 'parecer_tecnico': parecerTecnico,
       if (statusFinal != null) 'status_final': statusFinal,
       if (assinaturaPath != null) 'assinatura_path': assinaturaPath,
+      if (assinaturaClientePath != null)
+        'assinatura_cliente_path': assinaturaClientePath,
       if (dataHora != null) 'data_hora': dataHora,
       if (vistoriadorId != null) 'vistoriador_id': vistoriadorId,
       if (vistoriadorNome != null) 'vistoriador_nome': vistoriadorNome,
@@ -1217,6 +1261,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       Value<String?>? parecerTecnico,
       Value<String?>? statusFinal,
       Value<String?>? assinaturaPath,
+      Value<String?>? assinaturaClientePath,
       Value<DateTime>? dataHora,
       Value<String>? vistoriadorId,
       Value<String?>? vistoriadorNome,
@@ -1238,6 +1283,8 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       parecerTecnico: parecerTecnico ?? this.parecerTecnico,
       statusFinal: statusFinal ?? this.statusFinal,
       assinaturaPath: assinaturaPath ?? this.assinaturaPath,
+      assinaturaClientePath:
+          assinaturaClientePath ?? this.assinaturaClientePath,
       dataHora: dataHora ?? this.dataHora,
       vistoriadorId: vistoriadorId ?? this.vistoriadorId,
       vistoriadorNome: vistoriadorNome ?? this.vistoriadorNome,
@@ -1281,6 +1328,10 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     }
     if (assinaturaPath.present) {
       map['assinatura_path'] = Variable<String>(assinaturaPath.value);
+    }
+    if (assinaturaClientePath.present) {
+      map['assinatura_cliente_path'] =
+          Variable<String>(assinaturaClientePath.value);
     }
     if (dataHora.present) {
       map['data_hora'] = Variable<DateTime>(dataHora.value);
@@ -1330,6 +1381,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
           ..write('parecerTecnico: $parecerTecnico, ')
           ..write('statusFinal: $statusFinal, ')
           ..write('assinaturaPath: $assinaturaPath, ')
+          ..write('assinaturaClientePath: $assinaturaClientePath, ')
           ..write('dataHora: $dataHora, ')
           ..write('vistoriadorId: $vistoriadorId, ')
           ..write('vistoriadorNome: $vistoriadorNome, ')
@@ -6539,6 +6591,7 @@ typedef $$VistoriasTableCreateCompanionBuilder = VistoriasCompanion Function({
   Value<String?> parecerTecnico,
   Value<String?> statusFinal,
   Value<String?> assinaturaPath,
+  Value<String?> assinaturaClientePath,
   Value<DateTime> dataHora,
   required String vistoriadorId,
   Value<String?> vistoriadorNome,
@@ -6561,6 +6614,7 @@ typedef $$VistoriasTableUpdateCompanionBuilder = VistoriasCompanion Function({
   Value<String?> parecerTecnico,
   Value<String?> statusFinal,
   Value<String?> assinaturaPath,
+  Value<String?> assinaturaClientePath,
   Value<DateTime> dataHora,
   Value<String> vistoriadorId,
   Value<String?> vistoriadorNome,
@@ -6581,8 +6635,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$VeiculosTable, List<Veiculo>> _veiculosRefsTable(
           _$AppDatabase db) =>
       MultiTypedResultKey.fromTable(db.veiculos,
-          aliasName:
-              $_aliasNameGenerator(db.vistorias.id, db.veiculos.vistoriaId));
+          aliasName: 'vistorias__id__veiculos__vistoria_id');
 
   $$VeiculosTableProcessedTableManager get veiculosRefs {
     final manager = $$VeiculosTableTableManager($_db, $_db.veiculos)
@@ -6596,8 +6649,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$ItensVistoriaTable, List<ItensVistoriaData>>
       _itensVistoriaRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.itensVistoria,
-              aliasName: $_aliasNameGenerator(
-                  db.vistorias.id, db.itensVistoria.vistoriaId));
+              aliasName: 'vistorias__id__itens_vistoria__vistoria_id');
 
   $$ItensVistoriaTableProcessedTableManager get itensVistoriaRefs {
     final manager = $$ItensVistoriaTableTableManager($_db, $_db.itensVistoria)
@@ -6611,8 +6663,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$FotosVistoriaTable, List<FotosVistoriaData>>
       _fotosVistoriaRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.fotosVistoria,
-              aliasName: $_aliasNameGenerator(
-                  db.vistorias.id, db.fotosVistoria.vistoriaId));
+              aliasName: 'vistorias__id__fotos_vistoria__vistoria_id');
 
   $$FotosVistoriaTableProcessedTableManager get fotosVistoriaRefs {
     final manager = $$FotosVistoriaTableTableManager($_db, $_db.fotosVistoria)
@@ -6626,8 +6677,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$ItensPinturaTable, List<ItensPinturaData>>
       _itensPinturaRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.itensPintura,
-              aliasName: $_aliasNameGenerator(
-                  db.vistorias.id, db.itensPintura.vistoriaId));
+              aliasName: 'vistorias__id__itens_pintura__vistoria_id');
 
   $$ItensPinturaTableProcessedTableManager get itensPinturaRefs {
     final manager = $$ItensPinturaTableTableManager($_db, $_db.itensPintura)
@@ -6641,8 +6691,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$ItensEstruturaTable, List<ItensEstruturaData>>
       _itensEstruturaRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.itensEstrutura,
-              aliasName: $_aliasNameGenerator(
-                  db.vistorias.id, db.itensEstrutura.vistoriaId));
+              aliasName: 'vistorias__id__itens_estrutura__vistoria_id');
 
   $$ItensEstruturaTableProcessedTableManager get itensEstruturaRefs {
     final manager = $$ItensEstruturaTableTableManager($_db, $_db.itensEstrutura)
@@ -6656,8 +6705,7 @@ final class $$VistoriasTableReferences
   static MultiTypedResultKey<$VidrosVistoriaTable, List<VidrosVistoriaData>>
       _vidrosVistoriaRefsTable(_$AppDatabase db) =>
           MultiTypedResultKey.fromTable(db.vidrosVistoria,
-              aliasName: $_aliasNameGenerator(
-                  db.vistorias.id, db.vidrosVistoria.vistoriaId));
+              aliasName: 'vistorias__id__vidros_vistoria__vistoria_id');
 
   $$VidrosVistoriaTableProcessedTableManager get vidrosVistoriaRefs {
     final manager = $$VidrosVistoriaTableTableManager($_db, $_db.vidrosVistoria)
@@ -6672,8 +6720,7 @@ final class $$VistoriasTableReferences
       List<ConsultasAutocredData>> _consultasAutocredRefsTable(
           _$AppDatabase db) =>
       MultiTypedResultKey.fromTable(db.consultasAutocred,
-          aliasName: $_aliasNameGenerator(
-              db.vistorias.id, db.consultasAutocred.vistoriaId));
+          aliasName: 'vistorias__id__consultas_autocred__vistoria_id');
 
   $$ConsultasAutocredTableProcessedTableManager get consultasAutocredRefs {
     final manager = $$ConsultasAutocredTableTableManager(
@@ -6723,6 +6770,10 @@ class $$VistoriasTableFilterComposer
 
   ColumnFilters<String> get assinaturaPath => $composableBuilder(
       column: $table.assinaturaPath,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get assinaturaClientePath => $composableBuilder(
+      column: $table.assinaturaClientePath,
       builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get dataHora => $composableBuilder(
@@ -6945,6 +6996,10 @@ class $$VistoriasTableOrderingComposer
       column: $table.assinaturaPath,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get assinaturaClientePath => $composableBuilder(
+      column: $table.assinaturaClientePath,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<DateTime> get dataHora => $composableBuilder(
       column: $table.dataHora, builder: (column) => ColumnOrderings(column));
 
@@ -7016,6 +7071,9 @@ class $$VistoriasTableAnnotationComposer
 
   GeneratedColumn<String> get assinaturaPath => $composableBuilder(
       column: $table.assinaturaPath, builder: (column) => column);
+
+  GeneratedColumn<String> get assinaturaClientePath => $composableBuilder(
+      column: $table.assinaturaClientePath, builder: (column) => column);
 
   GeneratedColumn<DateTime> get dataHora =>
       $composableBuilder(column: $table.dataHora, builder: (column) => column);
@@ -7235,6 +7293,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
             Value<String?> parecerTecnico = const Value.absent(),
             Value<String?> statusFinal = const Value.absent(),
             Value<String?> assinaturaPath = const Value.absent(),
+            Value<String?> assinaturaClientePath = const Value.absent(),
             Value<DateTime> dataHora = const Value.absent(),
             Value<String> vistoriadorId = const Value.absent(),
             Value<String?> vistoriadorNome = const Value.absent(),
@@ -7257,6 +7316,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
             parecerTecnico: parecerTecnico,
             statusFinal: statusFinal,
             assinaturaPath: assinaturaPath,
+            assinaturaClientePath: assinaturaClientePath,
             dataHora: dataHora,
             vistoriadorId: vistoriadorId,
             vistoriadorNome: vistoriadorNome,
@@ -7279,6 +7339,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
             Value<String?> parecerTecnico = const Value.absent(),
             Value<String?> statusFinal = const Value.absent(),
             Value<String?> assinaturaPath = const Value.absent(),
+            Value<String?> assinaturaClientePath = const Value.absent(),
             Value<DateTime> dataHora = const Value.absent(),
             required String vistoriadorId,
             Value<String?> vistoriadorNome = const Value.absent(),
@@ -7301,6 +7362,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
             parecerTecnico: parecerTecnico,
             statusFinal: statusFinal,
             assinaturaPath: assinaturaPath,
+            assinaturaClientePath: assinaturaClientePath,
             dataHora: dataHora,
             vistoriadorId: vistoriadorId,
             vistoriadorNome: vistoriadorNome,
@@ -7518,8 +7580,7 @@ final class $$VeiculosTableReferences
   $$VeiculosTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.veiculos.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('veiculos__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -8055,8 +8116,7 @@ final class $$ItensVistoriaTableReferences extends BaseReferences<_$AppDatabase,
       super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.itensVistoria.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('itens_vistoria__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -8386,8 +8446,7 @@ final class $$FotosVistoriaTableReferences extends BaseReferences<_$AppDatabase,
       super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.fotosVistoria.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('fotos_vistoria__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -8769,8 +8828,7 @@ final class $$ItensPinturaTableReferences extends BaseReferences<_$AppDatabase,
   $$ItensPinturaTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.itensPintura.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('itens_pintura__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -9075,8 +9133,7 @@ final class $$ItensEstruturaTableReferences extends BaseReferences<
       super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.itensEstrutura.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('itens_estrutura__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -9369,8 +9426,7 @@ final class $$VidrosVistoriaTableReferences extends BaseReferences<
       super.$_db, super.$_table, super.$_typedResult);
 
   static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias(
-          $_aliasNameGenerator(db.vidrosVistoria.vistoriaId, db.vistorias.id));
+      db.vistorias.createAlias('vidros_vistoria__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id')!;
@@ -10093,9 +10149,8 @@ final class $$ConsultasAutocredTableReferences extends BaseReferences<
   $$ConsultasAutocredTableReferences(
       super.$_db, super.$_table, super.$_typedResult);
 
-  static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) =>
-      db.vistorias.createAlias($_aliasNameGenerator(
-          db.consultasAutocred.vistoriaId, db.vistorias.id));
+  static $VistoriasTable _vistoriaIdTable(_$AppDatabase db) => db.vistorias
+      .createAlias('consultas_autocred__vistoria_id__vistorias__id');
 
   $$VistoriasTableProcessedTableManager? get vistoriaId {
     final $_column = $_itemColumn<String>('vistoria_id');

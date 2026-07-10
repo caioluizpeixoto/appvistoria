@@ -67,7 +67,8 @@ class _StepPainelHodometroState extends State<StepPainelHodometro> {
             'Com avaria',
             'Hodômetro ilegível',
             'Divergente',
-            'Não analisado',
+            'Ilegível',
+            'Substituído',
           ],
         ),
 
