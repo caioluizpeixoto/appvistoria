@@ -25,7 +25,7 @@ class AppDrawer extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.fact_check_rounded, color: AppTheme.textSecondary),
                   title: const Text(
-                    'Laudos',
+                    'Laudos Locais',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimary,
@@ -37,6 +37,22 @@ class AppDrawer extends StatelessWidget {
                     context.push('/historico-vistorias');
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.cloud_sync_rounded, color: AppTheme.textSecondary),
+                  title: const Text(
+                    'Histórico de Consultas',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/historico-radar');
+                  },
+                ),
+                const Divider(),
               ],
             ),
           ),
@@ -75,21 +91,22 @@ class _DrawerHeader extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
-              Icons.shield_rounded,
-              color: Colors.white,
-              size: 32,
+            clipBehavior: Clip.antiAlias,
+            padding: const EdgeInsets.all(2),
+            child: Image.asset(
+              'assets/images/logo.pdf.png',
+              fit: BoxFit.contain,
             ),
           ),
           const SizedBox(height: 14),
           const Text(
-            'VistoriaPro',
+            'Home Auto Vistorias',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w700,
               letterSpacing: 0.3,
             ),
@@ -171,4 +188,3 @@ class _DrawerFooter extends StatelessWidget {
     );
   }
 }
-

@@ -30,6 +30,22 @@ class AutocredDao extends DatabaseAccessor<AppDatabase> with _$AutocredDaoMixin 
     return await query.getSingleOrNull();
   }
 
+  Future<ConsultasAutocredData?> buscarConsultaPorChassi(String chassi) async {
+    final query = select(consultasAutocred)
+      ..where((t) => t.chassi.equals(chassi))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ..limit(1);
+    return await query.getSingleOrNull();
+  }
+
+  Future<ConsultasAutocredData?> buscarConsultaPorMotor(String motor) async {
+    final query = select(consultasAutocred)
+      ..where((t) => t.motor.equals(motor))
+      ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+      ..limit(1);
+    return await query.getSingleOrNull();
+  }
+
   Stream<ConsultasAutocredData?> watchConsultaPorVistoria(String vistoriaId) {
     final query = select(consultasAutocred)
       ..where((t) => t.vistoriaId.equals(vistoriaId))

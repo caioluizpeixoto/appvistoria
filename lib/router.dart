@@ -15,6 +15,7 @@ import 'features/vistoria/presentation/screens/vistoria_wizard_screen.dart';
 import 'features/pdf/presentation/screens/pdf_preview_screen.dart';
 import 'features/consulta_bin/presentation/screens/historico_consultas_screen.dart';
 import 'features/vistoria/presentation/screens/historico_vistorias_screen.dart';
+import 'features/vistoria/presentation/screens/historico_radar_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -64,6 +65,10 @@ GoRouter buildRouter(AuthBloc authBloc) {
       GoRoute(
         path: '/historico-vistorias',
         builder: (ctx, state) => const HistoricoVistoriasScreen(),
+      ),
+      GoRoute(
+        path: '/historico-radar',
+        builder: (ctx, state) => const HistoricoRadarScreen(),
       ),
       // Etapas da vistoria
       GoRoute(

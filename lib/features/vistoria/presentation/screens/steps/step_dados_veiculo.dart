@@ -192,7 +192,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
                   }
                 },
                 icon: const Icon(Icons.picture_as_pdf_rounded),
-                label: const Text('Ver Laudo Original Radar Consultas'),
+                label: const Text('Ver Pesquisa'),
               ),
             ),
           ],

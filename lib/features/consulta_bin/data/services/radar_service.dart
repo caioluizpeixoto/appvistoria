@@ -12,6 +12,39 @@ class RadarService {
 
   RadarService({required this.supabase, required this.repository});
 
+  Future<List<dynamic>> listarConsultasRadar({
+    String? produto,
+    String? param,
+    String? value,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      
+      if (param != null && value != null) {
+        body['param'] = param;
+        body['value'] = value;
+        if (produto != null) {
+          body['produto'] = produto;
+        }
+      }
+
+      final response = await supabase.functions
+          .invoke('radar-listar-consultas', body: body)
+          .timeout(const Duration(minutes: 10)); // Usando um timeout de 10 min, igual ao consultar
+
+      final data = response.data;
+      if (data != null && data is Map<String, dynamic> && data['sucesso'] == true) {
+        return data['consultas'] as List<dynamic>;
+      } else {
+        print('Erro na Radar (API não retornou sucesso): $data');
+        return [];
+      }
+    } catch (e) {
+      print('Erro ao listar consultas da Radar: $e');
+      return [];
+    }
+  }
+
   Future<RadarVeiculo> consultarVeiculo({
     required String produto, // ex: "auto_bin"
     required String param,   // ex: "placa", "chassi"
@@ -19,6 +52,7 @@ class RadarService {
     String vistoriaId = '',
     int codigoConsulta = 0,
     bool forcarNova = false,
+    String? tokenConsulta,
   }) async {
     final idPesquisa = const Uuid().v4();
 
@@ -42,6 +76,7 @@ class RadarService {
           'param': param,
           'value': value,
           'forcarNova': forcarNova,
+          'tokenConsulta': tokenConsulta,
         },
       ).timeout(const Duration(minutes: 15));
 
@@ -95,5 +130,17 @@ class RadarService {
   Future<List<RadarHistorico>> getHistorico() async {
     final data = await repository.buscarHistoricoConsultas();
     return data.map((json) => RadarHistorico.fromJson(json)).toList();
+  }
+
+  Future<String> consultarSaldo() async {
+    try {
+      final response = await supabase.functions.invoke('radar-saldo');
+      if (response.data is Map<String, dynamic> && response.data['sucesso'] == true) {
+        return response.data['saldo'].toString();
+      }
+      return 'Indisponível';
+    } catch (e) {
+      return 'Erro';
+    }
   }
 }

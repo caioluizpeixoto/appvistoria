@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'pdf_radar_generator.dart';
 
 // ── Paleta PDF ──────────────────────────────────────────────────────────────
 const _kBlack = PdfColor.fromInt(0xFF222222);
@@ -378,7 +379,7 @@ class PdfGeneratorService {
           'engine': veiculo.motorVeiculo ?? '',
           if (apontamentosList.isNotEmpty) 'apontamentos': apontamentosList,
         },
-      ).timeout(const Duration(seconds: 20));
+      ).timeout(const Duration(seconds: 60));
 
       if (resFicha.status == 200 && resFicha.data != null) {
         final data = resFicha.data is String ? jsonDecode(resFicha.data) : resFicha.data;
@@ -402,6 +403,22 @@ class PdfGeneratorService {
       assinaturaCliente: assinaturaClienteImage,
       state: wizardState,
     ));
+
+    // ── Anexar Pesquisa (Radar) se existir ──────────────────────────────────
+    try {
+      final autocredDao = sl<AutocredDao>();
+      final consulta = await autocredDao.buscarConsultaPorVistoria(vistoria.id);
+      if (consulta != null && consulta.dadosTratadosJson != null && consulta.dadosTratadosJson!.isNotEmpty) {
+        final Map<String, dynamic> dadosPesquisa = jsonDecode(consulta.dadosTratadosJson!);
+        final radarPages = await PdfRadarGenerator.buildRadarPages(dadosPesquisa);
+        for (var page in radarPages) {
+          pdf.addPage(page);
+        }
+      }
+    } catch (e, stackTrace) {
+      print('Erro ao anexar pesquisa Radar ao PDF: $e');
+      print('Stack trace: $stackTrace');
+    }
 
     final Uint8List finalBytes = await pdf.save();
 
@@ -1128,19 +1145,19 @@ class PdfGeneratorService {
 
           // BASE (4 caixas)
           pw.Positioned(
-            left: 25, bottom: 50, // Subiu 40px, 30px pra esquerda
+            left: 25, bottom: 100, // Subiu 50px
             child: _buildPinturaStatus('PARA-LAMA DIAN. ESQ.', state?.getStatus('peca_paralama_dianteiro_esquerdo') ?? 'NÃO ANALISADO', styles, width: 85, tagOnTop: true),
           ),
           pw.Positioned(
-            left: 175, bottom: 60, // Subiu 10px, 30px pra direita
+            left: 165, bottom: 110, // Subiu 50px, 10px pra esquerda
             child: _buildPinturaStatus('PORTA DIAN. ESQ.', state?.getStatus('peca_porta_dianteira_esquerda') ?? 'NÃO ANALISADO', styles, width: 85, tagOnTop: true),
           ),
           pw.Positioned(
-            right: 165, bottom: 60, // Desceu 20px
+            right: 145, bottom: 110, // Subiu 50px, 20px pra direita
             child: _buildPinturaStatus('PORTA TRAS. ESQ.', state?.getStatus('peca_porta_traseira_esquerda') ?? 'NÃO ANALISADO', styles, width: 85, tagOnTop: true),
           ),
           pw.Positioned(
-            right: 55, bottom: 70, // Subiu 30px, 20px pra esquerda
+            right: 45, bottom: 120, // Subiu 50px, 10px pra direita
             child: _buildPinturaStatus('LATERAL TRAS. ESQ.', state?.getStatus('peca_lateral_traseira_esquerda') ?? 'NÃO ANALISADO', styles, width: 85, tagOnTop: true),
           ),
         ],

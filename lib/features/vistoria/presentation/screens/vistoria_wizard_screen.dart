@@ -109,11 +109,18 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     _consultaSub = _autocredDao.watchConsultaPorVistoria(widget.vistoriaId).listen((consulta) {
       if (consulta != null && mounted) {
         _wizardState.arquivoPesquisaUrl = consulta.arquivoPesquisaUrl ?? '';
-        final novoStatus = consulta.status;
+        var novoStatus = consulta.status;
+        final retornoBruto = consulta.retornoBruto ?? "";
+        
+        // Se no banco tá erro mas a msg for de andamento, tratamos visualmente como andamento
+        if (novoStatus == 'erro' && retornoBruto.contains('já está em andamento')) {
+          novoStatus = 'andamento';
+        }
+
         if (_statusConsulta == 'pendente' && novoStatus == 'concluida') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Pesquisa Radar Consultas concluída! Os dados foram preenchidos.'),
+              content: Text('✅ Pesquisa concluída! Os dados foram preenchidos.'),
               backgroundColor: AppTheme.conforme,
               duration: Duration(seconds: 4),
             ),
@@ -121,7 +128,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         } else if (_statusConsulta == 'pendente' && novoStatus == 'erro') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('❌ Radar: ${consulta.retornoBruto ?? "Falha na pesquisa"}'),
+              content: Text('❌ Erro na consulta: $retornoBruto'),
               backgroundColor: AppTheme.naoConforme,
               duration: const Duration(seconds: 6),
             ),
@@ -194,18 +201,24 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           _statusConsulta = 'concluida';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pesquisa Radar Consultas atualizada!'), backgroundColor: AppTheme.conforme),
+          const SnackBar(content: Text('✅ Pesquisa atualizada!'), backgroundColor: AppTheme.conforme),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _statusConsulta = 'erro';
-        });
-        
         String cleanError = e.toString().replaceAll('Exception: ', '').trim();
         if (cleanError.startsWith('Erro na consulta: ')) {
           cleanError = cleanError.replaceAll('Erro na consulta: ', '');
+        }
+
+        if (cleanError.contains('já está em andamento')) {
+          setState(() {
+            _statusConsulta = 'andamento';
+          });
+        } else {
+          setState(() {
+            _statusConsulta = 'erro';
+          });
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -227,7 +240,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         return StatefulBuilder(
           builder: (context, setStateBuilder) {
             return AlertDialog(
-              title: const Text('Consultar Radar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              title: const Text('Consultar Base', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -666,7 +679,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                     child: Padding(
                       padding: EdgeInsets.only(right: 16),
                       child: Tooltip(
-                        message: 'Pesquisando na base Radar Consultas...',
+                        message: 'Pesquisando na base...',
                         child: SizedBox(
                           width: 18, height: 18,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
@@ -679,7 +692,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                     child: Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Tooltip(
-                        message: 'Pesquisa Radar Consultas concluída. Clique para atualizar novamente.',
+                        message: 'Pesquisa concluída. Clique para atualizar novamente.',
                         child: InkWell(
                           onTap: _retryRadarConsulta,
                           borderRadius: BorderRadius.circular(20),
@@ -691,12 +704,29 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       ),
                     ),
                   )
+                else if (_statusConsulta == 'andamento')
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Tooltip(
+                        message: 'Consulta em andamento. Toque para verificar se terminou.',
+                        child: InkWell(
+                          onTap: _retryRadarConsulta,
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.hourglass_bottom_rounded, color: Colors.orangeAccent, size: 22),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
                 else if (_statusConsulta == 'erro')
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.only(right: 16),
                       child: Tooltip(
-                        message: 'Erro na pesquisa Radar Consultas. Tocar para tentar novamente.',
+                        message: 'Erro na pesquisa. Tocar para tentar novamente.',
                         child: InkWell(
                           onTap: _retryRadarConsulta,
                           borderRadius: BorderRadius.circular(20),

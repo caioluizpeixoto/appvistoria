@@ -9,8 +9,12 @@ import 'placa_camera_screen.dart';
 
 import '../../../../injection_container.dart';
 import '../../../../features/consulta_bin/data/services/radar_service.dart';
+import '../../../../features/consulta_bin/data/repositories/radar_repository.dart';
+import '../../../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 import '../../../../database/daos/vistoria_dao.dart';
+import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
+import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -51,6 +55,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   bool _veiculoEncontrado = false;
   bool _modoOffline = false;
   bool _buscandoVeiculo = false;
+  bool _buscandoRadarHistorico = false;
   bool _buscandoLaudo = false;
   String _mensagemCarregamento = '';
   String? _arquivoPesquisaUrl;
@@ -58,6 +63,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
   // Modo de entrada da busca: 'placa', 'chassi', ou 'motor'
   String _modoEntrada = 'placa';
+  bool _somentePesquisa = false;
 
   // Tipos de consulta disponíveis (Radar Consultas)
   final List<Map<String, dynamic>> _tiposConsulta = [
@@ -76,6 +82,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     if (widget.dadosIniciais != null && widget.dadosIniciais!.isNotEmpty) {
       if (widget.dadosIniciais!.containsKey('produtoSelecionado')) {
         _produtoSelecionado = widget.dadosIniciais!['produtoSelecionado'];
+      }
+      if (widget.dadosIniciais!.containsKey('somentePesquisa')) {
+        _somentePesquisa = widget.dadosIniciais!['somentePesquisa'] == true;
       }
       if (widget.dadosIniciais!.containsKey('placa')) {
         _veiculoEncontrado = true;
@@ -135,14 +144,198 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
   // ── Busca veículo (AutoCredCar) ──────────────────────────────────────────
 
-  Future<void> _buscarVeiculo() async {
+  void _preencherDados(RadarVeiculo veiculo) {
+    setState(() {
+      _mensagemCarregamento = 'Consulta carregada com sucesso';
+      _veiculoEncontrado = true;
+
+      _placaEditCtrl.text = veiculo.placa;
+      _chassiEditCtrl.text = veiculo.chassi;
+      _motorEditCtrl.text = veiculo.motor;
+      
+      final mm = veiculo.marcaModelo.split('/');
+      _marcaEditCtrl.text = mm.isNotEmpty ? mm[0].trim() : '';
+      _modeloEditCtrl.text = mm.length > 1 ? mm[1].trim() : '';
+      
+      _anoFabEditCtrl.text = veiculo.anoFabricacao;
+      _anoModEditCtrl.text = veiculo.anoModelo;
+      _corEditCtrl.text = veiculo.cor;
+      _renavamEditCtrl.text = veiculo.renavam;
+      _municipioEditCtrl.text = veiculo.municipio;
+      _ufEditCtrl.text = veiculo.estado;
+      _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty ? veiculo.restricoes1 : veiculo.informacoesRelevantes;
+      _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
+      _situacaoVeiculo = veiculo.situacao;
+    });
+  }
+
+  Future<Map<String, dynamic>?> _verificarNuvem(String valor) async {
+    final repo = sl<RadarRepository>();
+    final service = sl<RadarService>();
+    
+    // Mostra loading rápido de busca
+    setState(() {
+      _buscandoVeiculo = true;
+      _mensagemCarregamento = 'Buscando histórico na nuvem...';
+    });
+
+    List<Map<String, dynamic>> consultasNuvem = [];
+    if (_modoEntrada == 'placa') {
+      consultasNuvem = await repo.buscarConsultasRecentesNuvem('placa', valor);
+    } else if (_modoEntrada == 'chassi') {
+      consultasNuvem = await repo.buscarConsultasRecentesNuvem('chassi', valor);
+    } else if (_modoEntrada == 'motor') {
+      consultasNuvem = await repo.buscarConsultasRecentesNuvem('motor', valor);
+    }
+
+    // Marca como local
+    final combinadas = consultasNuvem.map((c) => {...c, 'fonte': 'local'}).toList();
+
+    // Busca na API da Radar
+    try {
+      final radarConsultas = await service.listarConsultasRadar(
+        param: _modoEntrada,
+        value: valor,
+      );
+      for (var c in radarConsultas) {
+        combinadas.add({
+          'fonte': 'radar',
+          'tokenConsulta': c['token'],
+          'titulo': c['titulo'],
+          'created_at': c['data_hora'] ?? c['ctime'],
+        });
+      }
+    } catch (e) {
+      print('Erro ao buscar histórico radar: $e');
+    }
+
+    setState(() {
+      _buscandoVeiculo = false;
+    });
+
+    if (combinadas.isEmpty || !mounted) return {'forcarNova': true};
+
+    // Ordenar por data mais recente
+    combinadas.sort((a, b) {
+      try {
+        final da = DateTime.parse(a['created_at'].toString());
+        final db = DateTime.parse(b['created_at'].toString());
+        return db.compareTo(da);
+      } catch (_) {
+        return 0;
+      }
+    });
+
+    return await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Consultas Existentes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Encontramos pesquisas recentes para este veículo. Você pode reaproveitá-las sem custo adicional:'),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: combinadas.length,
+                  itemBuilder: (context, index) {
+                    final item = combinadas[index];
+                    final isRadar = item['fonte'] == 'radar';
+                    final dataString = item['created_at'].toString();
+                    DateTime? createdAt;
+                    try {
+                       createdAt = DateTime.parse(dataString);
+                    } catch (_) {}
+                    
+                    final dateFormatted = createdAt != null 
+                        ? '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year} às ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}' 
+                        : dataString;
+                    
+                    final prefix = isRadar ? '[Nuvem]' : '[Local]';
+                    final title = item['titulo'] != null ? '$prefix ${item['titulo']}' : '$prefix Pesquisa';
+                    final subtitle = 'Realizada em: $dateFormatted';
+                    
+                    return Card(
+                      elevation: 0,
+                      color: AppTheme.surfaceVariant,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(
+                          isRadar ? Icons.cloud_sync_rounded : Icons.history_rounded, 
+                          color: AppTheme.primary
+                        ),
+                        title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+                        trailing: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                          onPressed: () => Navigator.of(ctx).pop(item),
+                          child: const Text('Reutilizar'),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.comObs),
+            onPressed: () => Navigator.of(ctx).pop({'forcarNova': true}),
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 16),
+            label: const Text('Nova Consulta', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _buscarVeiculo() async {
+    if (_buscandoVeiculo) return false;
+    
     final valor = _buscaCtrl.text.trim();
-    if (valor.isEmpty) return;
+    if (valor.isEmpty) return false;
+
+    final escolhida = await _verificarNuvem(valor);
+    if (escolhida == null) return false; // Cancelou
+    
+    String? tokenConsulta;
+    
+    if (escolhida['forcarNova'] != true) {
+      if (escolhida['fonte'] == 'local') {
+        // Reaproveitar dados antigos locais/nuvem supabase
+        try {
+          final veiculo = RadarVeiculo.fromJson(escolhida['dados_tratados']);
+          _preencherDados(veiculo);
+          return true;
+        } catch (e) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao carregar dados antigos: $e')));
+          return false;
+        }
+      } else if (escolhida['fonte'] == 'radar') {
+        // Obteve o token da Radar e vai consultar os detalhes
+        tokenConsulta = escolhida['tokenConsulta'];
+      }
+    }
 
     setState(() {
       _buscandoVeiculo = true;
       _veiculoEncontrado = false;
-      _mensagemCarregamento = 'Consultando veículo...';
+      _mensagemCarregamento = tokenConsulta != null 
+          ? 'Puxando detalhes da base...' 
+          : 'Consultando veículo...';
     });
 
     try {
@@ -153,34 +346,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         value: valor,
         vistoriaId: '',
         forcarNova: true,
+        tokenConsulta: tokenConsulta,
       );
 
       if (mounted) {
-        setState(() {
-          _mensagemCarregamento = 'Consulta realizada com sucesso';
-          _veiculoEncontrado = true;
-
-          // Pré-preencher os campos editáveis
-          _placaEditCtrl.text = veiculo.placa;
-          _chassiEditCtrl.text = veiculo.chassi;
-          _motorEditCtrl.text = veiculo.motor;
-          
-          // Radar retorna marcaModelo junto. Tentamos separar:
-          final mm = veiculo.marcaModelo.split('/');
-          _marcaEditCtrl.text = mm.isNotEmpty ? mm[0].trim() : '';
-          _modeloEditCtrl.text = mm.length > 1 ? mm[1].trim() : '';
-          
-          _anoFabEditCtrl.text = veiculo.anoFabricacao;
-          _anoModEditCtrl.text = veiculo.anoModelo;
-          _corEditCtrl.text = veiculo.cor;
-          _renavamEditCtrl.text = veiculo.renavam;
-          _municipioEditCtrl.text = veiculo.municipio;
-          _ufEditCtrl.text = veiculo.estado;
-          _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty ? veiculo.restricoes1 : veiculo.informacoesRelevantes;
-          _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
-          _situacaoVeiculo = veiculo.situacao;
-        });
+        _preencherDados(veiculo);
       }
+      return true;
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -193,13 +365,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           ),
         );
       }
+      return false;
     } finally {
       if (mounted) {
         // Aguarda 1s para o usuário ler "Consulta realizada com sucesso"
         await Future.delayed(const Duration(seconds: 1));
-        if (mounted) {
-          setState(() => _buscandoVeiculo = false);
-        }
+        setState(() {
+          _buscandoVeiculo = false;
+          _mensagemCarregamento = '';
+        });
       }
     }
   }
@@ -410,9 +584,33 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         }
       }
 
-      if (reuse) {
+      bool forcarNova = false;
+      String? tokenConsulta;
+      Map<String, dynamic>? dadosReaproveitados;
+
+      if (!reuse) {
+        final escolhida = await _verificarNuvem(valor);
+        if (escolhida == null) return; // Cancela se o usuário fechar o Dialog
+        
+        if (escolhida['forcarNova'] == true) {
+          forcarNova = true;
+        } else {
+          if (escolhida['fonte'] == 'local') {
+            dadosReaproveitados = escolhida;
+            reuse = true; // trata como reuso para pular a chamada à Radar API
+          } else if (escolhida['fonte'] == 'radar') {
+            // Se for via buscar histórico radar, a gente força nova local para bater na API com token
+            forcarNova = true;
+            tokenConsulta = escolhida['tokenConsulta'];
+          }
+        }
+      }
+
+      if (reuse && dadosReaproveitados == null) {
+        // Reuso local puro
         vistoriaId = veiculoExistente!.vistoriaId;
       } else {
+        // Nova vistoria local, mas com ou sem dados da nuvem
         vistoriaId = DateTime.now().millisecondsSinceEpoch.toString();
         final shortCode = const Uuid().v4().substring(0, 8).toUpperCase();
 
@@ -423,63 +621,75 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           tipoVistoria: drift.Value(widget.tipo.titulo),
         ));
 
+        // Prepara objeto com dados que o usuário digitou ou que vieram da nuvem
+        String chassi = _modoEntrada == 'chassi' ? valor : (veiculoExistente?.chassiVeiculo ?? '');
+        String motor = _modoEntrada == 'motor' ? valor : (veiculoExistente?.motorVeiculo ?? '');
+        String placa = _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
+        
+        if (dadosReaproveitados != null && dadosReaproveitados['dados_tratados'] != null) {
+          try {
+            final veiculoNuvem = RadarVeiculo.fromJson(dadosReaproveitados['dados_tratados']);
+            if (veiculoNuvem.placa.isNotEmpty) placa = veiculoNuvem.placa;
+            if (veiculoNuvem.chassi.isNotEmpty) chassi = veiculoNuvem.chassi;
+            if (veiculoNuvem.motor.isNotEmpty) motor = veiculoNuvem.motor;
+          } catch (_) {}
+        }
+
         await dao.inserirVeiculo(VeiculosCompanion.insert(
           id: vistoriaId,
           vistoriaId: vistoriaId,
-          placa:
-              _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? ''),
-          chassiVeiculo: drift.Value(_modoEntrada == 'chassi'
-              ? valor
-              : (veiculoExistente?.chassiVeiculo ?? '')),
-          motorVeiculo: drift.Value(_modoEntrada == 'motor'
-              ? valor
-              : (veiculoExistente?.motorVeiculo ?? '')),
+          placa: placa,
+          chassiVeiculo: drift.Value(chassi),
+          motorVeiculo: drift.Value(motor),
         ));
       }
 
-      // Inicia consulta em segundo plano sem await
-      final service = sl<RadarService>();
-      service
-          .consultarVeiculo(
-        produto: _produtoSelecionado,
-        param: _modoEntrada,
-        value: valor,
-        vistoriaId: vistoriaId,
-        forcarNova: true,
-      )
-          .then((veiculoApi) async {
-        final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
-        if (veiculoDb != null) {
-          final mm = veiculoApi.marcaModelo.split('/');
-          final marca = mm.isNotEmpty ? mm[0].trim() : '';
-          final modelo = mm.length > 1 ? mm[1].trim() : '';
-          
-          await dao.atualizarVeiculo(VeiculosCompanion(
-            id: drift.Value(veiculoDb.id),
-            vistoriaId: drift.Value(veiculoDb.vistoriaId),
-            placa: drift.Value(veiculoApi.placa.isNotEmpty
-                ? veiculoApi.placa
-                : veiculoDb.placa),
-            chassiVeiculo:
-                drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
-            motorVeiculo:
-                drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
-            marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
-            modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
-            anoFabricacao: drift.Value(
-                int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
-            anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
-            cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
-            renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
-            chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
-            motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
-            municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
-            uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
-          ));
-        }
-      }).catchError((_) {
-        // Erros de background não interrompem a vistoria
-      });
+      // Inicia consulta em segundo plano sem await apenas se for nova!
+      if (!reuse && forcarNova) {
+        final service = sl<RadarService>();
+        service
+            .consultarVeiculo(
+          produto: _produtoSelecionado,
+          param: _modoEntrada,
+          value: valor,
+          vistoriaId: vistoriaId,
+          forcarNova: false, 
+          tokenConsulta: tokenConsulta,
+        )
+            .then((veiculoApi) async {
+          final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
+          if (veiculoDb != null) {
+            final mm = veiculoApi.marcaModelo.split('/');
+            final marca = mm.isNotEmpty ? mm[0].trim() : '';
+            final modelo = mm.length > 1 ? mm[1].trim() : '';
+            
+            await dao.atualizarVeiculo(VeiculosCompanion(
+              id: drift.Value(veiculoDb.id),
+              vistoriaId: drift.Value(veiculoDb.vistoriaId),
+              placa: drift.Value(veiculoApi.placa.isNotEmpty
+                  ? veiculoApi.placa
+                  : veiculoDb.placa),
+              chassiVeiculo:
+                  drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
+              motorVeiculo:
+                  drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+              marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
+              modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
+              anoFabricacao: drift.Value(
+                  int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
+              anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+              cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+              renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
+              chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
+              motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
+              municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
+              uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+            ));
+          }
+        }).catchError((_) {
+          // Erros de background não interrompem a vistoria
+        });
+      }
 
       if (mounted) {
         context.push('/vistoria-wizard/$vistoriaId');
@@ -607,9 +817,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _buscandoVeiculo ? null : () async {
-                    setState(() => _buscandoVeiculo = true);
-                    await _iniciarVistoriaEmBackground();
-                    if (mounted) setState(() => _buscandoVeiculo = false);
+                    if (_somentePesquisa) {
+                      await _buscarVeiculo();
+                    } else {
+                      setState(() => _buscandoVeiculo = true);
+                      await _iniciarVistoriaEmBackground();
+                      if (mounted) setState(() => _buscandoVeiculo = false);
+                    }
                   },
                   icon: _buscandoVeiculo
                       ? const SizedBox(
@@ -620,8 +834,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                         )
                       : const Icon(Icons.play_arrow_rounded),
                   label: Text(_buscandoVeiculo
-                      ? 'Iniciando Vistoria...'
-                      : 'Consultar Veículo e Iniciar'),
+                      ? (_somentePesquisa ? 'Consultando...' : 'Iniciando Vistoria...')
+                      : (_somentePesquisa ? 'Realizar Pesquisa' : 'Consultar Veículo e Iniciar')),
                 ),
               ),
               const SizedBox(height: 12),
@@ -656,38 +870,83 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               ],
 
               if (_veiculoEncontrado || _modoOffline) ...[
-                const SizedBox(height: 32),
-                _SectionHeader(
-                  icon: Icons.directions_car_rounded,
-                  title: 'Dados da Vistoria',
-                  subtitle: _modoOffline
-                      ? 'Preencha os dados manualmente (Modo Offline)'
-                      : 'Revise e edite os dados retornados',
-                ),
-                const SizedBox(height: 16),
-
-                // Formulário de Dados Retornados (Editáveis)
-                _buildFormularioEditavel(),
-
-                const SizedBox(height: 24),
-                // Old button removed
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.conforme,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                if (_somentePesquisa && !_modoOffline) ...[
+                  const SizedBox(height: 32),
+                  const _SectionHeader(
+                    icon: Icons.check_circle_outline_rounded,
+                    title: 'Pesquisa Concluída',
+                    subtitle: 'A consulta foi realizada com sucesso.',
+                  ),
+                  const SizedBox(height: 24),
+                  if (_arquivoPesquisaUrl != null && _arquivoPesquisaUrl!.isNotEmpty)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.conforme,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        onPressed: () async {
+                          final uri = Uri.parse(_arquivoPesquisaUrl!);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 22),
+                        label: const Text(
+                          'Visualizar Laudo PDF',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                      ),
                     ),
-                    onPressed: _iniciarVistoria,
-                    icon: const Icon(Icons.play_arrow_rounded, size: 22),
-                    label: const Text(
-                      'Iniciar Vistoria',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: () => context.push('/historico-consultas'),
+                      icon: const Icon(Icons.history_rounded, size: 22),
+                      label: const Text(
+                        'Acessar Histórico de Consultas',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
                     ),
                   ),
-                ),
+                ] else ...[
+                  const SizedBox(height: 32),
+                  _SectionHeader(
+                    icon: Icons.directions_car_rounded,
+                    title: 'Dados da Vistoria',
+                    subtitle: _modoOffline
+                        ? 'Preencha os dados manualmente (Modo Offline)'
+                        : 'Revise e edite os dados retornados',
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Formulário de Dados Retornados (Editáveis)
+                  _buildFormularioEditavel(),
+
+                  const SizedBox(height: 24),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.conforme,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      onPressed: _iniciarVistoria,
+                      icon: const Icon(Icons.play_arrow_rounded, size: 22),
+                      label: const Text(
+                        'Iniciar Vistoria',
+                        style:
+                            TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ]
               ],
 
               const SizedBox(height: 32),

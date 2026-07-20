@@ -5,10 +5,10 @@ class AppTheme {
   AppTheme._();
 
   // ── Paleta de cores ──────────────────────────────────────────────────────────
-  static const Color primary = Color(0xFF1565C0);
-  static const Color primaryDark = Color(0xFF0D47A1);
-  static const Color primaryLight = Color(0xFF1976D2);
-  static const Color accent = Color(0xFF1E88E5);
+  static const Color primary = Color(0xFF1B5E20); // Verde Escuro Principal
+  static const Color primaryDark = Color(0xFF0A2B0E); // Verde Mais Escuro
+  static const Color primaryLight = Color(0xFF2E7D32); // Verde Um Pouco Mais Claro
+  static const Color accent = Color(0xFF43A047); // Verde Destaque
 
   static const Color conforme = Color(0xFF2E7D32);
   static const Color conformeLight = Color(0xFFE8F5E9);

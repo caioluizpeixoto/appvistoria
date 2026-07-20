@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { produto, param, value, forcarNova } = await req.json();
+    const { produto, param, value, forcarNova, tokenConsulta } = await req.json();
 
     if (!produto || !param || !value) {
       throw new Error("Parâmetros 'produto', 'param' e 'value' são obrigatórios.");
@@ -32,7 +32,7 @@ serve(async (req) => {
     }
 
     const radarUser = Deno.env.get("RADAR_USER") ?? "20401";
-    const radarPassword = Deno.env.get("RADAR_PASSWORD") ?? "ussj2306";
+    const radarPassword = Deno.env.get("RADAR_PASSWORD") ?? "*Ultra541";
     const radarApiToken = Deno.env.get("RADAR_API_TOKEN") ?? "216A3AD5C8689671782240712MY1KQ6IY9693950QYFCEMEDUO";
 
     if (!radarUser || !radarPassword || !radarApiToken) {
@@ -41,27 +41,50 @@ serve(async (req) => {
 
     const basicAuth = btoa(`${radarUser}:${radarPassword}`);
 
-    const bodyParams = new URLSearchParams();
-    bodyParams.append("produto", tokenProduto);
-    bodyParams.append("param", param);
-    bodyParams.append("value", value);
-    bodyParams.append("aguardar-retorno", "true");
-    
-    if (forcarNova) {
-      bodyParams.append("forcar-nova", "true");
+    // Normalizar parâmetros
+    const normalizedParam = param.toLowerCase();
+    const normalizedValue = value.replace(/[^A-Za-z0-9]/g, "");
+
+    let data: any = null;
+
+    if (tokenConsulta) {
+      const detalhesParams = new URLSearchParams();
+      detalhesParams.append("consulta", tokenConsulta);
+
+      const detalhesResponse = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultas/detalhes", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${basicAuth}`,
+          "api-token": radarApiToken,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: detalhesParams.toString(),
+      });
+
+      data = await detalhesResponse.json();
+    } else {
+      const bodyParams = new URLSearchParams();
+      bodyParams.append("produto", tokenProduto);
+      bodyParams.append("param", normalizedParam);
+      bodyParams.append("value", normalizedValue);
+      bodyParams.append("aguardar-retorno", "true");
+      
+      if (forcarNova) {
+        bodyParams.append("forcar-nova", "true");
+      }
+
+      const response = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultar", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${basicAuth}`,
+          "api-token": radarApiToken,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: bodyParams.toString(),
+      });
+
+      data = await response.json();
     }
-
-    const response = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultar", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${basicAuth}`,
-        "api-token": radarApiToken,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: bodyParams.toString(),
-    });
-
-    const data = await response.json();
 
     if (data?.erro) {
       throw new Error(data.erro);
@@ -91,7 +114,7 @@ serve(async (req) => {
         anoModelo: resultData.anomodeloveiculo || resultData.anomodelo || "",
         marcaModelo: resultData.marcamodelo || "",
         cor: resultData.cor || "",
-        combustivel: resultData.combustivel || "",
+        combustivel: resultData.combustivel || resultData.tipocombustivel || "",
         tipoVeiculo: resultData.tipoveiculo || "",
         especie: resultData.especie || "",
         categoria: resultData.categoria || "",

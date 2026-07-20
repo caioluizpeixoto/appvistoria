@@ -88,10 +88,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/logos/
     - .env
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/app_icon.png"
-

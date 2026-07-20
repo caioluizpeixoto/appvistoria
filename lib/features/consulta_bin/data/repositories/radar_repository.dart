@@ -148,4 +148,26 @@ class RadarRepository {
       return [];
     }
   }
+
+  Future<List<Map<String, dynamic>>> buscarConsultasRecentesNuvem(String coluna, String valor) async {
+    try {
+      // Retirado filtro de user_id para permitir compartilhamento entre celulares
+      final response = await supabase
+          .from('autocred_consultas')
+          .select()
+          .eq(coluna, valor)
+          .eq('status', 'concluida')
+          .not('dados_tratados', 'is', null)
+          .order('created_at', ascending: false)
+          .limit(5);
+
+      if (response != null && response is List) {
+        return List<Map<String, dynamic>>.from(response);
+      }
+      return [];
+    } catch (e) {
+      print('Erro ao buscar nuvem: $e');
+      return [];
+    }
+  }
 }

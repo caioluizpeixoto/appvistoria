@@ -127,13 +127,14 @@ class _WelcomeBanner extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.15),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.shield_rounded,
-                  color: Colors.white,
-                  size: 36,
+                clipBehavior: Clip.antiAlias,
+                padding: const EdgeInsets.all(2),
+                child: Image.asset(
+                  'assets/images/logo.pdf.png',
+                  fit: BoxFit.contain,
                 ),
               ),
             ],
@@ -296,6 +297,7 @@ class _RadarCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      _PesquisaSomenteCard(codigoRadar: codigo),
                       _VistoriaCard(tipo: TipoVistoria.carroComCroqui, codigoRadar: codigo),
                       _VistoriaCard(tipo: TipoVistoria.cautelarCarro, codigoRadar: codigo),
                       _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao, codigoRadar: codigo),
@@ -338,6 +340,90 @@ class _RadarCard extends StatelessWidget {
                   Icons.arrow_forward_ios_rounded,
                   size: 16,
                   color: AppTheme.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Card de Somente Pesquisa ────────────────────────────────────────────────
+
+class _PesquisaSomenteCard extends StatelessWidget {
+  final String codigoRadar;
+
+  const _PesquisaSomenteCard({required this.codigoRadar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Material(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        elevation: 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.of(context).pop(); // fecha o modal
+            context.push('/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                extra: {
+                  'produtoSelecionado': codigoRadar,
+                  'somentePesquisa': true,
+                });
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                // Ícone
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.saved_search_rounded, color: Color(0xFFF57C00), size: 28),
+                ),
+                const SizedBox(width: 16),
+                // Texto
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Somente Pesquisa',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Realizar consulta sem iniciar laudo.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                  color: Color(0xFFF57C00),
                 ),
               ],
             ),
