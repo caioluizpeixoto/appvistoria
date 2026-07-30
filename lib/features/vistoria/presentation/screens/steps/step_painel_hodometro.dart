@@ -63,11 +63,10 @@ class _StepPainelHodometroState extends State<StepPainelHodometro> {
           label: 'Painel e Hodômetro',
           obrigatoria: true,
           statusOptions: const [
-            'Dentro dos padrões',
+            'Original',
             'Com avaria',
             'Hodômetro ilegível',
             'Divergente',
-            'Ilegível',
             'Substituído',
           ],
         ),

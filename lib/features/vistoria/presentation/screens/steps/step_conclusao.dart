@@ -7,6 +7,7 @@ import 'package:signature/signature.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import '../../../domain/vistoria_type.dart';
 
 /// Step 14 — Conclusão (Resultado Final + Assinatura Digital)
 class StepConclusao extends StatefulWidget {
@@ -268,6 +269,7 @@ class _StepConclusaoState extends State<StepConclusao> {
           ),
 
           const SizedBox(height: 20),
+
 
           // ── Parecer técnico ──────────────────────────────────────────────
           Container(
@@ -641,3 +643,5 @@ class _StepConclusaoState extends State<StepConclusao> {
     );
   }
 }
+
+

@@ -5,10 +5,10 @@ class AppTheme {
   AppTheme._();
 
   // ── Paleta de cores ──────────────────────────────────────────────────────────
-  static const Color primary = Color(0xFF1B5E20); // Verde Escuro Principal
-  static const Color primaryDark = Color(0xFF0A2B0E); // Verde Mais Escuro
-  static const Color primaryLight = Color(0xFF2E7D32); // Verde Um Pouco Mais Claro
-  static const Color accent = Color(0xFF43A047); // Verde Destaque
+  static const Color primary = Color(0xFF16A34A); // Verde Moderno (Emerald/Green)
+  static const Color primaryDark = Color(0xFF15803D); // Verde Escuro
+  static const Color primaryLight = Color(0xFF4ADE80); // Verde Claro
+  static const Color accent = Color(0xFF22C55E); // Verde Destaque
 
   static const Color conforme = Color(0xFF2E7D32);
   static const Color conformeLight = Color(0xFFE8F5E9);
@@ -48,45 +48,46 @@ class AppTheme {
         error: naoConforme,
       ),
       scaffoldBackgroundColor: background,
-      textTheme: GoogleFonts.robotoTextTheme(base.textTheme).copyWith(
-        displayLarge: GoogleFonts.roboto(
-            fontSize: 32, fontWeight: FontWeight.w700, color: textPrimary),
-        displayMedium: GoogleFonts.roboto(
-            fontSize: 24, fontWeight: FontWeight.w600, color: textPrimary),
-        headlineLarge: GoogleFonts.roboto(
-            fontSize: 22, fontWeight: FontWeight.w700, color: textPrimary),
-        headlineMedium: GoogleFonts.roboto(
-            fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary),
-        headlineSmall: GoogleFonts.roboto(
+      textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
+        displayLarge: GoogleFonts.inter(
+            fontSize: 32, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+        displayMedium: GoogleFonts.inter(
+            fontSize: 24, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5),
+        headlineLarge: GoogleFonts.inter(
+            fontSize: 22, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+        headlineMedium: GoogleFonts.inter(
+            fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5),
+        headlineSmall: GoogleFonts.inter(
             fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-        titleLarge: GoogleFonts.roboto(
+        titleLarge: GoogleFonts.inter(
             fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-        titleMedium: GoogleFonts.roboto(
+        titleMedium: GoogleFonts.inter(
             fontSize: 14, fontWeight: FontWeight.w500, color: textPrimary),
-        titleSmall: GoogleFonts.roboto(
+        titleSmall: GoogleFonts.inter(
             fontSize: 13, fontWeight: FontWeight.w500, color: textSecondary),
-        bodyLarge: GoogleFonts.roboto(
+        bodyLarge: GoogleFonts.inter(
             fontSize: 16, fontWeight: FontWeight.w400, color: textPrimary),
-        bodyMedium: GoogleFonts.roboto(
+        bodyMedium: GoogleFonts.inter(
             fontSize: 14, fontWeight: FontWeight.w400, color: textPrimary),
-        bodySmall: GoogleFonts.roboto(
+        bodySmall: GoogleFonts.inter(
             fontSize: 12, fontWeight: FontWeight.w400, color: textSecondary),
-        labelLarge: GoogleFonts.roboto(
+        labelLarge: GoogleFonts.inter(
             fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
-        labelMedium: GoogleFonts.roboto(
+        labelMedium: GoogleFonts.inter(
             fontSize: 12, fontWeight: FontWeight.w500, color: textSecondary),
-        labelSmall: GoogleFonts.roboto(
-            fontSize: 11, fontWeight: FontWeight.w400, color: textHint),
+        labelSmall: GoogleFonts.inter(
+            fontSize: 11, fontWeight: FontWeight.w500, color: textHint),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: primary,
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: false,
-        titleTextStyle: GoogleFonts.roboto(
+        titleTextStyle: GoogleFonts.inter(
           fontSize: 18,
           fontWeight: FontWeight.w600,
           color: Colors.white,
+          letterSpacing: -0.5,
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -95,11 +96,11 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.roboto(
+          textStyle: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -109,11 +110,11 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: primary,
           side: const BorderSide(color: primary, width: 1.5),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
           ),
-          textStyle: GoogleFonts.roboto(
+          textStyle: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -122,7 +123,11 @@ class AppTheme {
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: primary,
-          textStyle: GoogleFonts.roboto(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          textStyle: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -132,44 +137,45 @@ class AppTheme {
         filled: true,
         fillColor: surface,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: naoConforme),
         ),
         labelStyle:
-            GoogleFonts.roboto(fontSize: 14, color: textSecondary),
+            GoogleFonts.inter(fontSize: 14, color: textSecondary),
         hintStyle:
-            GoogleFonts.roboto(fontSize: 14, color: textHint),
+            GoogleFonts.inter(fontSize: 14, color: textHint),
       ),
       cardTheme: CardThemeData(
         color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: border),
         ),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: surfaceVariant,
         labelStyle:
-            GoogleFonts.roboto(fontSize: 12, fontWeight: FontWeight.w500),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
+          side: BorderSide.none,
         ),
       ),
       dividerTheme: const DividerThemeData(
@@ -185,9 +191,9 @@ class AppTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
         ),
-        contentTextStyle: GoogleFonts.roboto(fontSize: 14),
+        contentTextStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: primary,
@@ -195,7 +201,7 @@ class AppTheme {
       bottomSheetTheme: const BottomSheetThemeData(
         backgroundColor: surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
       ),
     );

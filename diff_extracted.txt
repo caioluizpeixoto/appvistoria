@@ -1,0 +1,189 @@
+Created At: 2026-07-29T01:21:02Z
+Completed At: 2026-07-29T01:21:02Z
+
+				The command completed successfully.
+				Output:
+				<truncated 167 lines>
+                       try {
+-                        final bytes = File(f['path']).readAsBytesSync();
++                        Uint8List bytes;
++                        if (f['base64'] != null) {
++                          bytes = base64Decode(f['base64']);
++                        } else {
++                          bytes = File(f['path']).readAsBytesSync();
++                        }
+                         final img = pw.MemoryImage(bytes);
+                         return pw.Container(
+                           decoration: pw.BoxDecoration(
+@@ -1330,6 +1357,20 @@ class PdfGeneratorService {
+     return '***.${raw.substring(3, 6)}.${raw.substring(6, 9)}-**';
+   }
+ 
++  String _formatCurrencyBR(dynamic value) {
++    if (value == null) return 'R\$ 0,00';
++    String strValue = value.toString().replaceAll(RegExp(r'[^0-9\.\,]'), '');
++    if (strValue.isEmpty) return value.toString();
++    try {
++      strValue = strValue.replaceAll(',', '.');
++      final double numValue = double.parse(strValue);
++      final formatter = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
++      return formatter.format(numValue);
++    } catch (_) {
++      return 'R\$ $value';
++    }
++  }
++
+   void _buildFichaTecnicaPages(
+     pw.Document pdf,
+     Map<String, dynamic> data,
+@@ -1629,6 +1670,149 @@ class PdfGeneratorService {
+       );
+     }
+   }
++  void _buildChecklistOpcionalPages(pw.Document pdf, VistoriaWizardState state, Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo, pw.ImageProvider? assinatura) {
++    _buildChecklistOpcionalPagesDb(pdf, state.checklistOpcional, vistoria, styles, logo, assinatura, motivos: state.checklistOpcionalMotivos);
++  }
++
++  void _buildChecklistOpcionalPagesDb(pw.Document pdf, Map<String, String> checklistOpcional, Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo, pw.ImageProvider? assinatura, {Map<String, String>? motivos}) {
++    if (checklistOpcional.isEmpty) return;
++
++    final categorias = {
++      'PNEUS/RODAS': [
++        'PNEU DIANTEIRO ESQUERDO', 'RODA DIANTEIRA ESQUERDA', 'CALOTA DIANTEIRA ESQUERDA',
++        'PNEU TRASEIRO ESQUERDO', 'RODA TRASEIRA ESQUERDA', 'CALOTA TRASEIRA ESQUERDA',
++        'PNEU ESTEPE', 'RODA ESTEPE',
++        'PNEU TRASEIRO DIREITO', 'RODA TRASEIRA DIREITA', 'CALOTA TRASEIRA DIREITA',
++        'PNEU DIANTEIRO DIREITO', 'RODA DIANTEIRA DIREITA', 'CALOTA DIANTEIRA DIREITA'
++      ],
++      'PARTE DIANTEIRA': [
++        'CAPÔ', 'FAROL DIREITO', 'LANTERNA DIREITA', 'FAROL DE MILHA DIR.',
++        'PARA-CHOQUE', 'GRADE', 'PARA-BRISA', 'FAROL ESQUERDO', 'LANTERNA ESQUERDA', 'FAROL DE MILHA ESQUERDO'
++      ],
++      'LATERAL ESQUERDA': [
++        'LATERAL', 'VIDRO VIGIA', 'VIDRO TRASEIRO', 'PORTA TRASEIRA', 'VIDRO DIANTEIRO',
++        'PORTA DIANTEIRA', 'ESPELHO RETROVISOR', 'PARA-LAMA'
++      ],
++      'LATERAL DIREITA': [
++        'LATERAL', 'VIDRO VIGIA', 'VIDRO TRASEIRO', 'PORTA TRASEIRA', 'VIDRO DIANTEIRO',
++        'PORTA DIANTEIRA', 'ESPELHO RETROVISOR', 'PARA-LAMA'
++      ],
++      'TRASEIRA': [
++        'LANTERNA DE NEBLINA ESQ.', 'LANTERNA DE NEBLINA DIR.', 'CAPÔ TRASEIRO/TAMPA',
++        'LUZ DA PLACA', 'VIDRO VIGIA', 'LIMPADOR TRASEIRO', 'LANTERNA ESQUERDA', 'LANTERNA DIREITA',
++        'PARA-CHOQUE', 'TETO'
++      ],
++      'EQUIPAMENTOS': [
++        'AR CONDICIONADO', 'VIDROS ELÉTRICOS', 'TRAVAS ELÉTRICAS', 'ALARME', 'PAINEL DE INSTRUMENTOS',
++        'PRESENÇA DE ODOR ?', 'VOLANTE', 'ANTENA', 'ALTO-FALANTES', 'RÁDIO CD PLAYER', 'RÁDIO DVD', 'TELAS AUXILIARES ?'
++      ],
++      'BANCOS E REVESTIMENTOS': [
++        'BANCO TRASEIRO', 'BANCO D.D.', 'BANCO D.E.', 'TAPETES', 'REVESTIMENTO DO TETO',
++        'REVESTIMENTO PORTA D.D.', 'REVESTIMENTO PORTA T.D.', 'REVESTIMENTO PORTA T.E.', 'REVESTIMENTO PORTA D.E.'
++      ],
++      'EQUIPAMENTOS OBRIGATÓRIOS (SEGURANÇA)': [
++        'LAVADOR', 'LIMPADOR PARA-BRISA', 'FAROL DE NEBLINA', 'LUZ DE RÉ', 'LUZ DE FREIO',
++        'LANTERNA', 'FAROL', 'MANUAL DO PROPRIETÁRIO', 'CHAVE RESERVA', 'BLINDAGEM', 'TRIÂNGULO',
++        'MACACO', 'CHAVE DE RODA', 'ESTEPE', 'EXTINTOR'
++      ],
++      'ACIONAMENTO DO MOTOR': [
++        'BATERIA', 'NÍVEL DO ÓLEO', 'PARTIDA / ACIONAMENTO DO MOTOR'
++      ]
++    };
++
++    final List<pw.Widget> leftWidgets = [];
++    final List<pw.Widget> rightWidgets = [];
++    final leftKeys = ['PNEUS/RODAS', 'PARTE DIANTEIRA', 'LATERAL ESQUERDA', 'LATERAL DIREITA'];
++
++    for (final entry in categorias.entries) {
++      final isLeft = leftKeys.contains(entry.key);
++      final targetList = isLeft ? leftWidgets : rightWidgets;
++
++      targetList.add(
++        pw.Container(
++          color: PdfColors.grey200,
++          width: double.infinity,
++          padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 4),
++          child: pw.Text(entry.key, style: pw.TextStyle(font: styles.bold, fontSize: 8)),
++        )
++      );
++
++      for (final item in entry.value) {
++        final status = checklistOpcional[item] ?? 'OK';
++        final motivo = motivos?[item];
++        
++        PdfColor statusColor = PdfColors.green700;
++        if (status == 'OK' || status == 'POSSUI E FUNCIONA' || status == 'SEM DESGASTE' || status == 'FUNCIONA') {
++          statusColor = PdfColors.green700;
++        } else if (status == 'NÃO POSSUI' || status == 'AVARIADO' || status == 'RISCO PROFUNDO' || status == 'AMASSADO') {
++          statusColor = PdfColors.red700;
++        } else {
++          statusColor = PdfColors.orange700;
++        }
++
++        targetList.add(
++          pw.Container(
++            decoration: const pw.BoxDecoration(
++              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey300, width: 0.5)),
++            ),
++            padding: const pw.EdgeInsets.symmetric(vertical: 3, horizontal: 4),
++            child: pw.Row(
++              children: [
++                pw.Expanded(flex: 3, child: pw.Column(
++                  crossAxisAlignment: pw.CrossAxisAlignment.start,
++                  children: [
++                    pw.Text(item, style: pw.TextStyle(font: styles.regular, fontSize: 7)),
++                    if (motivo != null && motivo.isNotEmpty)
++                      pw.Text('Motivo: $motivo', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.red700)),
++                  ]
++                )),
++                pw.Expanded(flex: 2, child: pw.Text(status, style: pw.TextStyle(font: styles.bold, fontSize: 7, color: statusColor), textAlign: pw.TextAlign.right)),
++              ]
++            )
++          )
++        );
++      }
++      targetList.add(pw.SizedBox(height: 8));
++    }
++
++    // Dividir em páginas se ficar muito grande
++    pdf.addPage(
++      pw.MultiPage(
++        pageFormat: PdfPageFormat.a4,
++        margin: const pw.EdgeInsets.all(16),
++        header: (context) => _buildHeader(vistoria, styles, logo),
++        footer: (context) => _buildFooter(vistoria, styles, context, assinatura, showSignatures: false),
++        build: (context) {
++          final int maxLen = leftWidgets.length > rightWidgets.length ? leftWidgets.length : rightWidgets.length;
++          final List<pw.Widget> rowWidgets = [];
++          
++          for (int i = 0; i < maxLen; i++) {
++            rowWidgets.add(
++              pw.Row(
++                crossAxisAlignment: pw.CrossAxisAlignment.start,
++                children: [
++                  pw.Expanded(child: i < leftWidgets.length ? leftWidgets[i] : pw.SizedBox.shrink()),
++                  pw.SizedBox(width: 16),
++                  pw.Expanded(child: i < rightWidgets.length ? rightWidgets[i] : pw.SizedBox.shrink()),
++                ]
++              )
++            );
++          }
++
++          return [
++            pw.Container(
++              margin: const pw.EdgeInsets.only(bottom: 12),
++              padding: const pw.EdgeInsets.all(6),
++              color: PdfColors.grey300,
++              width: double.infinity,
++              child: pw.Text('CHECKLIST OPCIONAL', style: pw.TextStyle(font: styles.bold, fontSize: 10), textAlign: pw.TextAlign.center),
++            ),
++            ...rowWidgets
++          ];
++        }
++      )
++    );
++  }
+ }
+ 
+ class _PdfStyles {
+

@@ -1502,6 +1502,12 @@ class $VeiculosTable extends Veiculos with TableInfo<$VeiculosTable, Veiculo> {
   late final GeneratedColumn<int> km = GeneratedColumn<int>(
       'km', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _aiImage3dBase64Meta =
+      const VerificationMeta('aiImage3dBase64');
+  @override
+  late final GeneratedColumn<String> aiImage3dBase64 = GeneratedColumn<String>(
+      'ai_image3d_base64', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _municipioMeta =
       const VerificationMeta('municipio');
   @override
@@ -1575,6 +1581,7 @@ class $VeiculosTable extends Veiculos with TableInfo<$VeiculosTable, Veiculo> {
         cor,
         combustivel,
         km,
+        aiImage3dBase64,
         municipio,
         uf,
         numeroGrv,
@@ -1677,6 +1684,12 @@ class $VeiculosTable extends Veiculos with TableInfo<$VeiculosTable, Veiculo> {
     if (data.containsKey('km')) {
       context.handle(_kmMeta, km.isAcceptableOrUnknown(data['km']!, _kmMeta));
     }
+    if (data.containsKey('ai_image3d_base64')) {
+      context.handle(
+          _aiImage3dBase64Meta,
+          aiImage3dBase64.isAcceptableOrUnknown(
+              data['ai_image3d_base64']!, _aiImage3dBase64Meta));
+    }
     if (data.containsKey('municipio')) {
       context.handle(_municipioMeta,
           municipio.isAcceptableOrUnknown(data['municipio']!, _municipioMeta));
@@ -1753,6 +1766,8 @@ class $VeiculosTable extends Veiculos with TableInfo<$VeiculosTable, Veiculo> {
           .read(DriftSqlType.string, data['${effectivePrefix}combustivel']),
       km: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}km']),
+      aiImage3dBase64: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}ai_image3d_base64']),
       municipio: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}municipio']),
       uf: attachedDatabase.typeMapping
@@ -1794,6 +1809,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
   final String? cor;
   final String? combustivel;
   final int? km;
+  final String? aiImage3dBase64;
   final String? municipio;
   final String? uf;
   final String? numeroGrv;
@@ -1819,6 +1835,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
       this.cor,
       this.combustivel,
       this.km,
+      this.aiImage3dBase64,
       this.municipio,
       this.uf,
       this.numeroGrv,
@@ -1873,6 +1890,9 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
     }
     if (!nullToAbsent || km != null) {
       map['km'] = Variable<int>(km);
+    }
+    if (!nullToAbsent || aiImage3dBase64 != null) {
+      map['ai_image3d_base64'] = Variable<String>(aiImage3dBase64);
     }
     if (!nullToAbsent || municipio != null) {
       map['municipio'] = Variable<String>(municipio);
@@ -1931,6 +1951,9 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
           ? const Value.absent()
           : Value(combustivel),
       km: km == null && nullToAbsent ? const Value.absent() : Value(km),
+      aiImage3dBase64: aiImage3dBase64 == null && nullToAbsent
+          ? const Value.absent()
+          : Value(aiImage3dBase64),
       municipio: municipio == null && nullToAbsent
           ? const Value.absent()
           : Value(municipio),
@@ -1966,6 +1989,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
       cor: serializer.fromJson<String?>(json['cor']),
       combustivel: serializer.fromJson<String?>(json['combustivel']),
       km: serializer.fromJson<int?>(json['km']),
+      aiImage3dBase64: serializer.fromJson<String?>(json['aiImage3dBase64']),
       municipio: serializer.fromJson<String?>(json['municipio']),
       uf: serializer.fromJson<String?>(json['uf']),
       numeroGrv: serializer.fromJson<String?>(json['numeroGrv']),
@@ -1996,6 +2020,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
       'cor': serializer.toJson<String?>(cor),
       'combustivel': serializer.toJson<String?>(combustivel),
       'km': serializer.toJson<int?>(km),
+      'aiImage3dBase64': serializer.toJson<String?>(aiImage3dBase64),
       'municipio': serializer.toJson<String?>(municipio),
       'uf': serializer.toJson<String?>(uf),
       'numeroGrv': serializer.toJson<String?>(numeroGrv),
@@ -2024,6 +2049,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
           Value<String?> cor = const Value.absent(),
           Value<String?> combustivel = const Value.absent(),
           Value<int?> km = const Value.absent(),
+          Value<String?> aiImage3dBase64 = const Value.absent(),
           Value<String?> municipio = const Value.absent(),
           Value<String?> uf = const Value.absent(),
           Value<String?> numeroGrv = const Value.absent(),
@@ -2053,6 +2079,9 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
         cor: cor.present ? cor.value : this.cor,
         combustivel: combustivel.present ? combustivel.value : this.combustivel,
         km: km.present ? km.value : this.km,
+        aiImage3dBase64: aiImage3dBase64.present
+            ? aiImage3dBase64.value
+            : this.aiImage3dBase64,
         municipio: municipio.present ? municipio.value : this.municipio,
         uf: uf.present ? uf.value : this.uf,
         numeroGrv: numeroGrv.present ? numeroGrv.value : this.numeroGrv,
@@ -2090,6 +2119,9 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
       combustivel:
           data.combustivel.present ? data.combustivel.value : this.combustivel,
       km: data.km.present ? data.km.value : this.km,
+      aiImage3dBase64: data.aiImage3dBase64.present
+          ? data.aiImage3dBase64.value
+          : this.aiImage3dBase64,
       municipio: data.municipio.present ? data.municipio.value : this.municipio,
       uf: data.uf.present ? data.uf.value : this.uf,
       numeroGrv: data.numeroGrv.present ? data.numeroGrv.value : this.numeroGrv,
@@ -2126,6 +2158,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
           ..write('cor: $cor, ')
           ..write('combustivel: $combustivel, ')
           ..write('km: $km, ')
+          ..write('aiImage3dBase64: $aiImage3dBase64, ')
           ..write('municipio: $municipio, ')
           ..write('uf: $uf, ')
           ..write('numeroGrv: $numeroGrv, ')
@@ -2156,6 +2189,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
         cor,
         combustivel,
         km,
+        aiImage3dBase64,
         municipio,
         uf,
         numeroGrv,
@@ -2185,6 +2219,7 @@ class Veiculo extends DataClass implements Insertable<Veiculo> {
           other.cor == this.cor &&
           other.combustivel == this.combustivel &&
           other.km == this.km &&
+          other.aiImage3dBase64 == this.aiImage3dBase64 &&
           other.municipio == this.municipio &&
           other.uf == this.uf &&
           other.numeroGrv == this.numeroGrv &&
@@ -2212,6 +2247,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
   final Value<String?> cor;
   final Value<String?> combustivel;
   final Value<int?> km;
+  final Value<String?> aiImage3dBase64;
   final Value<String?> municipio;
   final Value<String?> uf;
   final Value<String?> numeroGrv;
@@ -2238,6 +2274,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
     this.cor = const Value.absent(),
     this.combustivel = const Value.absent(),
     this.km = const Value.absent(),
+    this.aiImage3dBase64 = const Value.absent(),
     this.municipio = const Value.absent(),
     this.uf = const Value.absent(),
     this.numeroGrv = const Value.absent(),
@@ -2265,6 +2302,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
     this.cor = const Value.absent(),
     this.combustivel = const Value.absent(),
     this.km = const Value.absent(),
+    this.aiImage3dBase64 = const Value.absent(),
     this.municipio = const Value.absent(),
     this.uf = const Value.absent(),
     this.numeroGrv = const Value.absent(),
@@ -2294,6 +2332,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
     Expression<String>? cor,
     Expression<String>? combustivel,
     Expression<int>? km,
+    Expression<String>? aiImage3dBase64,
     Expression<String>? municipio,
     Expression<String>? uf,
     Expression<String>? numeroGrv,
@@ -2321,6 +2360,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
       if (cor != null) 'cor': cor,
       if (combustivel != null) 'combustivel': combustivel,
       if (km != null) 'km': km,
+      if (aiImage3dBase64 != null) 'ai_image3d_base64': aiImage3dBase64,
       if (municipio != null) 'municipio': municipio,
       if (uf != null) 'uf': uf,
       if (numeroGrv != null) 'numero_grv': numeroGrv,
@@ -2350,6 +2390,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
       Value<String?>? cor,
       Value<String?>? combustivel,
       Value<int?>? km,
+      Value<String?>? aiImage3dBase64,
       Value<String?>? municipio,
       Value<String?>? uf,
       Value<String?>? numeroGrv,
@@ -2376,6 +2417,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
       cor: cor ?? this.cor,
       combustivel: combustivel ?? this.combustivel,
       km: km ?? this.km,
+      aiImage3dBase64: aiImage3dBase64 ?? this.aiImage3dBase64,
       municipio: municipio ?? this.municipio,
       uf: uf ?? this.uf,
       numeroGrv: numeroGrv ?? this.numeroGrv,
@@ -2441,6 +2483,9 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
     if (km.present) {
       map['km'] = Variable<int>(km.value);
     }
+    if (aiImage3dBase64.present) {
+      map['ai_image3d_base64'] = Variable<String>(aiImage3dBase64.value);
+    }
     if (municipio.present) {
       map['municipio'] = Variable<String>(municipio.value);
     }
@@ -2488,6 +2533,7 @@ class VeiculosCompanion extends UpdateCompanion<Veiculo> {
           ..write('cor: $cor, ')
           ..write('combustivel: $combustivel, ')
           ..write('km: $km, ')
+          ..write('aiImage3dBase64: $aiImage3dBase64, ')
           ..write('municipio: $municipio, ')
           ..write('uf: $uf, ')
           ..write('numeroGrv: $numeroGrv, ')
@@ -7538,6 +7584,7 @@ typedef $$VeiculosTableCreateCompanionBuilder = VeiculosCompanion Function({
   Value<String?> cor,
   Value<String?> combustivel,
   Value<int?> km,
+  Value<String?> aiImage3dBase64,
   Value<String?> municipio,
   Value<String?> uf,
   Value<String?> numeroGrv,
@@ -7565,6 +7612,7 @@ typedef $$VeiculosTableUpdateCompanionBuilder = VeiculosCompanion Function({
   Value<String?> cor,
   Value<String?> combustivel,
   Value<int?> km,
+  Value<String?> aiImage3dBase64,
   Value<String?> municipio,
   Value<String?> uf,
   Value<String?> numeroGrv,
@@ -7650,6 +7698,10 @@ class $$VeiculosTableFilterComposer
 
   ColumnFilters<int> get km => $composableBuilder(
       column: $table.km, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get aiImage3dBase64 => $composableBuilder(
+      column: $table.aiImage3dBase64,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get municipio => $composableBuilder(
       column: $table.municipio, builder: (column) => ColumnFilters(column));
@@ -7757,6 +7809,10 @@ class $$VeiculosTableOrderingComposer
   ColumnOrderings<int> get km => $composableBuilder(
       column: $table.km, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get aiImage3dBase64 => $composableBuilder(
+      column: $table.aiImage3dBase64,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get municipio => $composableBuilder(
       column: $table.municipio, builder: (column) => ColumnOrderings(column));
 
@@ -7859,6 +7915,9 @@ class $$VeiculosTableAnnotationComposer
   GeneratedColumn<int> get km =>
       $composableBuilder(column: $table.km, builder: (column) => column);
 
+  GeneratedColumn<String> get aiImage3dBase64 => $composableBuilder(
+      column: $table.aiImage3dBase64, builder: (column) => column);
+
   GeneratedColumn<String> get municipio =>
       $composableBuilder(column: $table.municipio, builder: (column) => column);
 
@@ -7941,6 +8000,7 @@ class $$VeiculosTableTableManager extends RootTableManager<
             Value<String?> cor = const Value.absent(),
             Value<String?> combustivel = const Value.absent(),
             Value<int?> km = const Value.absent(),
+            Value<String?> aiImage3dBase64 = const Value.absent(),
             Value<String?> municipio = const Value.absent(),
             Value<String?> uf = const Value.absent(),
             Value<String?> numeroGrv = const Value.absent(),
@@ -7968,6 +8028,7 @@ class $$VeiculosTableTableManager extends RootTableManager<
             cor: cor,
             combustivel: combustivel,
             km: km,
+            aiImage3dBase64: aiImage3dBase64,
             municipio: municipio,
             uf: uf,
             numeroGrv: numeroGrv,
@@ -7995,6 +8056,7 @@ class $$VeiculosTableTableManager extends RootTableManager<
             Value<String?> cor = const Value.absent(),
             Value<String?> combustivel = const Value.absent(),
             Value<int?> km = const Value.absent(),
+            Value<String?> aiImage3dBase64 = const Value.absent(),
             Value<String?> municipio = const Value.absent(),
             Value<String?> uf = const Value.absent(),
             Value<String?> numeroGrv = const Value.absent(),
@@ -8022,6 +8084,7 @@ class $$VeiculosTableTableManager extends RootTableManager<
             cor: cor,
             combustivel: combustivel,
             km: km,
+            aiImage3dBase64: aiImage3dBase64,
             municipio: municipio,
             uf: uf,
             numeroGrv: numeroGrv,

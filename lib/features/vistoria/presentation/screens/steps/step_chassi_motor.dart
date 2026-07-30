@@ -41,7 +41,7 @@ class StepMotorCambio extends StatelessWidget {
             label: 'Compartimento do Motor',
             obrigatoria: true,
             statusOptions: [
-              'Dentro dos padrões',
+              'Original',
               'Possui avaria',
               'Com observação',
             ],
@@ -59,7 +59,6 @@ class StepMotorCambio extends StatelessWidget {
               : null,
           showDivergenciaAlert: true,
           statusOptions: const [
-            'Dentro dos padrões',
             'Original',
             'Divergente',
             'Remarcado',
@@ -74,7 +73,6 @@ class StepMotorCambio extends StatelessWidget {
           label: 'Gravação do Câmbio',
           obrigatoria: true,
           statusOptions: [
-            'Dentro dos padrões',
             'Original',
             'Divergente',
             'Remarcado',
@@ -89,7 +87,6 @@ class StepMotorCambio extends StatelessWidget {
             label: 'Etiqueta VIS — Compartimento do Motor',
             obrigatoria: true,
             statusOptions: [
-              'Dentro dos padrões',
               'Original',
               'Ausente',
               'Danificada',
@@ -125,7 +122,6 @@ class StepEtiquetasChassi extends StatelessWidget {
             label: 'Etiqueta VIS — Porta / Coluna',
             obrigatoria: true,
             statusOptions: [
-              'Dentro dos padrões',
               'Original',
               'Ausente',
               'Danificada',
@@ -141,7 +137,7 @@ class StepEtiquetasChassi extends StatelessWidget {
             label: 'Plaqueta da cabine',
             obrigatoria: false,
             statusOptions: [
-              'Dentro dos padrões',
+              'Original',
               'Divergente',
               'Remarcada',
               'Não localizada',
@@ -179,7 +175,7 @@ class StepEtiquetasChassi extends StatelessWidget {
               : null,
           showDivergenciaAlert: true,
           statusOptions: const [
-            'Dentro dos padrões',
+            'Original',
             'Divergente',
             'Remarcado',
             'Não localizado',

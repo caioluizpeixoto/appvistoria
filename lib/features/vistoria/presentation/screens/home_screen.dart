@@ -10,6 +10,116 @@ import '../widgets/app_drawer.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  void _abrirModalCautelar(BuildContext context, String? produtoPesquisa) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.background,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Selecione o tipo de vistoria cautelar',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              _VistoriaCard(tipo: TipoVistoria.cautelarCarro, produtoPesquisa: produtoPesquisa),
+              _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao, produtoPesquisa: produtoPesquisa),
+              _VistoriaCard(tipo: TipoVistoria.carroComCroqui, produtoPesquisa: produtoPesquisa),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _abrirModalTipoPesquisa(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.background,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Selecione o tipo de pesquisa',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO BIN (Simples)',
+                codigo: 'auto_bin',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'auto_bin');
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO PERÍCIA',
+                codigo: 'auto_pericia',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'auto_pericia');
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO COMPLETA',
+                codigo: 'auto_completa',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'auto_completa');
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO LEILÃO',
+                codigo: 'auto_leilao',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'auto_leilao');
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'SEM PESQUISA PRÉVIA',
+                codigo: 'nenhuma',
+                icone: Icons.block_rounded,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, null);
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,23 +147,23 @@ class HomeScreen extends StatelessWidget {
           SliverToBoxAdapter(child: _WelcomeBanner()),
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: const [
                   Text(
-                    'Selecione a pesquisa',
+                    'O que deseja fazer?',
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
                       color: AppTheme.textPrimary,
                     ),
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Escolha o tipo de pesquisa antes do laudo',
+                    'Escolha o serviço para iniciar no sistema',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: AppTheme.textSecondary,
                     ),
                   ),
@@ -62,18 +172,133 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
 
-          SliverList(
-            delegate: SliverChildListDelegate([
-              _RadarCard(nome: 'AUTO BIN', codigo: 'auto_bin'),
-              _RadarCard(nome: 'AUTO PERÍCIA', codigo: 'auto_pericia'),
-              _RadarCard(nome: 'AUTO COMPLETA', codigo: 'auto_completa'),
-              _RadarCard(nome: 'AUTO LEILÃO', codigo: 'auto_leilao'),
-              _RadarCard(nome: 'AUTO BASE ESTADUAL', codigo: 'auto_base_estadual'),
-              _RadarCard(nome: 'AUTO DÉBITOS E RECALL', codigo: 'auto_debitos_recall'),
-              const SizedBox(height: 32),
-            ]),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // 1. CARD CAUTELAR
+                _MainActionCard(
+                  title: 'Cautelar',
+                  subtitle: 'Realizar laudo e vistoria cautelar veicular completa',
+                  icon: Icons.assignment_turned_in_rounded,
+                  badgeColor: const Color(0xFFE3F2FD),
+                  iconColor: AppTheme.primary,
+                  onTap: () => _abrirModalTipoPesquisa(context),
+                ),
+                const SizedBox(height: 16),
+
+                // 2. CARD PESQUISA
+                _MainActionCard(
+                  title: 'Pesquisa',
+                  subtitle: 'Realizar consulta rápida de dados veiculares, histórico e BIN',
+                  icon: Icons.manage_search_rounded,
+                  badgeColor: const Color(0xFFFFF3E0),
+                  iconColor: const Color(0xFFF57C00),
+                  onTap: () {
+                    context.push(
+                      '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                      extra: {'somentePesquisa': true},
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+              ]),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Card Principal de Ação ───────────────────────────────────────────────────
+
+class _MainActionCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color badgeColor;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _MainActionCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.badgeColor,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.08),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppTheme.border),
+          ),
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Icon(icon, color: iconColor, size: 32),
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: iconColor,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -145,15 +370,14 @@ class _WelcomeBanner extends StatelessWidget {
   }
 }
 
-// ── Card de tipo de vistoria ──────────────────────────────────────────────────
+// ── Card de tipo de vistoria (Modal) ─────────────────────────────────────────
 
 class _VistoriaCard extends StatelessWidget {
   final TipoVistoria tipo;
-  final String? codigoRadar;
+  final String? produtoPesquisa;
 
-  const _VistoriaCard({required this.tipo, this.codigoRadar});
+  const _VistoriaCard({required this.tipo, this.produtoPesquisa});
 
-  // Cores de destaque por tipo
   Color get _accentColor {
     switch (tipo) {
       case TipoVistoria.cautelarCarro:
@@ -187,13 +411,10 @@ class _VistoriaCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () {
-            if (codigoRadar != null) {
-              Navigator.of(context).pop(); // fecha o modal
-            }
-            context.push('/identificacao/${tipo.slug}',
-                extra: codigoRadar != null
-                    ? {'produtoSelecionado': codigoRadar}
-                    : null);
+            Navigator.of(context).pop(); // fecha o modal
+            context.push('/identificacao/${tipo.slug}', extra: {
+              if (produtoPesquisa != null) 'produtoSelecionado': produtoPesquisa,
+            });
           },
           child: Container(
             decoration: BoxDecoration(
@@ -254,13 +475,19 @@ class _VistoriaCard extends StatelessWidget {
   }
 }
 
-// ── Card de Pesquisa ────────────────────────────────────────────────────────
 
-class _RadarCard extends StatelessWidget {
-  final String nome;
+class _PesquisaCard extends StatelessWidget {
+  final String titulo;
   final String codigo;
+  final IconData? icone;
+  final VoidCallback onTap;
 
-  const _RadarCard({required this.nome, required this.codigo});
+  const _PesquisaCard({
+    required this.titulo,
+    required this.codigo,
+    required this.onTap,
+    this.icone,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -272,42 +499,7 @@ class _RadarCard extends StatelessWidget {
         elevation: 0,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            showModalBottomSheet(
-              context: context,
-              backgroundColor: AppTheme.background,
-              isScrollControlled: true,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              builder: (ctx) => SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Text(
-                          'Selecione o tipo de vistoria',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.textPrimary,
-                          ),
-                        ),
-                      ),
-                      _PesquisaSomenteCard(codigoRadar: codigo),
-                      _VistoriaCard(tipo: TipoVistoria.carroComCroqui, codigoRadar: codigo),
-                      _VistoriaCard(tipo: TipoVistoria.cautelarCarro, codigoRadar: codigo),
-                      _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao, codigoRadar: codigo),
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+          onTap: onTap,
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
@@ -320,15 +512,15 @@ class _RadarCard extends StatelessWidget {
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE3F2FD),
+                    color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 28),
+                  child: Icon(icone ?? Icons.search_rounded, color: AppTheme.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Text(
-                    nome,
+                    titulo,
                     style: const TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -336,6 +528,7 @@ class _RadarCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 const Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 16,
@@ -350,86 +543,3 @@ class _RadarCard extends StatelessWidget {
   }
 }
 
-// ── Card de Somente Pesquisa ────────────────────────────────────────────────
-
-class _PesquisaSomenteCard extends StatelessWidget {
-  final String codigoRadar;
-
-  const _PesquisaSomenteCard({required this.codigoRadar});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Material(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        elevation: 0,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.of(context).pop(); // fecha o modal
-            context.push('/identificacao/${TipoVistoria.cautelarCarro.slug}',
-                extra: {
-                  'produtoSelecionado': codigoRadar,
-                  'somentePesquisa': true,
-                });
-          },
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.border),
-            ),
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                // Ícone
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF3E0),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Icon(Icons.saved_search_rounded, color: Color(0xFFF57C00), size: 28),
-                ),
-                const SizedBox(width: 16),
-                // Texto
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Somente Pesquisa',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'Realizar consulta sem iniciar laudo.',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textSecondary,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 16,
-                  color: Color(0xFFF57C00),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

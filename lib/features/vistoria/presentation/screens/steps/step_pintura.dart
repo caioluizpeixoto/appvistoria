@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
@@ -46,15 +48,14 @@ class StepPintura extends StatelessWidget {
     'Danificado',
     'Amassado',
     'Riscado',
-    'Original sem reparo',
   ];
 
   Color _statusColor(String status) {
     if (status.isEmpty) return AppTheme.naoAplicavel;
     final s = status.toLowerCase();
     if (s.contains('original')) return AppTheme.conforme;
+    if (s.contains('substituído') || s.contains('danificado') || s.contains('massa')) return AppTheme.naoConforme;
     if (s.contains('repintura') || s.contains('amassado') || s.contains('riscado') || s.contains('envelopado')) return AppTheme.comObs;
-    if (s.contains('substituído') || s.contains('danificado')) return AppTheme.naoConforme;
     return AppTheme.textSecondary;
   }
 
@@ -77,8 +78,16 @@ class StepPintura extends StatelessWidget {
         _PinturaResumoCard(originais: originais, repinturas: repinturas, total: _pecas.length),
         const SizedBox(height: 8),
 
-        // ── Diagrama simplificado ──────────────────────────────────────────
-        _DiagramaPintura(pecas: _pecas, labels: _labels, statusFn: state.getStatus, colorFn: _statusColor),
+        // ── Visualização 3D por IA ─────────────────────────────────────────
+        _AiImagePreview(
+          marca: state.marca,
+          modelo: state.modelo,
+          ano: state.anoModelo.isNotEmpty ? state.anoModelo : state.anoFabricacao,
+          pecas: _pecas,
+          statusFn: state.getStatus,
+          initialBase64: state.aiImage3dBase64,
+          isGenerating: state.isGeneratingAiImage,
+        ),
         const SizedBox(height: 16),
 
         // ── Lista de itens ─────────────────────────────────────────────────
@@ -88,7 +97,9 @@ class StepPintura extends StatelessWidget {
               statusOptions: _statusOpcoes,
               obrigatoria: false,
             )),
-        const SizedBox(height: 32),
+        const SizedBox(height: 16),
+
+
       ],
     );
   }
@@ -219,6 +230,234 @@ class _Legenda extends StatelessWidget {
         const SizedBox(width: 4),
         Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
       ],
+    );
+  }
+}
+
+class _AiImagePreview extends StatefulWidget {
+  final String marca;
+  final String modelo;
+  final String ano;
+  final List<String> pecas;
+  final String Function(String) statusFn;
+  final String? initialBase64;
+  final bool isGenerating;
+
+  const _AiImagePreview({
+    required this.marca,
+    required this.modelo,
+    required this.ano,
+    required this.pecas,
+    required this.statusFn,
+    this.initialBase64,
+    required this.isGenerating,
+  });
+
+  @override
+  State<_AiImagePreview> createState() => _AiImagePreviewState();
+}
+
+class _AiImagePreviewState extends State<_AiImagePreview> {
+  String? _base64Image;
+  String? _errorMessage;
+  final TextEditingController _customInstructionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _base64Image = widget.initialBase64;
+  }
+
+  @override
+  void dispose() {
+    _customInstructionController.dispose();
+    super.dispose();
+  }
+
+  static const Map<String, String> _partToEnglish = {
+    'peca_capo_dianteiro': 'front hood',
+    'peca_paralama_dianteiro_esquerdo': 'front left (driver side) fender',
+    'peca_porta_dianteira_esquerda': 'front left (driver side) door',
+    'peca_porta_traseira_esquerda': 'rear left (driver side) door',
+    'peca_lateral_traseira_esquerda': 'rear left (driver side) quarter panel',
+    'peca_tampa_traseira': 'rear trunk / tailgate',
+    'peca_teto': 'roof',
+    'peca_lateral_traseira_direita': 'rear right (passenger side) quarter panel',
+    'peca_porta_traseira_direita': 'rear right (passenger side) door',
+    'peca_porta_dianteira_direita': 'front right (passenger side) door',
+    'peca_paralama_dianteiro_direito': 'front right (passenger side) fender',
+  };
+
+  Future<void> _gerarImagem() async {
+    final wizardState = context.read<VistoriaWizardState>();
+    
+    // Check if already generating to prevent double calls
+    if (wizardState.isGeneratingAiImage) return;
+
+    wizardState.setGeneratingAiImage(true);
+
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final List<Map<String, String>> partsToColor = [];
+      for (final pecaId in widget.pecas) {
+        final status = widget.statusFn(pecaId).toLowerCase();
+        String? color;
+        if (status.contains('substituído') || status.contains('danificado') || status.contains('massa')) {
+          color = 'red';
+        } else if (status.contains('repintura') || status.contains('amassado') || status.contains('riscado') || status.contains('envelopado')) {
+          color = 'yellow';
+        }
+        
+        if (color != null && _partToEnglish.containsKey(pecaId)) {
+          partsToColor.add({
+            'part': _partToEnglish[pecaId]!,
+            'color': color,
+          });
+        }
+      }
+
+      final dio = Dio(
+        BaseOptions(
+          connectTimeout: const Duration(seconds: 120),
+          receiveTimeout: const Duration(seconds: 300), // Aumentado para 5 minutos
+          sendTimeout: const Duration(seconds: 120),
+        ),
+      );
+      final url = 'https://cmcpmppgpbrufrxznost.supabase.co/functions/v1/gerar-imagem-veiculo';
+      final apiKey = 'sb_publishable_C2JRdVkSfBaVeNE904dfTg_KTg6oksq';
+
+      final customInstruction = _customInstructionController.text.trim();
+
+      final response = await dio.post(
+        url,
+        options: Options(
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer $apiKey',
+            'apikey': apiKey,
+          },
+        ),
+        data: {
+          'brand': widget.marca.isNotEmpty ? widget.marca : 'Jeep',
+          'model': widget.modelo.isNotEmpty ? widget.modelo : 'Compass',
+          'year': widget.ano.isNotEmpty ? widget.ano : '2022',
+          'parts': partsToColor,
+          if (customInstruction.isNotEmpty) 'customInstruction': customInstruction,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null && response.data is Map && response.data['base64'] != null) {
+        final b64 = response.data['base64'] as String;
+        
+        wizardState.aiImage3dBase64 = b64;
+        
+        if (mounted) {
+          setState(() {
+            _base64Image = b64;
+          });
+        }
+      } else {
+        final rawErr = response.data.toString();
+        final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
+        setState(() {
+          _errorMessage = isHtml 
+              ? 'Tempo limite esgotado no servidor. Clique em "Regerar com Ajustes" para tentar novamente.' 
+              : 'Erro ao gerar imagem: $rawErr';
+        });
+      }
+    } on DioException catch (e) {
+      final rawErr = e.response?.data?.toString() ?? e.message ?? '';
+      final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
+      setState(() {
+        _errorMessage = isHtml 
+            ? 'Tempo limite esgotado no servidor (502). Clique em "Regerar com Ajustes" para tentar novamente.' 
+            : 'Erro do Servidor: $rawErr';
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Falha: $e';
+      });
+    } finally {
+      // Must read context again or use the reference we captured
+      wizardState.setGeneratingAiImage(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text('Ilustração 3D Técnica (IA)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Gera o modelo 3D oficial do veículo com o mapa de lataria e pintura para ser exibido no laudo PDF.',
+            style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          if (_base64Image != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.memory(
+                base64Decode(_base64Image!),
+                fit: BoxFit.cover,
+              ),
+            ),
+          if (widget.isGenerating)
+            const Padding(
+              padding: EdgeInsets.all(32.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text(_errorMessage!, style: const TextStyle(color: AppTheme.naoConforme)),
+            ),
+          if (_base64Image != null) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: _customInstructionController,
+              decoration: InputDecoration(
+                labelText: 'Ajuste / Correção para a IA (Opcional)',
+                hintText: 'Ex: "destacar mais a repintura amarela do capô", "deixar a roda original"',
+                prefixIcon: const Icon(Icons.edit_note_rounded, color: AppTheme.primary),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                isDense: true,
+              ),
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 12),
+          
+          ElevatedButton.icon(
+            onPressed: widget.isGenerating ? null : _gerarImagem,
+            icon: Icon(_base64Image == null ? Icons.auto_awesome : Icons.refresh_rounded),
+            label: Text(_base64Image == null ? 'Gerar Imagem 3D (IA)' : 'Regerar com Ajustes'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

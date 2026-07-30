@@ -20,7 +20,6 @@ class StepVidros extends StatelessWidget {
 
   static const List<String> _statusOpcoes = [
     'Original',
-    'Dentro dos padrões',
     'Não original',
     'Vidro não original com gravação',
     'Inexistente',

@@ -21,6 +21,7 @@ import 'steps/step_etiquetas_vidros_placas.dart';
 import 'steps/step_estrutura.dart';
 import 'steps/step_pintura.dart';
 import 'steps/step_fotos_extras.dart';
+import 'steps/step_checklist_opcional.dart';
 import 'steps/step_conclusao.dart';
 
 /// Tela principal do wizard de Vistoria Cautelar Automotiva.
@@ -57,13 +58,14 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
       const _StepInfo(titulo: 'Fotos Externas', icone: Icons.photo_camera_rounded),
       const _StepInfo(titulo: 'Vidros', icone: Icons.window_rounded),
-      const _StepInfo(titulo: 'Hodômetro', icone: Icons.speed_rounded),
-      const _StepInfo(titulo: 'Motor e Câmbio', icone: Icons.settings_rounded),
-      const _StepInfo(titulo: 'Etiquetas e Chassi', icone: Icons.qr_code_rounded),
+      const _StepInfo(titulo: 'Painel / Hodômetro', icone: Icons.speed_rounded),
+      const _StepInfo(titulo: 'Motor / Câmbio', icone: Icons.settings_rounded),
+      const _StepInfo(titulo: 'Etiquetas / Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui) const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
       if (temAvarias) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
       const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
       const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
+      const _StepInfo(titulo: 'Checklist Opcional', icone: Icons.checklist_rounded),
       const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
     ];
   }
@@ -100,6 +102,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         if (veiculo.km != null && veiculo.km!.toString().isNotEmpty) { s.km = veiculo.km!.toString(); changed = true; }
         if (veiculo.numeroGrv != null && veiculo.numeroGrv!.isNotEmpty) { s.numeroGrv = veiculo.numeroGrv!; changed = true; }
         if (veiculo.combustivel != null && veiculo.combustivel!.isNotEmpty) { s.combustivel = veiculo.combustivel!; changed = true; }
+        if (veiculo.aiImage3dBase64 != null && veiculo.aiImage3dBase64!.isNotEmpty && veiculo.aiImage3dBase64 != s.aiImage3dBase64) { s.aiImage3dBase64 = veiculo.aiImage3dBase64!; changed = true; }
         if (changed) {
           s.forceUpdate();
         }
@@ -143,7 +146,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     });
   }
 
-  Future<void> _retryRadarConsulta() async {
+  Future<void> _retryRadarConsulta({bool blockUI = false}) async {
     final placa = _wizardState.placa;
     if (placa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -161,6 +164,22 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     setState(() {
       _statusConsulta = 'pendente';
     });
+
+    if (blockUI) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Consultando base de dados...'),
+            ],
+          ),
+        ),
+      );
+    }
 
     try {
       final service = sl<RadarService>();
@@ -197,6 +216,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
       
       if (mounted) {
+        if (blockUI) Navigator.pop(context); // fecha dialog
         setState(() {
           _statusConsulta = 'concluida';
         });
@@ -206,6 +226,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
     } catch (e) {
       if (mounted) {
+        if (blockUI) Navigator.pop(context); // fecha dialog
         String cleanError = e.toString().replaceAll('Exception: ', '').trim();
         if (cleanError.startsWith('Erro na consulta: ')) {
           cleanError = cleanError.replaceAll('Erro na consulta: ', '');
@@ -338,14 +359,20 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         _wizardState.municipio = veiculo.municipio ?? '';
         _wizardState.uf = veiculo.uf ?? '';
         _wizardState.combustivel = veiculo.combustivel ?? '';
+        _wizardState.aiImage3dBase64 = veiculo.aiImage3dBase64;
       }
     }
 
     // Carregar Itens
     final itens = await _dao.listarItensPorVistoria(widget.vistoriaId);
     for (final item in itens) {
-      _wizardState.checklistStatus[item.nome] = item.status;
-      _wizardState.checklistObs[item.nome] = item.observacao ?? '';
+      if (item.etapa == 'checklist_opcional') {
+        _wizardState.realizarChecklistOpcional = true;
+        _wizardState.checklistOpcional[item.nome] = item.status;
+      } else {
+        _wizardState.checklistStatus[item.nome] = item.status;
+        _wizardState.checklistObs[item.nome] = item.observacao ?? '';
+      }
     }
 
     // Carregar Fotos
@@ -435,6 +462,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           municipio: drift.Value(s.municipio),
           uf: drift.Value(s.uf),
           numeroGrv: drift.Value(s.numeroGrv),
+          aiImage3dBase64: drift.Value(s.aiImage3dBase64),
         ));
       }
 
@@ -454,6 +482,21 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           status: drift.Value(status),
           observacao: drift.Value(obs),
         ));
+      }
+
+      // Salvar Checklist Opcional se habilitado
+      if (s.realizarChecklistOpcional) {
+        for (final entry in s.checklistOpcional.entries) {
+          await _dao.inserirOuAtualizarItem(ItensVistoriaCompanion(
+            id: drift.Value('${widget.vistoriaId}_checklist_${entry.key}'),
+            vistoriaId: drift.Value(widget.vistoriaId),
+            etapa: const drift.Value('checklist_opcional'),
+            categoria: const drift.Value('opcional'),
+            nome: drift.Value(entry.key),
+            status: drift.Value(entry.value),
+            observacao: const drift.Value(''),
+          ));
+        }
       }
 
       // Salvar Fotos
@@ -577,7 +620,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     );
   }
 
-  void _confirmarFinalizar() {
+  void _confirmarFinalizar() async {
     final faltando = _wizardState.fotasObrigatoriasFaltando;
     final semAssinatura = _wizardState.assinaturaPath == null;
     final semResultado = _wizardState.resultadoFinal.isEmpty;
@@ -630,7 +673,35 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       return;
     }
 
-    // Tudo ok — vai para a revisão
+    // Tudo ok, verifica se já fez pesquisa
+    if (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro') {
+      final querPesquisar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pesquisa de Veículo'),
+          content: const Text('Você não realizou a pesquisa na base para este veículo. Deseja selecionar o estilo de pesquisa antes de gerar o laudo?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Ir sem pesquisa', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              child: const Text('Selecionar Pesquisa'),
+            ),
+          ],
+        ),
+      );
+
+      if (querPesquisar == true) {
+        await _retryRadarConsulta(blockUI: true);
+      }
+    }
+
+    if (!mounted) return;
+
+    // Vai para a revisão
     context.push('/revisao/${widget.vistoriaId}', extra: {
       'wizardState': _wizardState,
     });
@@ -775,22 +846,25 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
                 // ── Conteúdo das etapas ───────────────────────────────────
                 Expanded(
-                  child: PageView(
+                  child: PageView.builder(
                     controller: _pageController,
                     physics: const NeverScrollableScrollPhysics(),
-                    children: [
-                      const StepDadosGerais(),
-                      const StepFotosExternas(),
-                      const StepVidros(),
-                      const StepPainelHodometro(),
-                      const StepMotorCambio(),
-                      const StepEtiquetasChassi(),
-                      if (_wizardState.temCroqui) const StepEstrutura(),
-                      if (_wizardState.temAvarias) const StepPintura(),
-                      const StepFotosExtras(),
-                      const StepDadosVeiculo(),
-                      const StepConclusao(),
-                    ],
+                    itemCount: _activeSteps.length,
+                    itemBuilder: (ctx, idx) {
+                      final titulo = _activeSteps[idx].titulo;
+                      if (titulo == 'Dados Gerais') return const StepDadosGerais();
+                      if (titulo == 'Fotos Externas') return const StepFotosExternas();
+                      if (titulo == 'Vidros') return const StepVidros();
+                      if (titulo == 'Painel / Hodômetro') return const StepPainelHodometro();
+                      if (titulo == 'Motor / Câmbio') return const StepMotorCambio();
+                      if (titulo == 'Etiquetas / Chassi') return const StepEtiquetasChassi();
+                      if (titulo == 'Estrutura') return const StepEstrutura();
+                      if (titulo == 'Pintura') return const StepPintura();
+                      if (titulo == 'Fotos Extras') return const StepFotosExtras();
+                      if (titulo == 'Dados do Veículo') return const StepDadosVeiculo();
+                      if (titulo == 'Checklist Opcional') return const StepChecklistOpcional();
+                      return const StepConclusao();
+                    },
                   ),
                 ),
               ],

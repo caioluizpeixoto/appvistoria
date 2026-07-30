@@ -37,6 +37,8 @@ class VistoriaWizardState extends ChangeNotifier {
   String km = '';
   String numeroGrv = '';
   String arquivoPesquisaUrl = '';
+  String? aiImage3dBase64;
+  bool isGeneratingAiImage = false;
 
   // ── Checklist de itens: status e observação por itemId ────────────────────
   // Todas as etapas de inspeção usam este mapa
@@ -59,6 +61,11 @@ class VistoriaWizardState extends ChangeNotifier {
   String divergenciasEncontradas = '';
   String recomendacoes = '';
 
+  // ── Checklist Opcional ────────────────────────────────────────────────────
+  bool realizarChecklistOpcional = false;
+  final Map<String, String> checklistOpcional = {};
+  final Map<String, String> checklistOpcionalMotivos = {};
+
   // ── Conclusão (Step 14) ───────────────────────────────────────────────────
   String resultadoFinal = '';
   String parecerTecnico = '';
@@ -74,6 +81,21 @@ class VistoriaWizardState extends ChangeNotifier {
   bool get temCroqui => tipoEnum != TipoVistoria.cautelarCaminhao;
   bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
 
+  // Status unificados para o checklist opcional
+  static const List<String> statusChecklistOpcional = [
+    'OK',
+    'NÃO POSSUI',
+    'RISCO SUPERFICIAL',
+    'RISCO PROFUNDO',
+    'RISCADO',
+    'AMASSADO',
+    'POSSUI E FUNCIONA',
+    'SEM DESGASTE',
+    'MANUAL',
+    'FUNCIONA',
+    'AVARIADO'
+  ];
+
   VistoriaWizardState({
     required this.vistoriaId,
     this.currentStep = 0,
@@ -82,7 +104,7 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Navegação ──────────────────────────────────────────────────────────────
 
   int get totalSteps {
-    int count = 9;
+    int count = 10;
     if (temCroqui) count++;
     if (temAvarias) count++;
     return count;
@@ -163,6 +185,11 @@ class VistoriaWizardState extends ChangeNotifier {
     if (fotosLocais[itemId] != null && index < fotosLocais[itemId]!.length) {
       fotosLocais[itemId]!.removeAt(index);
     }
+    notifyListeners();
+  }
+
+  void setGeneratingAiImage(bool value) {
+    isGeneratingAiImage = value;
     notifyListeners();
   }
 

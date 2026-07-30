@@ -38,6 +38,7 @@ class PdfPreviewScreen extends StatelessWidget {
       ),
       body: PdfPreview(
         build: (format) => File(pdfPath!).readAsBytes(),
+        pdfFileName: pdfPath!.split(Platform.pathSeparator).last,
         canChangeOrientation: false,
         canChangePageFormat: false,
         canDebug: false,

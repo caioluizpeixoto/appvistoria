@@ -66,6 +66,8 @@ class Veiculos extends Table {
   TextColumn get cor => text().nullable()();
   TextColumn get combustivel => text().nullable()();
   IntColumn get km => integer().nullable()();
+  // IA
+  TextColumn get aiImage3dBase64 => text().nullable()();
   // Novo: localização
   TextColumn get municipio => text().nullable()();
   TextColumn get uf => text().nullable()();

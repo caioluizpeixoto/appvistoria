@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json()
-    let { brand, model, year, version, fuel, engine, apontamentos } = body
+    let { brand, model, year, version, fuel, engine, apontamentos, uf } = body
 
     if (!brand || !model || !year) {
       return new Response(JSON.stringify({ error: 'Marca, modelo e ano são obrigatórios.' }), {
@@ -85,16 +85,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${geminiApiKey}`
 
     let extraPrompt = '';
     let extraJsonSchema = '';
+    const estadoLocal = uf ? `Considere o mercado do estado de(a) ${uf}, NO BRASIL, para estimativa de preços.` : 'Considere o mercado médio brasileiro para estimativa de preços.';
+    
     if (hasApontamentos) {
-      extraPrompt = `\nIMPORTANTE: O vistoriador apontou as seguintes DIVERGÊNCIAS/DEFEITOS reais neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}\n\nSua tarefa é ESTIMAR o valor da peça de reposição (nova ou paralela) e o custo de mão de obra para reparar ou substituir as peças citadas acima. Inclua essas estimativas no JSON de retorno sob a chave "apontamentos_veiculo".`;
-      extraJsonSchema = `,\n"apontamentos_veiculo": [\n{\n"peca_ou_problema": "",\n"observacao_indicada": "",\n"valor_peca_estimado": "",\n"valor_mao_de_obra_estimado": ""\n}\n]`;
+      extraPrompt = `\nIMPORTANTE: O vistoriador apontou as seguintes DIVERGÊNCIAS/DEFEITOS reais neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}\n\nSua tarefa é ESTIMAR o valor da peça de reposição (nova ou paralela), o custo de mão de obra para reparar ou substituir as peças citadas acima e também indicar exatamente o local no veículo onde esse apontamento costuma ser encontrado (ex: 'Cofre do motor, lado direito' ou 'Estrutura Dianteira'). ${estadoLocal} REGRA CRÍTICA: Assuma sempre que o reparo é uma troca simples de componente mecânico/estético. Nunca orce reparos estruturais complexos (como alinhamento de chassi, solda ou repuxamento de torre), mesmo que o termo utilizado sugira parte estrutural, limite-se ao custo de substituição da peça mecânica correspondente. Inclua essas estimativas no JSON de retorno sob a chave "apontamentos_veiculo". TODOS OS VALORES DEVERÃO SER EM REAIS (R$).`;
+      extraJsonSchema = `,\n"apontamentos_veiculo": [\n{\n"peca_ou_problema": "",\n"local_no_veiculo": "",\n"observacao_indicada": "",\n"valor_peca_estimado": "",\n"valor_mao_de_obra_estimado": ""\n}\n]`;
     }
+    
+    // Sempre adicionar a análise final
+    extraPrompt += `\nAlém disso, faça uma análise final da vistoria: se está tudo certo ou se há avarias, apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado nas avarias informadas (se houver) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
+    extraJsonSchema += `,\n"analise_final": {\n"resumo_estado_veiculo": "",\n"valor_venda_mercado_local": "",\n"desconto_total_avarias": "",\n"valor_venda_sugerido_final": "",\n"justificativa": ""\n}`;
 
-    const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados.${extraPrompt}
+    const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados. OBRIGATÓRIO: TODOS OS PREÇOS E AVALIAÇÕES DEVEM SER EM MOEDA BRASILEIRA (BRL) FORMATADOS COMO "R$ X.XXX,XX". NUNCA USE USD NEM REALIZE AVALIAÇÕES DO MERCADO AMERICANO.${extraPrompt}
 
 Veículo:
 Marca: ${brand}
@@ -181,7 +187,7 @@ O JSON retornado deve seguir rigorosamente esta estrutura:
     if (!geminiResponse.ok) {
       const errorText = await geminiResponse.text()
       console.error('Erro na API Gemini:', errorText)
-      return new Response(JSON.stringify({ error: 'Erro ao gerar ficha com Gemini.' }), {
+      return new Response(JSON.stringify({ error: 'Erro ao gerar ficha com Gemini.', details: errorText }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

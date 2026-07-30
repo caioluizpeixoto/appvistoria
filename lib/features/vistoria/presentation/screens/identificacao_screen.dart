@@ -226,17 +226,41 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       }
     });
 
+    final total = combinadas.length;
+
     return await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Consultas Existentes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.history_rounded, color: AppTheme.primary, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Pesquisas Encontradas ($total)',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Encontramos pesquisas recentes para este veículo. Você pode reaproveitá-las sem custo adicional:'),
+              Text(
+                'Identificamos $total pesquisa(s) realizada(s) anteriormente para este veículo. Deseja utilizar uma pesquisa anterior ou realizar uma nova consulta?',
+                style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.4),
+              ),
               const SizedBox(height: 16),
               Flexible(
                 child: ListView.builder(
@@ -261,22 +285,28 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                     
                     return Card(
                       elevation: 0,
-                      color: AppTheme.surfaceVariant,
+                      color: AppTheme.surfaceVariant.withValues(alpha: 0.5),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: AppTheme.border),
+                      ),
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: Icon(
                           isRadar ? Icons.cloud_sync_rounded : Icons.history_rounded, 
-                          color: AppTheme.primary
+                          color: AppTheme.primary,
                         ),
                         title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                        trailing: ElevatedButton(
+                        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                        trailing: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
-                            textStyle: const TextStyle(fontSize: 12),
+                            backgroundColor: AppTheme.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () => Navigator.of(ctx).pop(item),
-                          child: const Text('Reutilizar'),
+                          icon: const Icon(Icons.check_rounded, size: 14),
+                          label: const Text('Utilizar'),
                         ),
                       ),
                     );
@@ -294,8 +324,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.comObs),
             onPressed: () => Navigator.of(ctx).pop({'forcarNova': true}),
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 16),
-            label: const Text('Nova Consulta', style: TextStyle(color: Colors.white)),
+            icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+            label: const Text('Realizar Nova Consulta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -716,12 +746,14 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     return limpo;
   }
 
+  bool _mostrarDetalhesPesquisa = true;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(widget.tipo.titulo),
+        title: Text(_somentePesquisa ? 'Pesquisa Veicular' : widget.tipo.titulo),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
@@ -812,7 +844,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               ),
               const SizedBox(height: 12),
 
-              // Botão Iniciar
+              // Botão Iniciar / Pesquisar
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -832,7 +864,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : const Icon(Icons.play_arrow_rounded),
+                      : Icon(_somentePesquisa ? Icons.search_rounded : Icons.play_arrow_rounded),
                   label: Text(_buscandoVeiculo
                       ? (_somentePesquisa ? 'Consultando...' : 'Iniciando Vistoria...')
                       : (_somentePesquisa ? 'Realizar Pesquisa' : 'Consultar Veículo e Iniciar')),
@@ -840,80 +872,153 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               ),
               const SizedBox(height: 12),
 
+              // Funcionalidade Preencher Manualmente / Offline removida a pedido do usuário
 
               if (!_veiculoEncontrado && !_modoOffline) ...[
-                const SizedBox(height: 16),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _modoOffline = true;
-                        if (_modoEntrada == 'placa') {
-                          _placaEditCtrl.text = _buscaCtrl.text.trim();
-                        } else if (_modoEntrada == 'chassi') {
-                          _chassiEditCtrl.text = _buscaCtrl.text.trim();
-                        } else if (_modoEntrada == 'motor') {
-                          _motorEditCtrl.text = _buscaCtrl.text.trim();
-                        }
-                      });
-                    },
-                    icon: const Icon(Icons.cloud_off_rounded,
-                        color: AppTheme.textSecondary, size: 20),
-                    label: const Text(
-                      'Preencher Manualmente / Offline',
-                      style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          decoration: TextDecoration.underline),
-                    ),
+                const SizedBox(height: 32),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.lightbulb_outline_rounded,
+                          color: AppTheme.primary, size: 28),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Dica de Vistoria',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: AppTheme.primary,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'A consulta buscará automaticamente os dados oficiais do veículo, restrições e histórico para preencher o laudo com segurança.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textSecondary,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
 
               if (_veiculoEncontrado || _modoOffline) ...[
                 if (_somentePesquisa && !_modoOffline) ...[
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 28),
                   const _SectionHeader(
                     icon: Icons.check_circle_outline_rounded,
                     title: 'Pesquisa Concluída',
-                    subtitle: 'A consulta foi realizada com sucesso.',
+                    subtitle: 'A consulta veicular foi realizada com sucesso.',
                   ),
-                  const SizedBox(height: 24),
-                  if (_arquivoPesquisaUrl != null && _arquivoPesquisaUrl!.isNotEmpty)
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.conforme,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                  const SizedBox(height: 20),
+
+                  // 2 BOTÕES DE AÇÃO: Acessar a Pesquisa & Baixar a Pesquisa
+                  Row(
+                    children: [
+                      // Botão 1: Acessar a Pesquisa
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _mostrarDetalhesPesquisa = !_mostrarDetalhesPesquisa;
+                            });
+                          },
+                          icon: Icon(
+                            _mostrarDetalhesPesquisa
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                            size: 20,
+                          ),
+                          label: Text(
+                            _mostrarDetalhesPesquisa
+                                ? 'Ocultar Pesquisa'
+                                : 'Acessar a Pesquisa',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                        onPressed: () async {
-                          final uri = Uri.parse(_arquivoPesquisaUrl!);
-                          if (await canLaunchUrl(uri)) {
-                            await launchUrl(uri, mode: LaunchMode.externalApplication);
-                          }
-                        },
-                        icon: const Icon(Icons.picture_as_pdf_rounded, size: 22),
-                        label: const Text(
-                          'Visualizar Laudo PDF',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Botão 2: Baixar a Pesquisa
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.conforme,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () async {
+                            if (_arquivoPesquisaUrl != null &&
+                                _arquivoPesquisaUrl!.isNotEmpty) {
+                              final uri = Uri.parse(_arquivoPesquisaUrl!);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri,
+                                    mode: LaunchMode.externalApplication);
+                              } else {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Não foi possível abrir o PDF.'),
+                                    ),
+                                  );
+                                }
+                              }
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('O relatório PDF da pesquisa está sendo processado.'),
+                                  backgroundColor: AppTheme.comObs,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.download_rounded, size: 20),
+                          label: const Text(
+                            'Baixar a Pesquisa',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      onPressed: () => context.push('/historico-consultas'),
-                      icon: const Icon(Icons.history_rounded, size: 22),
-                      label: const Text(
-                        'Acessar Histórico de Consultas',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
-                    ),
+                    ],
                   ),
+                  const SizedBox(height: 20),
+
+                  // Dados da Pesquisa exibidos/acessados
+                  if (_mostrarDetalhesPesquisa) ...[
+                    _buildFormularioEditavel(),
+                    const SizedBox(height: 16),
+                  ],
                 ] else ...[
                   const SizedBox(height: 32),
                   _SectionHeader(
@@ -949,46 +1054,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 ]
               ],
 
-              const SizedBox(height: 32),
-              Row(
-                children: const [
-                  Expanded(child: Divider()),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('OU',
-                        style: TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  Expanded(child: Divider()),
-                ],
-              ),
-              const SizedBox(height: 24),
-              const _SectionHeader(
-                icon: Icons.refresh_rounded,
-                title: 'Retomar Laudo Existente',
-                subtitle: 'Digite o código de um laudo já iniciado',
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _laudoCtrl,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: const InputDecoration(
-                        hintText: 'Ex: VST-20240042',
-                        prefixIcon: Icon(Icons.qr_code_scanner_rounded,
-                            color: AppTheme.primary),
-                      ),
-                      onFieldSubmitted: (_) => _buscarLaudo(),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  _SearchButton(loading: _buscandoLaudo, onTap: _buscarLaudo),
-                ],
-              ),
+              // Opção para Retomar Laudo Existente removida a pedido do usuário
               const SizedBox(height: 48),
             ],
           ),

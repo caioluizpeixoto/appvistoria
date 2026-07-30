@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/image_service.dart';
@@ -135,6 +137,28 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
             content: Text('Erro no upload: $e'),
             backgroundColor: AppTheme.naoConforme,
           ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _fillDummyPhoto() async {
+    setState(() => _uploading = true);
+    try {
+      final byteData = await rootBundle.load('assets/images/app_icon.png');
+      final appDir = await getApplicationDocumentsDirectory();
+      final tempFile = File('${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+
+      final state = context.read<VistoriaWizardState>();
+      state.addFotoLocal(widget.itemId, tempFile.path);
+      // Ignorando upload pro storage para economizar espaço em testes
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao preencher fictícia: $e')),
         );
       }
     } finally {
@@ -408,6 +432,16 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                 ],
               ),
             ),
+          
+          if (fotos.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: TextButton.icon(
+                onPressed: _uploading ? null : _fillDummyPhoto,
+                icon: const Icon(Icons.bug_report, size: 16, color: Colors.grey),
+                label: const Text('Preencher com foto fictícia (Teste)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ),
+            ),
 
           // ── Campo de código encontrado (vidros, placas etc.) ──────────────
           if (widget.showCodigoField)
@@ -543,14 +577,14 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     // NÃO CONFORME (Vermelho)
     if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
         s.contains('não original') || s.contains('substituído') || s.contains('ausente') ||
-        s.contains('danificad') || s.contains('colisão')) {
+        s.contains('danificad') || s.contains('colisão') || s.contains('ilegível') || s.contains('não localizad')) {
       return AppTheme.naoConforme;
     }
     
     // COM OBSERVAÇÃO (Laranja/Amarelo)
     if (s.contains('reparo') || s.contains('repintura') || s.contains('observação') || 
         s.contains('envelopado') || s.contains('amassado') || s.contains('riscado') ||
-        s.contains('soldado') || s.contains('avaria') || s.contains('massa') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso')) {
+        s.contains('soldado') || s.contains('avaria') || s.contains('massa') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso') || s.contains('inexistente') || s.contains('remarcad')) {
       return AppTheme.comObs;
     }
     
@@ -570,7 +604,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     
     // NÃO CONFORME
     if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
-        s.contains('não original') || s.contains('ausente') || s.contains('colisão')) {
+        s.contains('não original') || s.contains('ausente') || s.contains('colisão') || s.contains('ilegível') || s.contains('não localizad')) {
       return Icons.cancel_rounded;
     }
     if (s.contains('substituído')) {
@@ -587,7 +621,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     if (s.contains('repintura') || s.contains('massa') || s.contains('envelopado')) {
       return Icons.format_paint_rounded;
     }
-    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso')) {
+    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso') || s.contains('inexistente') || s.contains('remarcad')) {
       return Icons.warning_rounded;
     }
 

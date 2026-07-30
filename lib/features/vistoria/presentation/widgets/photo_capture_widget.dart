@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import '../../../../core/theme/app_theme.dart';
 
@@ -92,6 +93,27 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
     setState(() => _currentPhoto = null);
     if (widget.onPhotoDeleted != null) {
       widget.onPhotoDeleted!();
+    }
+  }
+
+  Future<void> _fillDummyPhoto() async {
+    setState(() => _isProcessing = true);
+    try {
+      final byteData = await rootBundle.load('assets/images/app_icon.png');
+      final appDir = await getApplicationDocumentsDirectory();
+      final tempFile = File('${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      
+      setState(() => _currentPhoto = tempFile);
+      if (widget.onPhotoCaptured != null) {
+        widget.onPhotoCaptured!(tempFile);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erro ao preencher foto fictícia: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -205,29 +227,39 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
   }
 
   Widget _buildActionButtons() {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: () => _pickImage(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_rounded),
+                label: const Text('Tirar Foto'),
+              ),
             ),
-            onPressed: () => _pickImage(ImageSource.camera),
-            icon: const Icon(Icons.camera_alt_rounded),
-            label: const Text('Tirar Foto'),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: AppTheme.primary),
+                ),
+                onPressed: () => _pickImage(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_rounded),
+                label: const Text('Galeria'),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppTheme.primary),
-            ),
-            onPressed: () => _pickImage(ImageSource.gallery),
-            icon: const Icon(Icons.photo_library_rounded),
-            label: const Text('Galeria'),
-          ),
+        const SizedBox(height: 8),
+        TextButton.icon(
+          onPressed: _fillDummyPhoto,
+          icon: const Icon(Icons.bug_report, size: 16, color: Colors.grey),
+          label: const Text('Preencher com foto fictícia (Teste)', style: TextStyle(color: Colors.grey, fontSize: 12)),
         ),
       ],
     );
