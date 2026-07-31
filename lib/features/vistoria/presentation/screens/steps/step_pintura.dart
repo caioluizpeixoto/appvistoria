@@ -78,6 +78,15 @@ class StepPintura extends StatelessWidget {
         _PinturaResumoCard(originais: originais, repinturas: repinturas, total: _pecas.length),
         const SizedBox(height: 8),
 
+        // ── Lista de itens ─────────────────────────────────────────────────
+        ..._pecas.map((id) => InspecaoItemWidget(
+              itemId: id,
+              label: _labels[id]!,
+              statusOptions: _statusOpcoes,
+              obrigatoria: false,
+            )),
+        const SizedBox(height: 24),
+
         // ── Visualização 3D por IA ─────────────────────────────────────────
         _AiImagePreview(
           marca: state.marca,
@@ -88,15 +97,6 @@ class StepPintura extends StatelessWidget {
           initialBase64: state.aiImage3dBase64,
           isGenerating: state.isGeneratingAiImage,
         ),
-        const SizedBox(height: 16),
-
-        // ── Lista de itens ─────────────────────────────────────────────────
-        ..._pecas.map((id) => InspecaoItemWidget(
-              itemId: id,
-              label: _labels[id]!,
-              statusOptions: _statusOpcoes,
-              obrigatoria: false,
-            )),
         const SizedBox(height: 16),
 
 
@@ -349,9 +349,27 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
         },
       );
 
-      if (response.statusCode == 200 && response.data != null && response.data is Map && response.data['base64'] != null) {
-        final b64 = response.data['base64'] as String;
+      var responseData = response.data;
+      if (responseData is String) {
+        try {
+          responseData = jsonDecode(responseData);
+        } catch (_) {}
+      }
+
+      if (response.statusCode == 200 && responseData != null && responseData is Map && responseData['base64'] != null) {
+        var b64 = responseData['base64'] as String;
         
+        // Limpar prefixo data URI se existir
+        if (b64.contains(',')) {
+          b64 = b64.split(',').last;
+        }
+        // Remover espaços em branco ou quebras de linha
+        b64 = b64.replaceAll(RegExp(r'\s+'), '');
+        // Adicionar padding necessário para o Dart base64Decode
+        while (b64.length % 4 != 0) {
+          b64 += '=';
+        }
+
         wizardState.aiImage3dBase64 = b64;
         
         if (mounted) {
@@ -360,26 +378,38 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
           });
         }
       } else {
-        final rawErr = response.data.toString();
+        var rawErr = response.data.toString();
+        if (rawErr.length > 500) {
+          rawErr = rawErr.substring(0, 500) + '...';
+        }
         final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
-        setState(() {
-          _errorMessage = isHtml 
-              ? 'Tempo limite esgotado no servidor. Clique em "Regerar com Ajustes" para tentar novamente.' 
-              : 'Erro ao gerar imagem: $rawErr';
-        });
+        if (mounted) {
+          setState(() {
+            _errorMessage = isHtml 
+                ? 'Tempo limite esgotado no servidor. Clique em "Regerar com Ajustes" para tentar novamente.' 
+                : 'Erro ao gerar imagem: $rawErr';
+          });
+        }
       }
     } on DioException catch (e) {
-      final rawErr = e.response?.data?.toString() ?? e.message ?? '';
+      var rawErr = e.response?.data?.toString() ?? e.message ?? '';
+      if (rawErr.length > 500) {
+        rawErr = rawErr.substring(0, 500) + '...';
+      }
       final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
-      setState(() {
-        _errorMessage = isHtml 
-            ? 'Tempo limite esgotado no servidor (502). Clique em "Regerar com Ajustes" para tentar novamente.' 
-            : 'Erro do Servidor: $rawErr';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = isHtml 
+              ? 'Tempo limite esgotado no servidor (502). Clique em "Regerar com Ajustes" para tentar novamente.' 
+              : 'Erro do Servidor: $rawErr';
+        });
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Falha: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Falha: $e';
+        });
+      }
     } finally {
       // Must read context again or use the reference we captured
       wizardState.setGeneratingAiImage(false);

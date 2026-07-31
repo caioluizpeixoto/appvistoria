@@ -97,3 +97,5 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/images/app_icon.png"
+  adaptive_icon_background: "#000000" # Cor de fundo preta para preencher o círculo
+  adaptive_icon_foreground: "assets/images/app_icon.png"
