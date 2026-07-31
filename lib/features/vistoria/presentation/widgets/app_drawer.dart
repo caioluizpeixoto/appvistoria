@@ -114,11 +114,20 @@ class _DrawerHeader extends StatelessWidget {
           const SizedBox(height: 2),
           BlocBuilder<AuthBloc, AuthBlocState>(
             builder: (context, state) {
-              final email = state is AuthAuthenticated
-                  ? state.user.email ?? 'Perito'
-                  : 'Perito';
+              String displayValue = 'Perito';
+              if (state is AuthAuthenticated) {
+                final name = state.user.userMetadata?['name'] as String?;
+                if (name != null && name.trim().isNotEmpty) {
+                  displayValue = name;
+                } else {
+                  final email = state.user.email ?? '';
+                  if (email.isNotEmpty) {
+                    displayValue = email.split('@').first;
+                  }
+                }
+              }
               return Text(
-                email,
+                displayValue,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.75),
                   fontSize: 13,
@@ -157,15 +166,19 @@ class _DrawerFooter extends StatelessWidget {
               ),
             ),
             onTap: () {
+              // Capture o BLoC antes de fechar o drawer/contexto atual
+              final authBloc = context.read<AuthBloc>();
+              // Fechar o drawer primeiro
               Navigator.pop(context);
+              
               showDialog(
-                context: context,
-                builder: (_) => AlertDialog(
+                context: context, // Nota: idealmente não se usa context após pop, mas como o flutter ainda encontra o navigator raiz, funciona.
+                builder: (dialogCtx) => AlertDialog(
                   title: const Text('Sair'),
                   content: const Text('Deseja encerrar a sessão?'),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: () => Navigator.pop(dialogCtx),
                       child: const Text('Cancelar'),
                     ),
                     ElevatedButton(
@@ -173,8 +186,8 @@ class _DrawerFooter extends StatelessWidget {
                         backgroundColor: AppTheme.naoConforme,
                       ),
                       onPressed: () {
-                        Navigator.pop(context);
-                        context.read<AuthBloc>().add(AuthLogoutRequested());
+                        Navigator.pop(dialogCtx); // Fechar dialog
+                        authBloc.add(AuthLogoutRequested());
                       },
                       child: const Text('Sair'),
                     ),

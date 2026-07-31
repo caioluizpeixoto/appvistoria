@@ -5,29 +5,46 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../blocs/auth_bloc.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nomeCtrl = TextEditingController();
   final _usernameController = TextEditingController();
   final _senhaCtrl = TextEditingController();
+  final _senhaConfCtrl = TextEditingController();
   bool _obscureSenha = true;
+  bool _obscureSenhaConf = true;
 
   @override
   void dispose() {
+    _nomeCtrl.dispose();
     _usernameController.dispose();
     _senhaCtrl.dispose();
+    _senhaConfCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    context.read<AuthBloc>().add(AuthLoginRequested(
+    
+    if (_senhaCtrl.text != _senhaConfCtrl.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('As senhas não coincidem.'),
+          backgroundColor: AppTheme.naoConforme,
+        ),
+      );
+      return;
+    }
+
+    context.read<AuthBloc>().add(AuthRegisterRequested(
+          name: _nomeCtrl.text.trim(),
           username: _usernameController.text.trim(),
           password: _senhaCtrl.text,
         ));
@@ -37,6 +54,11 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
+      appBar: AppBar(
+        title: const Text('Criar Conta'),
+        backgroundColor: AppTheme.background,
+        elevation: 0,
+      ),
       body: BlocConsumer<AuthBloc, AuthBlocState>(
         listener: (context, state) {
           if (state is AuthError) {
@@ -46,6 +68,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 backgroundColor: AppTheme.naoConforme,
               ),
             );
+          } else if (state is AuthAuthenticated) {
+             ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Conta criada com sucesso!'),
+                backgroundColor: AppTheme.conforme,
+              ),
+            );
+            // Router will handle redirect to /home automatically
           }
         },
         builder: (context, state) {
@@ -61,51 +91,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Logo
-                        Center(
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.primary.withValues(alpha: 0.3),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.directions_car_rounded,
-                              size: 44,
-                              color: Colors.white,
-                            ),
+                        const Text(
+                          'Preencha seus dados para criar uma nova conta de Vistoriador.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppTheme.textSecondary,
                           ),
+                          textAlign: TextAlign.center,
                         ),
-                        const SizedBox(height: 24),
-                        const Center(
-                          child: Text(
-                            'Vistorias',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        const Center(
-                          child: Text(
-                            'Faça login para continuar',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 32),
                         // Card do formulário
                         Container(
                           padding: const EdgeInsets.all(24),
@@ -125,19 +119,34 @@ class _LoginScreenState extends State<LoginScreen> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               TextFormField(
+                                controller: _nomeCtrl,
+                                keyboardType: TextInputType.name,
+                                textInputAction: TextInputAction.next,
+                                decoration: const InputDecoration(
+                                  labelText: 'Nome da Empresa / Pessoa',
+                                  prefixIcon:
+                                      Icon(Icons.badge_rounded, size: 20),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
+                                    return 'Informe um nome para exibição.';
+                                  }
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
                                 controller: _usernameController,
                                 keyboardType: TextInputType.text,
                                 textInputAction: TextInputAction.next,
-                                style: const TextStyle(color: AppTheme.textPrimary),
+                                autocorrect: false,
                                 decoration: const InputDecoration(
                                   labelText: 'Usuário (CPF/CNPJ)',
-                                  prefixIcon: Icon(
-                                    Icons.person_rounded,
-                                    color: AppTheme.textSecondary,
-                                  ),
+                                  prefixIcon:
+                                      Icon(Icons.person_rounded, size: 20),
                                 ),
-                                validator: (value) {
-                                  if (value == null || value.trim().isEmpty) {
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) {
                                     return 'Informe o usuário.';
                                   }
                                   return null;
@@ -147,8 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               TextFormField(
                                 controller: _senhaCtrl,
                                 obscureText: _obscureSenha,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _submit(),
+                                textInputAction: TextInputAction.next,
                                 decoration: InputDecoration(
                                   labelText: 'Senha',
                                   prefixIcon: const Icon(
@@ -175,6 +183,35 @@ class _LoginScreenState extends State<LoginScreen> {
                                   return null;
                                 },
                               ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _senhaConfCtrl,
+                                obscureText: _obscureSenhaConf,
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) => _submit(),
+                                decoration: InputDecoration(
+                                  labelText: 'Confirmar Senha',
+                                  prefixIcon: const Icon(
+                                      Icons.lock_outline_rounded,
+                                      size: 20),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscureSenhaConf
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => setState(
+                                        () => _obscureSenhaConf = !_obscureSenhaConf),
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) {
+                                    return 'Confirme a senha.';
+                                  }
+                                  return null;
+                                },
+                              ),
                               const SizedBox(height: 24),
                               SizedBox(
                                 height: 50,
@@ -189,30 +226,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text('Entrar'),
+                                      : const Text('Criar Conta'),
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              TextButton(
-                                onPressed: isLoading
-                                    ? null
-                                    : () {
-                                        context.push('/register');
-                                      },
-                                child: const Text('Não possui conta? Cadastre-se'),
-                              ),
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        Center(
-                          child: Text(
-                            'Acesso restrito a vistoriadores credenciados.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary.withValues(alpha: 0.7),
-                            ),
-                            textAlign: TextAlign.center,
                           ),
                         ),
                       ],

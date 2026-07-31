@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'features/auth/presentation/blocs/auth_bloc.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/login_screen.dart';
+import 'features/auth/presentation/screens/register_screen.dart';
 import 'features/vistoria/domain/vistoria_type.dart';
 import 'features/vistoria/presentation/screens/home_screen.dart';
 import 'features/vistoria/presentation/screens/identificacao_screen.dart';
@@ -22,19 +23,20 @@ final _rootNavigatorKey = GlobalKey<NavigatorState>();
 GoRouter buildRouter(AuthBloc authBloc) {
   return GoRouter(
     navigatorKey: _rootNavigatorKey,
-    // TODO: restaurar autenticação — iniciar em /splash com guard de auth
-    initialLocation: '/home',
-    // redirect: (context, state) {
-    //   final authState = authBloc.state;
-    //   final isAuth = authState is AuthAuthenticated;
-    //   final isSplash = state.matchedLocation == '/splash';
-    //   final isLogin = state.matchedLocation == '/login';
-    //   if (isSplash) return null;
-    //   if (!isAuth && !isLogin) return '/login';
-    //   if (isAuth && isLogin) return '/home';
-    //   return null;
-    // },
-    // refreshListenable: GoRouterRefreshStream(authBloc.stream),
+    initialLocation: '/splash',
+    redirect: (context, state) {
+      final authState = authBloc.state;
+      final isAuth = authState is AuthAuthenticated;
+      final isSplash = state.matchedLocation == '/splash';
+      final isLogin = state.matchedLocation == '/login';
+      final isRegister = state.matchedLocation == '/register';
+
+      if (isSplash) return null;
+      if (!isAuth && !isLogin && !isRegister) return '/login';
+      if (isAuth && (isLogin || isRegister)) return '/home';
+      return null;
+    },
+    refreshListenable: GoRouterRefreshStream(authBloc.stream),
     routes: [
       GoRoute(
         path: '/splash',
@@ -43,6 +45,10 @@ GoRouter buildRouter(AuthBloc authBloc) {
       GoRoute(
         path: '/login',
         builder: (ctx, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/register',
+        builder: (ctx, state) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/home',

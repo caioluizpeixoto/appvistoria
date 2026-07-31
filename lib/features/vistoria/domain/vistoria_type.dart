@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 enum TipoVistoria {
   cautelarCarro,
   cautelarCaminhao,
-  carroComCroqui;
+  carroComCroqui,
+  vistoriaEntrada;
 
   String get titulo {
     switch (this) {
@@ -13,6 +14,8 @@ enum TipoVistoria {
         return 'Vistoria Cautelar Caminhão';
       case TipoVistoria.carroComCroqui:
         return 'Vistoria Cautelar Croqui + Avarias';
+      case TipoVistoria.vistoriaEntrada:
+        return 'Vistoria de Entrada';
     }
   }
 
@@ -24,6 +27,8 @@ enum TipoVistoria {
         return 'Inspeção completa para caminhões e veículos pesados';
       case TipoVistoria.carroComCroqui:
         return 'Vistoria com mapeamento detalhado de danos e croqui';
+      case TipoVistoria.vistoriaEntrada:
+        return 'Checklist visual de recebimento do veículo na loja';
     }
   }
 
@@ -35,6 +40,8 @@ enum TipoVistoria {
         return Icons.local_shipping_rounded;
       case TipoVistoria.carroComCroqui:
         return Icons.car_repair_rounded;
+      case TipoVistoria.vistoriaEntrada:
+        return Icons.fact_check_rounded;
     }
   }
 
@@ -46,6 +53,8 @@ enum TipoVistoria {
         return 'cautelar-caminhao';
       case TipoVistoria.carroComCroqui:
         return 'carro-croqui';
+      case TipoVistoria.vistoriaEntrada:
+        return 'vistoria-entrada';
     }
   }
 
@@ -58,8 +67,10 @@ enum TipoVistoria {
 
   static TipoVistoria fromString(String val) {
     final lower = val.toLowerCase();
+    if (lower.contains('entrada')) return TipoVistoria.vistoriaEntrada;
     if (lower.contains('caminh')) return TipoVistoria.cautelarCaminhao;
     if (lower.contains('avaria') || lower.contains('pintura')) return TipoVistoria.carroComCroqui;
     return TipoVistoria.cautelarCarro; // default fallback
   }
 }
+

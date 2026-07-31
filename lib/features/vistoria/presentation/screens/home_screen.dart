@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/blocs/auth_bloc.dart';
 import '../../domain/vistoria_type.dart';
@@ -122,6 +124,10 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final role = user?.userMetadata?['role'] as String? ?? 'empresa'; // default fallback
+    final isUsuarioOnly = role == 'usuario';
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
@@ -176,28 +182,50 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // 1. CARD CAUTELAR
-                _MainActionCard(
-                  title: 'Cautelar',
-                  subtitle: 'Realizar laudo e vistoria cautelar veicular completa',
-                  icon: Icons.assignment_turned_in_rounded,
-                  badgeColor: const Color(0xFFE3F2FD),
-                  iconColor: AppTheme.primary,
-                  onTap: () => _abrirModalTipoPesquisa(context),
-                ),
-                const SizedBox(height: 16),
+                // 1. CARD CAUTELAR (Oculto se for apenas 'usuario')
+                if (!isUsuarioOnly) ...[
+                  _MainActionCard(
+                    title: 'Cautelar',
+                    subtitle: 'Realizar laudo e vistoria cautelar veicular completa',
+                    icon: Icons.assignment_turned_in_rounded,
+                    badgeColor: const Color(0xFFE3F2FD),
+                    iconColor: AppTheme.primary,
+                    onTap: () => _abrirModalTipoPesquisa(context),
+                  ),
+                  const SizedBox(height: 16),
+                ],
 
-                // 2. CARD PESQUISA
+                // 2. CARD PESQUISA (Oculto se for apenas 'usuario')
+                if (!isUsuarioOnly) ...[
+                  _MainActionCard(
+                    title: 'Pesquisa',
+                    subtitle: 'Realizar consulta rápida de dados veiculares, histórico e BIN',
+                    icon: Icons.manage_search_rounded,
+                    badgeColor: const Color(0xFFFFF3E0),
+                    iconColor: const Color(0xFFF57C00),
+                    onTap: () {
+                      context.push(
+                        '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                        extra: {'somentePesquisa': true},
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // 3. CARD VISTORIA DE ENTRADA
                 _MainActionCard(
-                  title: 'Pesquisa',
-                  subtitle: 'Realizar consulta rápida de dados veiculares, histórico e BIN',
-                  icon: Icons.manage_search_rounded,
-                  badgeColor: const Color(0xFFFFF3E0),
-                  iconColor: const Color(0xFFF57C00),
+                  title: 'Vistoria de Entrada',
+                  subtitle: 'Checklist visual de recebimento do veículo na loja',
+                  icon: Icons.fact_check_rounded,
+                  badgeColor: const Color(0xFFE8F5E9),
+                  iconColor: const Color(0xFF388E3C), // verde
                   onTap: () {
-                    context.push(
-                      '/identificacao/${TipoVistoria.cautelarCarro.slug}',
-                      extra: {'somentePesquisa': true},
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vistoria de Entrada em breve!'),
+                        backgroundColor: AppTheme.primary,
+                      ),
                     );
                   },
                 ),
@@ -321,8 +349,20 @@ class _WelcomeBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       child: BlocBuilder<AuthBloc, AuthBlocState>(
         builder: (context, state) {
-          final email =
-              state is AuthAuthenticated ? state.user.email ?? '' : '';
+          String displayValue = 'Vistoriador';
+          if (state is AuthAuthenticated) {
+            final name = state.user.userMetadata?['name'] as String?;
+            if (name != null && name.trim().isNotEmpty) {
+              displayValue = name;
+            } else {
+              final email = state.user.email ?? '';
+              if (email.isNotEmpty) {
+                // Remove o @appvistoria.com.br
+                displayValue = email.split('@').first;
+              }
+            }
+          }
+
           return Row(
             children: [
               Expanded(
@@ -338,7 +378,7 @@ class _WelcomeBanner extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      email.isNotEmpty ? email : 'Perito',
+                      displayValue,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -386,6 +426,8 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFF00796B); // teal
       case TipoVistoria.carroComCroqui:
         return const Color(0xFF6A1B9A); // roxo
+      case TipoVistoria.vistoriaEntrada:
+        return const Color(0xFF388E3C); // verde
     }
   }
 
@@ -397,6 +439,8 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFFE0F2F1);
       case TipoVistoria.carroComCroqui:
         return const Color(0xFFF3E5F5);
+      case TipoVistoria.vistoriaEntrada:
+        return const Color(0xFFE8F5E9); // verde claro
     }
   }
 
