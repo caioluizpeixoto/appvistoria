@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import '../../../../../core/services/ocr_crlv_service.dart';
 import '../placa_camera_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -34,6 +37,8 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   final _motorVeiculoCtrl = TextEditingController();
   final _cambioBinCtrl = TextEditingController();
   final _cambioVeiculoCtrl = TextEditingController();
+
+  bool _isLoadingOcr = false;
 
   @override
   void initState() {
@@ -131,45 +136,65 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Botão OCR CRLV ───────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                side: const BorderSide(color: AppTheme.primary),
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: () {
-                setState(() {
-                  if (state.placa.isNotEmpty) _placaCtrl.text = state.placa;
-                  if (state.marca.isNotEmpty) _marcaCtrl.text = state.marca;
-                  if (state.modelo.isNotEmpty) _modeloCtrl.text = state.modelo;
-                  if (state.anoFabricacao.isNotEmpty) _anoFabCtrl.text = state.anoFabricacao;
-                  if (state.anoModelo.isNotEmpty) _anoModCtrl.text = state.anoModelo;
-                  if (state.cor.isNotEmpty) _corCtrl.text = state.cor;
-                  if (state.combustivel.isNotEmpty) _combustivelCtrl.text = state.combustivel;
-                  if (state.municipio.isNotEmpty) _municipioCtrl.text = state.municipio;
-                  if (state.uf.isNotEmpty) _ufCtrl.text = state.uf;
-                  if (state.renavam.isNotEmpty) _renavamCtrl.text = state.renavam;
-                  if (state.km.isNotEmpty) _kmCtrl.text = state.km;
-                  if (state.numeroGrv.isNotEmpty) _numeroGrvCtrl.text = state.numeroGrv;
-                  if (state.chassiBin.isNotEmpty) _chassiBinCtrl.text = state.chassiBin;
-                  if (state.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = state.chassiVeiculo;
-                  if (state.motorBin.isNotEmpty) _motorBinCtrl.text = state.motorBin;
-                  if (state.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = state.motorVeiculo;
-                  if (state.cambioBin.isNotEmpty) _cambioBinCtrl.text = state.cambioBin;
-                  if (state.cambioVeiculo.isNotEmpty) _cambioVeiculoCtrl.text = state.cambioVeiculo;
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Formulário atualizado com os últimos dados pesquisados/salvos!'),
-                    backgroundColor: AppTheme.primary,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.sync_rounded),
-              label: const Text('Atualizar / Preencher Formulario'),
+              onPressed: _isLoadingOcr ? null : _scanCrlv,
+              icon: _isLoadingOcr
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.document_scanner_rounded),
+              label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
             ),
           ),
+          const SizedBox(height: 16),
+
+          if (!state.isChecklist)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: AppTheme.primary),
+                ),
+                onPressed: () {
+                  setState(() {
+                    if (state.placa.isNotEmpty) _placaCtrl.text = state.placa;
+                    if (state.marca.isNotEmpty) _marcaCtrl.text = state.marca;
+                    if (state.modelo.isNotEmpty) _modeloCtrl.text = state.modelo;
+                    if (state.anoFabricacao.isNotEmpty) _anoFabCtrl.text = state.anoFabricacao;
+                    if (state.anoModelo.isNotEmpty) _anoModCtrl.text = state.anoModelo;
+                    if (state.cor.isNotEmpty) _corCtrl.text = state.cor;
+                    if (state.combustivel.isNotEmpty) _combustivelCtrl.text = state.combustivel;
+                    if (state.municipio.isNotEmpty) _municipioCtrl.text = state.municipio;
+                    if (state.uf.isNotEmpty) _ufCtrl.text = state.uf;
+                    if (state.renavam.isNotEmpty) _renavamCtrl.text = state.renavam;
+                    if (state.km.isNotEmpty) _kmCtrl.text = state.km;
+                    if (state.numeroGrv.isNotEmpty) _numeroGrvCtrl.text = state.numeroGrv;
+                    if (state.chassiBin.isNotEmpty) _chassiBinCtrl.text = state.chassiBin;
+                    if (state.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = state.chassiVeiculo;
+                    if (state.motorBin.isNotEmpty) _motorBinCtrl.text = state.motorBin;
+                    if (state.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = state.motorVeiculo;
+                    if (state.cambioBin.isNotEmpty) _cambioBinCtrl.text = state.cambioBin;
+                    if (state.cambioVeiculo.isNotEmpty) _cambioVeiculoCtrl.text = state.cambioVeiculo;
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Formulário atualizado com os últimos dados pesquisados/salvos!'),
+                      backgroundColor: AppTheme.primary,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.sync_rounded),
+                label: const Text('Atualizar / Preencher Formulario'),
+              ),
+            ),
           
           if (state.arquivoPesquisaUrl.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -197,6 +222,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
             ),
           ],
           
+          const SizedBox(height: 24),
           const SizedBox(height: 24),
 
           _buildSection(
@@ -449,5 +475,60 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
         ),
       ),
     );
+  }
+
+  Future<void> _scanCrlv() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    if (pickedFile == null) return;
+
+    setState(() => _isLoadingOcr = true);
+
+    try {
+      final file = File(pickedFile.path);
+      final result = await OcrCrlvService.scanImage(file);
+
+      if (result.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível encontrar dados legíveis na imagem.'),
+              backgroundColor: AppTheme.naoConforme,
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          if (result.placa.isNotEmpty) _placaCtrl.text = result.placa;
+          if (result.renavam.isNotEmpty) _renavamCtrl.text = result.renavam;
+          if (result.chassi.isNotEmpty) {
+            _chassiVeiculoCtrl.text = result.chassi;
+            if (!context.read<VistoriaWizardState>().isChecklist) _chassiBinCtrl.text = result.chassi; // auto fill bin if cautious
+          }
+          if (result.cor.isNotEmpty) _corCtrl.text = result.cor;
+          if (result.combustivel.isNotEmpty) _combustivelCtrl.text = result.combustivel;
+          if (result.anoFabricacao.isNotEmpty) _anoFabCtrl.text = result.anoFabricacao;
+          if (result.anoModelo.isNotEmpty) _anoModCtrl.text = result.anoModelo;
+          if (result.marcaModelo.isNotEmpty) _marcaCtrl.text = result.marcaModelo;
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dados capturados com sucesso! Revise os campos preenchidos.'),
+              backgroundColor: AppTheme.conforme,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao processar imagem: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isLoadingOcr = false);
+    }
   }
 }

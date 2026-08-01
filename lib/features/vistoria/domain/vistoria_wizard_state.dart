@@ -78,8 +78,26 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Flags Auxiliares ───────────────────────────────────────────────────────
   TipoVistoria get tipoEnum => TipoVistoria.fromString(tipoVistoria);
   bool get isCaminhao => tipoEnum == TipoVistoria.cautelarCaminhao;
-  bool get temCroqui => tipoEnum != TipoVistoria.cautelarCaminhao;
+  bool get temCroqui => tipoEnum != TipoVistoria.cautelarCaminhao && !isChecklistPesado && !isChecklistPasseio;
   bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
+  bool get isChecklistPesado => tipoEnum == TipoVistoria.checklistPesado;
+  bool get isChecklistPasseio => tipoEnum == TipoVistoria.checklistPasseio;
+  bool get isChecklist => isChecklistPesado || isChecklistPasseio;
+
+  // ── Medidas e Complementos (apenas Caminhão) ──────────────────────────────
+  final Map<String, String> medidasComplementos = {
+    'dataTrocaOleo': '',
+    'kmTrocaOleo': '',
+    'tipoTrocaMotor': '',
+    'tipoTrocaCambio': '',
+    'tipoTrocaDiferencial': '',
+    'implementoDescricao': '',
+    'implementoMarca': '',
+    'implementoEntreEixo': '',
+    'implementoComprimento': '',
+    'implementoLargura': '',
+    'implementoAltura': '',
+  };
 
   // Status unificados para o checklist opcional
   static const List<String> statusChecklistOpcional = [
@@ -104,6 +122,8 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Navegação ──────────────────────────────────────────────────────────────
 
   int get totalSteps {
+    if (isChecklistPesado) return 5;
+    if (isChecklistPasseio) return 4;
     int count = 10;
     if (temCroqui) count++;
     if (temAvarias) count++;
@@ -241,8 +261,9 @@ class VistoriaWizardState extends ChangeNotifier {
 
   // ── Validação ─────────────────────────────────────────────────────────────
 
-  /// Fotos obrigatórias que precisam estar preenchidas para gerar o PDF
   List<String> get fotosObrigatorias {
+    if (isChecklist || tipoEnum == TipoVistoria.vistoriaEntrada) return [];
+
     final list = [
       'foto_placa',
       'frente_direita',

@@ -3,11 +3,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/blocs/auth_bloc.dart';
 import '../../domain/vistoria_type.dart';
 import '../widgets/app_drawer.dart';
+import '../../../../injection_container.dart';
+import '../../../../database/daos/vistoria_dao.dart';
+import '../../../../database/app_database.dart';
+import 'package:drift/drift.dart' as drift;
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -132,7 +137,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: const Text('Home Auto'),
+        title: const Text('Prime Auto'),
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu_rounded),
@@ -213,18 +218,44 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                 ],
 
-                // 3. CARD VISTORIA DE ENTRADA
+                // 3. CARD VISTORIA DE ENTRADA (antigo Checklist Veicular)
                 _MainActionCard(
                   title: 'Vistoria de Entrada',
-                  subtitle: 'Checklist visual de recebimento do veículo na loja',
+                  subtitle: 'Realizar vistoria de entrada para veículos pesados ou de passeio',
                   icon: Icons.fact_check_rounded,
                   badgeColor: const Color(0xFFE8F5E9),
                   iconColor: const Color(0xFF388E3C), // verde
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vistoria de Entrada em breve!'),
-                        backgroundColor: AppTheme.primary,
+                    showModalBottomSheet(
+                      context: context,
+                      backgroundColor: AppTheme.background,
+                      isScrollControlled: true,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                      ),
+                      builder: (ctx) => SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Text(
+                                  'Selecione o tipo de Vistoria',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              _VistoriaCard(tipo: TipoVistoria.checklistPasseio),
+                              _VistoriaCard(tipo: TipoVistoria.checklistPesado),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -428,6 +459,10 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFF6A1B9A); // roxo
       case TipoVistoria.vistoriaEntrada:
         return const Color(0xFF388E3C); // verde
+      case TipoVistoria.checklistPesado:
+        return const Color(0xFFE65100); // laranja escuro
+      case TipoVistoria.checklistPasseio:
+        return const Color(0xFFF57C00); // laranja
     }
   }
 
@@ -441,6 +476,10 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFFF3E5F5);
       case TipoVistoria.vistoriaEntrada:
         return const Color(0xFFE8F5E9); // verde claro
+      case TipoVistoria.checklistPesado:
+        return const Color(0xFFFFF3E0); // laranja claro
+      case TipoVistoria.checklistPasseio:
+        return const Color(0xFFFFF8E1); // amarelado claro
     }
   }
 
@@ -454,11 +493,55 @@ class _VistoriaCard extends StatelessWidget {
         elevation: 0,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
-            Navigator.of(context).pop(); // fecha o modal
-            context.push('/identificacao/${tipo.slug}', extra: {
-              if (produtoPesquisa != null) 'produtoSelecionado': produtoPesquisa,
-            });
+          onTap: () async {
+            if (tipo == TipoVistoria.checklistPesado || tipo == TipoVistoria.checklistPasseio) {
+              // Pula a tela de pesquisa (IdentificacaoScreen) e cria a vistoria direto
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (_) => const Center(child: CircularProgressIndicator()),
+              );
+
+              try {
+                final dao = sl<VistoriaDao>();
+                final vistoriaId = const Uuid().v4();
+                final shortCode = vistoriaId.substring(0, 8).toUpperCase();
+                final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? 'usuario-deslogado';
+
+                await dao.inserirVistoria(VistoriasCompanion.insert(
+                  id: vistoriaId,
+                  numeroLaudo: 'CHK-$shortCode',
+                  vistoriadorId: currentUserId,
+                  tipoVistoria: drift.Value(tipo.titulo),
+                ));
+
+                await dao.inserirVeiculo(VeiculosCompanion.insert(
+                  id: vistoriaId,
+                  vistoriaId: vistoriaId,
+                  placa: '',
+                ));
+
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // fecha o loading
+                  Navigator.of(context).pop(); // fecha o modal de checklist
+                  context.push('/vistoria-wizard/$vistoriaId', extra: {
+                    'dadosIniciais': <String, dynamic>{},
+                  });
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.of(context).pop(); // fecha o loading
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erro ao criar checklist: $e')),
+                  );
+                }
+              }
+            } else {
+              Navigator.of(context).pop(); // fecha o modal
+              context.push('/identificacao/${tipo.slug}', extra: {
+                if (produtoPesquisa != null) 'produtoSelecionado': produtoPesquisa,
+              });
+            }
           },
           child: Container(
             decoration: BoxDecoration(

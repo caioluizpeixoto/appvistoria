@@ -158,8 +158,8 @@ class _VistoriaCard extends StatelessWidget {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Retificar Laudo'),
-              content: Text('Este laudo foi concluído. Você tem ${72 - diff.inHours}h restantes para retificá-lo. Deseja reabrir a edição?'),
+              title: const Text('Retificar Vistoria'),
+              content: Text('Esta vistoria foi concluída. Você tem ${72 - diff.inHours}h restantes para retificá-la. Deseja reabrir a edição?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -180,7 +180,7 @@ class _VistoriaCard extends StatelessWidget {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Prazo Expirado'),
-              content: const Text('Este laudo foi concluído há mais de 72h e não pode mais ser alterado.'),
+              content: const Text('Esta vistoria foi concluída há mais de 72h e não pode mais ser alterada.'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -270,7 +270,7 @@ class _VistoriaCard extends StatelessWidget {
                       vistoria.status == 'concluido' ? Icons.edit_document : Icons.edit_rounded,
                       color: AppTheme.primary,
                     ),
-                    tooltip: vistoria.status == 'concluido' ? 'Retificar Laudo' : 'Continuar Vistoria',
+                    tooltip: vistoria.status == 'concluido' ? 'Retificar Vistoria' : 'Continuar Vistoria',
                     onPressed: _handleEdit,
                   ),
                   IconButton(
@@ -279,7 +279,7 @@ class _VistoriaCard extends StatelessWidget {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Excluir Laudo?'),
+                          title: const Text('Excluir Vistoria?'),
                           content: const Text('Tem certeza que deseja excluir esta vistoria? Esta ação não pode ser desfeita.'),
                           actions: [
                             TextButton(
@@ -325,7 +325,7 @@ class _VistoriaCard extends StatelessWidget {
                   context.push('/pdf-preview/${vistoria.id}?path=${vistoria.pdfUrl}');
                 },
                 icon: const Icon(Icons.picture_as_pdf_rounded, color: AppTheme.primary, size: 20),
-                label: const Text('Ver Laudo em PDF', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                label: const Text('Ver Documento em PDF', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
               ),
             ),
           if (consulta != null || webhookPdfUrl != null) ...[

@@ -22,6 +22,8 @@ import 'steps/step_estrutura.dart';
 import 'steps/step_pintura.dart';
 import 'steps/step_fotos_extras.dart';
 import 'steps/step_checklist_opcional.dart';
+import 'steps/step_checklist_medidas.dart';
+import 'steps/step_checklist_inspecao.dart';
 import 'steps/step_conclusao.dart';
 
 /// Tela principal do wizard de Vistoria Cautelar Automotiva.
@@ -51,6 +53,19 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   StreamSubscription? _consultaSub;
 
   List<_StepInfo> get _activeSteps {
+    final isChecklist = _wizardState.isChecklist;
+    final isChecklistPesado = _wizardState.isChecklistPesado;
+    
+    if (isChecklist) {
+      return [
+        const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
+        const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
+        if (isChecklistPesado) const _StepInfo(titulo: 'Medidas e Complementos', icone: Icons.straighten_rounded),
+        const _StepInfo(titulo: 'Inspeção do Checklist', icone: Icons.fact_check_rounded),
+        const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
+      ];
+    }
+
     final temCroqui = _wizardState.temCroqui;
     final temAvarias = _wizardState.temAvarias;
     
@@ -673,8 +688,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       return;
     }
 
-    // Tudo ok, verifica se já fez pesquisa
-    if (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro') {
+    // Tudo ok, verifica se já fez pesquisa (exceto para Checklists, que são manuais)
+    if (!_wizardState.isChecklist && (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro')) {
       final querPesquisar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -745,70 +760,72 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                 ],
               ),
               actions: [
-                if (_statusConsulta == 'pendente')
-                  const Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(right: 16),
-                      child: Tooltip(
-                        message: 'Pesquisando na base...',
-                        child: SizedBox(
-                          width: 18, height: 18,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                if (!_wizardState.isChecklist) ...[
+                  if (_statusConsulta == 'pendente')
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message: 'Pesquisando na base...',
+                          child: SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          ),
                         ),
                       ),
-                    ),
-                  )
-                else if (_statusConsulta == 'concluida')
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Tooltip(
-                        message: 'Pesquisa concluída. Clique para atualizar novamente.',
-                        child: InkWell(
-                          onTap: _retryRadarConsulta,
-                          borderRadius: BorderRadius.circular(20),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 22),
+                    )
+                  else if (_statusConsulta == 'concluida')
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message: 'Pesquisa concluída. Clique para atualizar novamente.',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_statusConsulta == 'andamento')
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message: 'Consulta em andamento. Toque para verificar se terminou.',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.hourglass_bottom_rounded, color: Colors.orangeAccent, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_statusConsulta == 'erro')
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message: 'Erro na pesquisa. Tocar para tentar novamente.',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 22),
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  )
-                else if (_statusConsulta == 'andamento')
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Tooltip(
-                        message: 'Consulta em andamento. Toque para verificar se terminou.',
-                        child: InkWell(
-                          onTap: _retryRadarConsulta,
-                          borderRadius: BorderRadius.circular(20),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.hourglass_bottom_rounded, color: Colors.orangeAccent, size: 22),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else if (_statusConsulta == 'erro')
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 16),
-                      child: Tooltip(
-                        message: 'Erro na pesquisa. Tocar para tentar novamente.',
-                        child: InkWell(
-                          onTap: _retryRadarConsulta,
-                          borderRadius: BorderRadius.circular(20),
-                          child: const Padding(
-                            padding: EdgeInsets.all(4.0),
-                            child: Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 22),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                ],
                 IconButton(
                   icon: _isSaving
                       ? const SizedBox(
@@ -863,6 +880,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       if (titulo == 'Fotos Extras') return const StepFotosExtras();
                       if (titulo == 'Dados do Veículo') return const StepDadosVeiculo();
                       if (titulo == 'Checklist Opcional') return const StepChecklistOpcional();
+                      if (titulo == 'Medidas e Complementos') return const StepChecklistMedidas();
+                      if (titulo == 'Inspeção do Checklist') return const StepChecklistInspecao();
                       return const StepConclusao();
                     },
                   ),

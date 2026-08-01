@@ -20,6 +20,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'pdf_radar_generator.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'pdf_checklist_generator.dart';
 
 // ── Paleta PDF ──────────────────────────────────────────────────────────────
 const _kBlack = PdfColor.fromInt(0xFF222222);
@@ -37,6 +38,19 @@ class PdfGeneratorService {
     required Map<String, String> uploadedPhotos,
     required Map<String, String> ocrResults,
   }) async {
+    final type = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
+    if (type == TipoVistoria.checklistPesado || type == TipoVistoria.checklistPasseio || type == TipoVistoria.vistoriaEntrada) {
+      final path = await generateChecklistPdf(
+        vistoria: vistoria,
+        veiculo: veiculo,
+        // The wizardState is not passed here directly in generateLaudoPdf signature
+        // but wait, generateLaudoCompleto does have wizardState. We can fetch it if needed or 
+        // we should route inside `generateLaudoCompleto` which receives wizardState.
+      );
+      if (path != null) return File(path);
+      throw Exception('Falha ao gerar Checklist PDF');
+    }
+
     return generateLaudoCompleto(
       vistoria: vistoria,
       veiculo: veiculo,
@@ -82,6 +96,15 @@ class PdfGeneratorService {
     required Veiculo veiculo,
     VistoriaWizardState? wizardState,
   }) async {
+    final type = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
+    if (type == TipoVistoria.checklistPesado || type == TipoVistoria.checklistPasseio || type == TipoVistoria.vistoriaEntrada) {
+      return generateChecklistPdf(
+        vistoria: vistoria,
+        veiculo: veiculo,
+        wizardState: wizardState,
+      );
+    }
+
     final pdf = pw.Document(
       title: 'Laudo Cautelar - ${veiculo.placa}',
       author: vistoria.vistoriadorNome ?? 'UltraVisão',
@@ -96,12 +119,6 @@ class PdfGeneratorService {
     try {
       final logoBytes = await rootBundle.load('assets/images/logo.pdf.png');
       logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-    } catch (_) {}
-
-    pw.ImageProvider? marcaImage;
-    try {
-      final marcaBytes = await rootBundle.load('assets/images/marca.png');
-      marcaImage = pw.MemoryImage(marcaBytes.buffer.asUint8List());
     } catch (_) {}
 
     pw.ImageProvider? carroEstruturaImage;
@@ -141,7 +158,7 @@ class PdfGeneratorService {
     }
 
     // Página 1 — Dados Gerais
-    pdf.addPage(await _buildPage1Modern(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage, assinaturaCliente: assinaturaClienteImage, marcaAgua: marcaImage));
+    pdf.addPage(await _buildPage1Modern(vistoria: vistoria, veiculo: veiculo, state: wizardState, styles: styles, logo: logoImage, assinatura: assinaturaImage, assinaturaCliente: assinaturaClienteImage, marcaAgua: null));
 
     final tipoEnum = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
     final isCaminhao = tipoEnum == TipoVistoria.cautelarCaminhao;
@@ -338,11 +355,11 @@ class PdfGeneratorService {
                                   child: pw.Column(
                                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                                     children: [
-                                      _buildKvSmall('Nº CHASSI:', veiculo.chassiVeiculo ?? '-', styles),
-                                      _buildKvSmall('Nº MOTOR:', veiculo.motorVeiculo ?? '-', styles),
-                                      _buildKvSmall('PLACA:', veiculo.placa ?? '-', styles),
-                                      _buildKvSmall('MARCA:', veiculo.marca ?? '-', styles),
-                                      _buildKvSmall('MODELO:', veiculo.modelo ?? '-', styles),
+                                      _buildKvSmall('Nº CHASSI:', wizardState?.chassiVeiculo.isNotEmpty == true ? wizardState!.chassiVeiculo : veiculo.chassiVeiculo ?? '-', styles),
+                                      _buildKvSmall('Nº MOTOR:', wizardState?.motorVeiculo.isNotEmpty == true ? wizardState!.motorVeiculo : veiculo.motorVeiculo ?? '-', styles),
+                                      _buildKvSmall('PLACA:', wizardState?.placa.isNotEmpty == true ? wizardState!.placa : veiculo.placa ?? '-', styles),
+                                      _buildKvSmall('MARCA:', wizardState?.marca.isNotEmpty == true ? wizardState!.marca : veiculo.marca ?? '-', styles),
+                                      _buildKvSmall('MODELO:', wizardState?.modelo.isNotEmpty == true ? wizardState!.modelo : veiculo.modelo ?? '-', styles),
                                     ]
                                   )
                                 ),
@@ -350,10 +367,10 @@ class PdfGeneratorService {
                                   child: pw.Column(
                                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                                     children: [
-                                      _buildKvSmall('COR:', veiculo.cor ?? '-', styles),
-                                      _buildKvSmall('COMBUSTÍVEL:', veiculo.combustivel ?? '-', styles),
-                                      _buildKvSmall('ANO FABRICAÇÃO:', veiculo.anoFabricacao?.toString() ?? '-', styles),
-                                      _buildKvSmall('ANO MODELO:', veiculo.anoModelo?.toString() ?? '-', styles),
+                                      _buildKvSmall('COR:', wizardState?.cor.isNotEmpty == true ? wizardState!.cor : veiculo.cor ?? '-', styles),
+                                      _buildKvSmall('COMBUSTÍVEL:', wizardState?.combustivel.isNotEmpty == true ? wizardState!.combustivel : veiculo.combustivel ?? '-', styles),
+                                      _buildKvSmall('ANO FABRICAÇÃO:', wizardState?.anoFabricacao.isNotEmpty == true ? wizardState!.anoFabricacao : veiculo.anoFabricacao?.toString() ?? '-', styles),
+                                      _buildKvSmall('ANO MODELO:', wizardState?.anoModelo.isNotEmpty == true ? wizardState!.anoModelo : veiculo.anoModelo?.toString() ?? '-', styles),
                                       _buildKvSmall('SITUAÇÃO CHASSI:', 'CIRCULAÇÃO', styles),
                                     ]
                                   )

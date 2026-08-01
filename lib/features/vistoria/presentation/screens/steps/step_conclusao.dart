@@ -21,12 +21,18 @@ class _StepConclusaoState extends State<StepConclusao> {
   late SignatureController _signatureController;
   late SignatureController _signatureControllerCliente;
 
-  final List<String> _resultados = [
-    'Conforme',
-    'Conforme com observações',
-    'Reprovado',
-    'Necessita análise complementar',
-  ];
+  List<String> get _resultados {
+    final state = context.read<VistoriaWizardState>();
+    if (state.isChecklist || state.tipoEnum == TipoVistoria.vistoriaEntrada) {
+      return ['Conforme', 'Não Conforme'];
+    }
+    return [
+      'Conforme',
+      'Conforme com observações',
+      'Reprovado',
+      'Necessita análise complementar',
+    ];
+  }
 
   @override
   void initState() {
@@ -104,6 +110,7 @@ class _StepConclusaoState extends State<StepConclusao> {
         return AppTheme.conforme;
       case 'Conforme com observações':
         return AppTheme.comObs;
+      case 'Não Conforme':
       case 'Reprovado':
         return AppTheme.naoConforme;
       case 'Necessita análise complementar':
@@ -119,6 +126,7 @@ class _StepConclusaoState extends State<StepConclusao> {
         return Icons.check_circle_rounded;
       case 'Conforme com observações':
         return Icons.warning_amber_rounded;
+      case 'Não Conforme':
       case 'Reprovado':
         return Icons.cancel_rounded;
       case 'Necessita análise complementar':
@@ -199,7 +207,7 @@ class _StepConclusaoState extends State<StepConclusao> {
           const SizedBox(height: 32),
 
           // ── Resultado final ──────────────────────────────────────────────
-          const Text('Resultado Final do Laudo',
+          const Text('Resultado Final',
               style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -471,7 +479,8 @@ class _StepConclusaoState extends State<StepConclusao> {
           const SizedBox(height: 20),
           
           // ── Assinatura digital do Cliente ──────────────────────────────────
-          Container(
+          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada)
+            Container(
             decoration: BoxDecoration(
               color: AppTheme.surface,
               borderRadius: BorderRadius.circular(12),

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import '../../../domain/vistoria_type.dart';
 
 /// Step 1 — Dados Gerais da Vistoria
 class StepDadosGerais extends StatefulWidget {
@@ -62,7 +63,9 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
             children: [
               _InfoRow(
                   icon: Icons.tag_rounded,
-                  label: 'Número do Laudo',
+                  label: (state.tipoVistoria.toLowerCase().contains('cautelar') || state.tipoVistoria.toLowerCase().contains('croqui'))
+                      ? 'Número do Laudo'
+                      : 'Número do Registro',
                   value: state.numeroLaudo.isNotEmpty ? state.numeroLaudo : 'Carregando...'),
               const Divider(height: 1),
               _InfoRow(
@@ -88,33 +91,34 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
           const SizedBox(height: 14),
 
           // ── Cliente ──────────────────────────────────────────────────────
-          TextFormField(
-            controller: _clienteCtrl,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Cliente / Proprietário',
-              prefixIcon: Icon(Icons.person_rounded, color: AppTheme.primary),
+          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
+            TextFormField(
+              controller: _clienteCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Cliente / Proprietário',
+                prefixIcon: Icon(Icons.person_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.clienteNome = v;
+              },
             ),
-            onChanged: (v) {
-              state.clienteNome = v;
-            },
-          ),
-          const SizedBox(height: 14),
+            const SizedBox(height: 14),
 
-          // ── Unidade ──────────────────────────────────────────────────────
-          TextFormField(
-            controller: _unidadeCtrl,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Unidade / Empresa',
-              prefixIcon: Icon(Icons.business_rounded, color: AppTheme.primary),
+            // ── Unidade ──────────────────────────────────────────────────────
+            TextFormField(
+              controller: _unidadeCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Unidade / Empresa',
+                prefixIcon: Icon(Icons.business_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.unidade = v;
+              },
             ),
-            onChanged: (v) {
-              state.unidade = v;
-            },
-          ),
-
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
+          ],
           _SectionHeader(
             icon: Icons.badge_rounded,
             title: 'Dados do Vistoriador',
@@ -134,21 +138,22 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               state.vistoriadorNome = v;
             },
           ),
-          const SizedBox(height: 14),
-
-          TextFormField(
-            controller: _vistoriadorCpfCtrl,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'CPF do Vistoriador',
-              hintText: '000.000.000-00',
-              prefixIcon: Icon(Icons.credit_card_rounded, color: AppTheme.primary),
+          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _vistoriadorCpfCtrl,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'CPF do Vistoriador',
+                hintText: '000.000.000-00',
+                prefixIcon: Icon(Icons.credit_card_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.vistoriadorCpf = v;
+              },
             ),
-            onChanged: (v) {
-              state.vistoriadorCpf = v;
-            },
-          ),
+          ],
           const SizedBox(height: 32),
         ],
       ),

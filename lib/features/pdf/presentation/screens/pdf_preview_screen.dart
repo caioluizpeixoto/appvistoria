@@ -16,21 +16,21 @@ class PdfPreviewScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     if (pdfPath == null || !File(pdfPath!).existsSync()) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Laudo PDF')),
+        appBar: AppBar(title: const Text('Documento PDF')),
         body: const Center(child: Text('Arquivo PDF não encontrado.')),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Laudo PDF'),
+        title: const Text('Documento PDF'),
         actions: [
           IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Compartilhar',
             onPressed: () {
               if (pdfPath != null && File(pdfPath!).existsSync()) {
-                Share.shareXFiles([XFile(pdfPath!)], text: 'Laudo Vistoria');
+                Share.shareXFiles([XFile(pdfPath!)], text: 'Documento Vistoria');
               }
             },
           ),
