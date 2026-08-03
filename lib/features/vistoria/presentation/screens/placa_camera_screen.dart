@@ -250,9 +250,8 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
             height: frameH,
             decoration: BoxDecoration(
               border: Border.all(
-                color: _placaDetectada != null
-                    ? AppTheme.conforme
-                    : Colors.white,
+                color:
+                    _placaDetectada != null ? AppTheme.conforme : Colors.white,
                 width: 2.5,
               ),
               borderRadius: BorderRadius.circular(8),
@@ -270,8 +269,7 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
           width: frameW,
           child: Center(
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.6),
                 borderRadius: BorderRadius.circular(20),
@@ -317,12 +315,10 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
     );
   }
 
-  List<Widget> _buildCorners(
-      double left, double top, double w, double h) {
+  List<Widget> _buildCorners(double left, double top, double w, double h) {
     const size = 20.0;
     const thickness = 3.0;
-    final color =
-        _placaDetectada != null ? AppTheme.conforme : Colors.white;
+    final color = _placaDetectada != null ? AppTheme.conforme : Colors.white;
 
     Widget corner(double l, double t, bool flipH, bool flipV) {
       return Positioned(
@@ -402,8 +398,7 @@ class _PlacaCameraScreenState extends State<PlacaCameraScreen>
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
               side: const BorderSide(color: Colors.white54),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
             icon: const Icon(Icons.keyboard_rounded, size: 18),
             label: const Text('Digitar manualmente'),

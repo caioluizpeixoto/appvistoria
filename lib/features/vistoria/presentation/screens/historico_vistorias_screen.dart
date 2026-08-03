@@ -13,7 +13,8 @@ class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
 
   @override
-  State<HistoricoVistoriasScreen> createState() => _HistoricoVistoriasScreenState();
+  State<HistoricoVistoriasScreen> createState() =>
+      _HistoricoVistoriasScreenState();
 }
 
 class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
@@ -40,18 +41,25 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
       final veiculo = await dao.buscarVeiculoPorVistoria(v.id);
       var consulta = await autocredDao.buscarConsultaPorVistoria(v.id);
       if (consulta == null && veiculo != null && veiculo.placa.isNotEmpty) {
-        final placaLimpa = veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+        final placaLimpa =
+            veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
         consulta = await autocredDao.buscarConsultaPorPlaca(placaLimpa);
         // Tenta também com a placa original caso tenha sido salva com traço
         if (consulta == null) {
           consulta = await autocredDao.buscarConsultaPorPlaca(veiculo.placa);
         }
       }
-      
+
       String? webhookPdfUrl;
-      if (veiculo != null && veiculo.placa.isNotEmpty && (consulta == null || consulta.arquivoPesquisaUrl == null || consulta.arquivoPesquisaUrl!.isEmpty)) {
+      if (veiculo != null &&
+          veiculo.placa.isNotEmpty &&
+          (consulta == null ||
+              consulta.arquivoPesquisaUrl == null ||
+              consulta.arquivoPesquisaUrl!.isEmpty)) {
         try {
-          final placaLimpa = veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+          final placaLimpa = veiculo.placa
+              .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
+              .toUpperCase();
           final supabase = sl<SupabaseClient>();
           final res = await supabase
               .from('autocred_consultas')
@@ -139,11 +147,11 @@ class _VistoriaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEmAndamento = vistoria.status != 'concluido';
-    final placa = (veiculo?.placa != null && veiculo!.placa.isNotEmpty) 
-        ? veiculo.placa.toUpperCase() 
+    final placa = (veiculo?.placa != null && veiculo!.placa.isNotEmpty)
+        ? veiculo.placa.toUpperCase()
         : 'S/ Placa';
     final tipo = vistoria.tipoVistoria;
-    
+
     String formatLaudo(String num) {
       if (num.length > 20) {
         return '${num.substring(0, 12).toUpperCase()}...';
@@ -159,7 +167,8 @@ class _VistoriaCard extends StatelessWidget {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Retificar Vistoria'),
-              content: Text('Esta vistoria foi concluída. Você tem ${72 - diff.inHours}h restantes para retificá-la. Deseja reabrir a edição?'),
+              content: Text(
+                  'Esta vistoria foi concluída. Você tem ${72 - diff.inHours}h restantes para retificá-la. Deseja reabrir a edição?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -180,7 +189,8 @@ class _VistoriaCard extends StatelessWidget {
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Prazo Expirado'),
-              content: const Text('Esta vistoria foi concluída há mais de 72h e não pode mais ser alterada.'),
+              content: const Text(
+                  'Esta vistoria foi concluída há mais de 72h e não pode mais ser alterada.'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
@@ -222,12 +232,17 @@ class _VistoriaCard extends StatelessWidget {
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: isEmAndamento ? AppTheme.comObsLight : AppTheme.conformeLight,
+                      color: isEmAndamento
+                          ? AppTheme.comObsLight
+                          : AppTheme.conformeLight,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
-                      isEmAndamento ? Icons.pending_actions_rounded : Icons.check_circle_rounded,
-                      color: isEmAndamento ? AppTheme.comObs : AppTheme.conforme,
+                      isEmAndamento
+                          ? Icons.pending_actions_rounded
+                          : Icons.check_circle_rounded,
+                      color:
+                          isEmAndamento ? AppTheme.comObs : AppTheme.conforme,
                       size: 24,
                     ),
                   ),
@@ -256,7 +271,8 @@ class _VistoriaCard extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          DateFormat('dd/MM/yyyy HH:mm').format(vistoria.dataHora),
+                          DateFormat('dd/MM/yyyy HH:mm')
+                              .format(vistoria.dataHora),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textHint,
@@ -267,27 +283,34 @@ class _VistoriaCard extends StatelessWidget {
                   ),
                   IconButton(
                     icon: Icon(
-                      vistoria.status == 'concluido' ? Icons.edit_document : Icons.edit_rounded,
+                      vistoria.status == 'concluido'
+                          ? Icons.edit_document
+                          : Icons.edit_rounded,
                       color: AppTheme.primary,
                     ),
-                    tooltip: vistoria.status == 'concluido' ? 'Retificar Vistoria' : 'Continuar Vistoria',
+                    tooltip: vistoria.status == 'concluido'
+                        ? 'Retificar Vistoria'
+                        : 'Continuar Vistoria',
                     onPressed: _handleEdit,
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppTheme.naoConforme),
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: AppTheme.naoConforme),
                     onPressed: () {
                       showDialog(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: const Text('Excluir Vistoria?'),
-                          content: const Text('Tem certeza que deseja excluir esta vistoria? Esta ação não pode ser desfeita.'),
+                          content: const Text(
+                              'Tem certeza que deseja excluir esta vistoria? Esta ação não pode ser desfeita.'),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.pop(ctx),
                               child: const Text('Cancelar'),
                             ),
                             ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppTheme.naoConforme),
                               onPressed: () async {
                                 Navigator.pop(ctx);
                                 final dao = sl<VistoriaDao>();
@@ -296,7 +319,8 @@ class _VistoriaCard extends StatelessWidget {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Vistoria excluída com sucesso.'),
+                                      content: Text(
+                                          'Vistoria excluída com sucesso.'),
                                       backgroundColor: AppTheme.conforme,
                                     ),
                                   );
@@ -319,35 +343,48 @@ class _VistoriaCard extends StatelessWidget {
               child: OutlinedButton.icon(
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppTheme.primary),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: () {
-                  context.push('/pdf-preview/${vistoria.id}?path=${vistoria.pdfUrl}');
+                  context.push(
+                      '/pdf-preview/${vistoria.id}?path=${vistoria.pdfUrl}');
                 },
-                icon: const Icon(Icons.picture_as_pdf_rounded, color: AppTheme.primary, size: 20),
-                label: const Text('Ver Documento em PDF', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                icon: const Icon(Icons.picture_as_pdf_rounded,
+                    color: AppTheme.primary, size: 20),
+                label: const Text('Ver Documento em PDF',
+                    style: TextStyle(
+                        color: AppTheme.primary, fontWeight: FontWeight.w600)),
               ),
             ),
           if (consulta != null || webhookPdfUrl != null) ...[
-            if ((consulta?.arquivoPesquisaUrl != null && consulta!.arquivoPesquisaUrl!.isNotEmpty) || (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty))
+            if ((consulta?.arquivoPesquisaUrl != null &&
+                    consulta!.arquivoPesquisaUrl!.isNotEmpty) ||
+                (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty))
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.orange),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
-                    final urlFinal = (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty) 
-                        ? webhookPdfUrl 
-                        : consulta?.arquivoPesquisaUrl;
+                    final urlFinal =
+                        (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty)
+                            ? webhookPdfUrl
+                            : consulta?.arquivoPesquisaUrl;
                     final uri = Uri.parse(urlFinal!);
                     if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
                     }
                   },
-                  icon: const Icon(Icons.cloud_download_rounded, color: Colors.orange, size: 20),
-                  label: const Text('Baixar Pesquisa Radar Consultas Original', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.w600)),
+                  icon: const Icon(Icons.cloud_download_rounded,
+                      color: Colors.orange, size: 20),
+                  label: const Text('Baixar Pesquisa Radar Consultas Original',
+                      style: TextStyle(
+                          color: Colors.orange, fontWeight: FontWeight.w600)),
                 ),
               )
             else
@@ -356,11 +393,16 @@ class _VistoriaCard extends StatelessWidget {
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppTheme.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: null, // Desabilitado
-                  icon: const Icon(Icons.cloud_off_rounded, color: AppTheme.textHint, size: 20),
-                  label: const Text('Pesquisa Radar Consultas Sem PDF', style: TextStyle(color: AppTheme.textHint, fontWeight: FontWeight.w600)),
+                  icon: const Icon(Icons.cloud_off_rounded,
+                      color: AppTheme.textHint, size: 20),
+                  label: const Text('Pesquisa Radar Consultas Sem PDF',
+                      style: TextStyle(
+                          color: AppTheme.textHint,
+                          fontWeight: FontWeight.w600)),
                 ),
               )
           ],

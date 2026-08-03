@@ -19,7 +19,7 @@ class RadarService {
   }) async {
     try {
       final body = <String, dynamic>{};
-      
+
       if (param != null && value != null) {
         body['param'] = param;
         body['value'] = value;
@@ -30,10 +30,13 @@ class RadarService {
 
       final response = await supabase.functions
           .invoke('radar-listar-consultas', body: body)
-          .timeout(const Duration(minutes: 10)); // Usando um timeout de 10 min, igual ao consultar
+          .timeout(const Duration(
+              minutes: 10)); // Usando um timeout de 10 min, igual ao consultar
 
       final data = response.data;
-      if (data != null && data is Map<String, dynamic> && data['sucesso'] == true) {
+      if (data != null &&
+          data is Map<String, dynamic> &&
+          data['sucesso'] == true) {
         return data['consultas'] as List<dynamic>;
       } else {
         print('Erro na Radar (API não retornou sucesso): $data');
@@ -47,8 +50,8 @@ class RadarService {
 
   Future<RadarVeiculo> consultarVeiculo({
     required String produto, // ex: "auto_bin"
-    required String param,   // ex: "placa", "chassi"
-    required String value,   // ex: "ABC1234"
+    required String param, // ex: "placa", "chassi"
+    required String value, // ex: "ABC1234"
     String vistoriaId = '',
     int codigoConsulta = 0,
     bool forcarNova = false,
@@ -80,8 +83,10 @@ class RadarService {
         },
       ).timeout(const Duration(minutes: 15));
 
-      if (response.data is Map<String, dynamic> && response.data['sucesso'] == false) {
-        throw Exception(response.data['error'] ?? 'Erro desconhecido na Radar Consultas');
+      if (response.data is Map<String, dynamic> &&
+          response.data['sucesso'] == false) {
+        throw Exception(
+            response.data['error'] ?? 'Erro desconhecido na Radar Consultas');
       }
 
       final data = response.data;
@@ -107,20 +112,25 @@ class RadarService {
       );
 
       String mensagemErro = e.toString();
-      
+
       if (e is TimeoutException) {
-        mensagemErro = 'A consulta demorou muito para responder. Verifique sua conexão ou tente novamente.';
-      } else if (mensagemErro.contains('ClientSoftware caused connection abort') || 
-                 mensagemErro.contains('SocketException') || 
-                 mensagemErro.contains('Failed host lookup')) {
-        mensagemErro = 'Falha de conexão. Verifique sua internet e tente novamente.';
+        mensagemErro =
+            'A consulta demorou muito para responder. Verifique sua conexão ou tente novamente.';
+      } else if (mensagemErro
+              .contains('ClientSoftware caused connection abort') ||
+          mensagemErro.contains('SocketException') ||
+          mensagemErro.contains('Failed host lookup')) {
+        mensagemErro =
+            'Falha de conexão. Verifique sua internet e tente novamente.';
       } else if (e is FunctionException) {
         final details = e.details;
         if (details is Map && details.containsKey('error')) {
           mensagemErro = details['error'].toString();
         }
       } else {
-        mensagemErro = mensagemErro.replaceAll('Exception: ', '').replaceAll('Erro na consulta: ', '');
+        mensagemErro = mensagemErro
+            .replaceAll('Exception: ', '')
+            .replaceAll('Erro na consulta: ', '');
       }
 
       throw Exception(mensagemErro);
@@ -135,7 +145,8 @@ class RadarService {
   Future<String> consultarSaldo() async {
     try {
       final response = await supabase.functions.invoke('radar-saldo');
-      if (response.data is Map<String, dynamic> && response.data['sucesso'] == true) {
+      if (response.data is Map<String, dynamic> &&
+          response.data['sucesso'] == true) {
         return response.data['saldo'].toString();
       }
       return 'Indisponível';

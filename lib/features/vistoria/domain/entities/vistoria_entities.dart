@@ -75,11 +75,9 @@ class VistoriaEntity extends Equatable {
   /// Calcula status com base nos itens inspecionados
   String get statusCalculado {
     if (itens.isEmpty) return 'em_andamento';
-    final temNaoConforme =
-        itens.any((i) => i.status == 'nao_conforme');
+    final temNaoConforme = itens.any((i) => i.status == 'nao_conforme');
     if (temNaoConforme) return 'nao_conforme';
-    final temComObs =
-        itens.any((i) => i.status == 'conforme_obs');
+    final temComObs = itens.any((i) => i.status == 'conforme_obs');
     if (temComObs) return 'conforme_obs';
     final temPendente = itens.any((i) => i.status == 'pendente');
     if (temPendente) return 'em_andamento';
@@ -87,8 +85,7 @@ class VistoriaEntity extends Equatable {
   }
 
   int get totalItens => itens.where((i) => i.status != 'nao_aplicavel').length;
-  int get itensRespondidos =>
-      itens.where((i) => i.status != 'pendente').length;
+  int get itensRespondidos => itens.where((i) => i.status != 'pendente').length;
 
   @override
   List<Object?> get props => [

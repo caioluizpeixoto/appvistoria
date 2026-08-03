@@ -10,11 +10,32 @@ class StepFotosExternas extends StatelessWidget {
   const StepFotosExternas({super.key});
 
   static const List<Map<String, dynamic>> _itens = [
-    {'id': 'foto_placa', 'label': 'Foto da Placa', 'icon': Icons.subtitles_rounded, 'showCodigo': true},
-    {'id': 'frente_esquerda', 'label': 'Frente Esquerda', 'icon': Icons.north_west},
-    {'id': 'traseira_esquerda', 'label': 'Traseira Esquerda', 'icon': Icons.south_west},
-    {'id': 'traseira_direita', 'label': 'Traseira Direita', 'icon': Icons.south_east},
-    {'id': 'frente_direita', 'label': 'Frente Direita', 'icon': Icons.north_east},
+    {
+      'id': 'foto_placa',
+      'label': 'Foto da Placa',
+      'icon': Icons.subtitles_rounded,
+      'showCodigo': true
+    },
+    {
+      'id': 'frente_esquerda',
+      'label': 'Frente Esquerda',
+      'icon': Icons.north_west
+    },
+    {
+      'id': 'traseira_esquerda',
+      'label': 'Traseira Esquerda',
+      'icon': Icons.south_west
+    },
+    {
+      'id': 'traseira_direita',
+      'label': 'Traseira Direita',
+      'icon': Icons.south_east
+    },
+    {
+      'id': 'frente_direita',
+      'label': 'Frente Direita',
+      'icon': Icons.north_east
+    },
   ];
 
   static const List<String> _statusOpcoes = [

@@ -46,7 +46,8 @@ class _StepPainelHodometroState extends State<StepPainelHodometro> {
           ),
           child: const Row(
             children: [
-              Icon(Icons.tips_and_updates_rounded, color: AppTheme.primary, size: 18),
+              Icon(Icons.tips_and_updates_rounded,
+                  color: AppTheme.primary, size: 18),
               SizedBox(width: 10),
               Expanded(
                 child: Text(

@@ -63,39 +63,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         // Logo
                         Center(
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: AppTheme.primary,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppTheme.primary.withValues(alpha: 0.3),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.directions_car_rounded,
-                              size: 44,
-                              color: Colors.white,
-                            ),
+                          child: Image.asset(
+                            'assets/images/topo.pdf.png',
+                            height: 200,
+                            fit: BoxFit.contain,
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Center(
-                          child: Text(
-                            'Vistorias',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              color: AppTheme.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
                         const Center(
                           child: Text(
                             'Faça login para continuar',
@@ -128,7 +102,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 controller: _usernameController,
                                 keyboardType: TextInputType.text,
                                 textInputAction: TextInputAction.next,
-                                style: const TextStyle(color: AppTheme.textPrimary),
+                                style: const TextStyle(
+                                    color: AppTheme.textPrimary),
                                 decoration: const InputDecoration(
                                   labelText: 'Usuário (CPF/CNPJ)',
                                   prefixIcon: Icon(
@@ -199,7 +174,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     : () {
                                         context.push('/register');
                                       },
-                                child: const Text('Não possui conta? Cadastre-se'),
+                                child:
+                                    const Text('Não possui conta? Cadastre-se'),
                               ),
                             ],
                           ),
@@ -210,7 +186,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             'Acesso restrito a vistoriadores credenciados.',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textSecondary.withValues(alpha: 0.7),
+                              color:
+                                  AppTheme.textSecondary.withValues(alpha: 0.7),
                             ),
                             textAlign: TextAlign.center,
                           ),

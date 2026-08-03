@@ -291,7 +291,8 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
             ],
           ),
 
-          const SizedBox(height: 24),
+          if (!state.isChecklist) ...[
+            const SizedBox(height: 24),
 
           // ── Chassi: BIN vs Veículo ────────────────────────────────────────
           _buildSection(
@@ -348,8 +349,8 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
             ],
           ),
 
+          ],
           const SizedBox(height: 32),
-
           // Botão salvar dados
           SizedBox(
             width: double.infinity,

@@ -42,9 +42,15 @@ class HomeScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              _VistoriaCard(tipo: TipoVistoria.cautelarCarro, produtoPesquisa: produtoPesquisa),
-              _VistoriaCard(tipo: TipoVistoria.cautelarCaminhao, produtoPesquisa: produtoPesquisa),
-              _VistoriaCard(tipo: TipoVistoria.carroComCroqui, produtoPesquisa: produtoPesquisa),
+              _VistoriaCard(
+                  tipo: TipoVistoria.cautelarCarro,
+                  produtoPesquisa: produtoPesquisa),
+              _VistoriaCard(
+                  tipo: TipoVistoria.cautelarCaminhao,
+                  produtoPesquisa: produtoPesquisa),
+              _VistoriaCard(
+                  tipo: TipoVistoria.carroComCroqui,
+                  produtoPesquisa: produtoPesquisa),
               const SizedBox(height: 16),
             ],
           ),
@@ -130,7 +136,8 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final role = user?.userMetadata?['role'] as String? ?? 'empresa'; // default fallback
+    final role =
+        user?.userMetadata?['role'] as String? ?? 'empresa'; // default fallback
     final isUsuarioOnly = role == 'usuario';
 
     return Scaffold(
@@ -182,7 +189,6 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
           ),
-
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
@@ -191,7 +197,8 @@ class HomeScreen extends StatelessWidget {
                 if (!isUsuarioOnly) ...[
                   _MainActionCard(
                     title: 'Cautelar',
-                    subtitle: 'Realizar laudo e vistoria cautelar veicular completa',
+                    subtitle:
+                        'Realizar laudo e vistoria cautelar veicular completa',
                     icon: Icons.assignment_turned_in_rounded,
                     badgeColor: const Color(0xFFE3F2FD),
                     iconColor: AppTheme.primary,
@@ -204,7 +211,8 @@ class HomeScreen extends StatelessWidget {
                 if (!isUsuarioOnly) ...[
                   _MainActionCard(
                     title: 'Pesquisa',
-                    subtitle: 'Realizar consulta rápida de dados veiculares, histórico e BIN',
+                    subtitle:
+                        'Realizar consulta rápida de dados veiculares, histórico e BIN',
                     icon: Icons.manage_search_rounded,
                     badgeColor: const Color(0xFFFFF3E0),
                     iconColor: const Color(0xFFF57C00),
@@ -221,7 +229,8 @@ class HomeScreen extends StatelessWidget {
                 // 3. CARD VISTORIA DE ENTRADA (antigo Checklist Veicular)
                 _MainActionCard(
                   title: 'Vistoria de Entrada',
-                  subtitle: 'Realizar vistoria de entrada para veículos pesados ou de passeio',
+                  subtitle:
+                      'Realizar vistoria de entrada para veículos pesados ou de passeio',
                   icon: Icons.fact_check_rounded,
                   badgeColor: const Color(0xFFE8F5E9),
                   iconColor: const Color(0xFF388E3C), // verde
@@ -231,7 +240,8 @@ class HomeScreen extends StatelessWidget {
                       backgroundColor: AppTheme.background,
                       isScrollControlled: true,
                       shape: const RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(24)),
                       ),
                       builder: (ctx) => SafeArea(
                         child: Padding(
@@ -250,8 +260,12 @@ class HomeScreen extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              _VistoriaCard(tipo: TipoVistoria.checklistPasseio),
+                              _VistoriaCard(
+                                  tipo: TipoVistoria.checklistPasseio),
                               _VistoriaCard(tipo: TipoVistoria.checklistPesado),
+                              _VistoriaCard(tipo: TipoVistoria.checklistOnibus),
+                              _VistoriaCard(
+                                  tipo: TipoVistoria.checklistMicroOnibus),
                               const SizedBox(height: 16),
                             ],
                           ),
@@ -461,6 +475,10 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFF388E3C); // verde
       case TipoVistoria.checklistPesado:
         return const Color(0xFFE65100); // laranja escuro
+      case TipoVistoria.checklistOnibus:
+        return const Color(0xFFD84315); // deep orange
+      case TipoVistoria.checklistMicroOnibus:
+        return const Color(0xFFEF6C00); // orange
       case TipoVistoria.checklistPasseio:
         return const Color(0xFFF57C00); // laranja
     }
@@ -478,6 +496,10 @@ class _VistoriaCard extends StatelessWidget {
         return const Color(0xFFE8F5E9); // verde claro
       case TipoVistoria.checklistPesado:
         return const Color(0xFFFFF3E0); // laranja claro
+      case TipoVistoria.checklistOnibus:
+        return const Color(0xFFFBE9E7); // deep orange claro
+      case TipoVistoria.checklistMicroOnibus:
+        return const Color(0xFFFFF3E0); // orange claro
       case TipoVistoria.checklistPasseio:
         return const Color(0xFFFFF8E1); // amarelado claro
     }
@@ -494,19 +516,23 @@ class _VistoriaCard extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () async {
-            if (tipo == TipoVistoria.checklistPesado || tipo == TipoVistoria.checklistPasseio) {
+            if (tipo == TipoVistoria.checklistPesado ||
+                tipo == TipoVistoria.checklistPasseio) {
               // Pula a tela de pesquisa (IdentificacaoScreen) e cria a vistoria direto
               showDialog(
                 context: context,
                 barrierDismissible: false,
-                builder: (_) => const Center(child: CircularProgressIndicator()),
+                builder: (_) =>
+                    const Center(child: CircularProgressIndicator()),
               );
 
               try {
                 final dao = sl<VistoriaDao>();
                 final vistoriaId = const Uuid().v4();
                 final shortCode = vistoriaId.substring(0, 8).toUpperCase();
-                final currentUserId = Supabase.instance.client.auth.currentUser?.id ?? 'usuario-deslogado';
+                final currentUserId =
+                    Supabase.instance.client.auth.currentUser?.id ??
+                        'usuario-deslogado';
 
                 await dao.inserirVistoria(VistoriasCompanion.insert(
                   id: vistoriaId,
@@ -539,7 +565,8 @@ class _VistoriaCard extends StatelessWidget {
             } else {
               Navigator.of(context).pop(); // fecha o modal
               context.push('/identificacao/${tipo.slug}', extra: {
-                if (produtoPesquisa != null) 'produtoSelecionado': produtoPesquisa,
+                if (produtoPesquisa != null)
+                  'produtoSelecionado': produtoPesquisa,
               });
             }
           },
@@ -602,7 +629,6 @@ class _VistoriaCard extends StatelessWidget {
   }
 }
 
-
 class _PesquisaCard extends StatelessWidget {
   final String titulo;
   final String codigo;
@@ -642,7 +668,8 @@ class _PesquisaCard extends StatelessWidget {
                     color: AppTheme.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(icone ?? Icons.search_rounded, color: AppTheme.primary, size: 28),
+                  child: Icon(icone ?? Icons.search_rounded,
+                      color: AppTheme.primary, size: 28),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -669,4 +696,3 @@ class _PesquisaCard extends StatelessWidget {
     );
   }
 }
-

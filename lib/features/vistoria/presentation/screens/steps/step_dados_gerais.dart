@@ -19,8 +19,6 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
   final _vistoriadorNomeCtrl = TextEditingController();
   final _vistoriadorCpfCtrl = TextEditingController();
 
-
-
   @override
   void initState() {
     super.initState();
@@ -63,10 +61,15 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
             children: [
               _InfoRow(
                   icon: Icons.tag_rounded,
-                  label: (state.tipoVistoria.toLowerCase().contains('cautelar') || state.tipoVistoria.toLowerCase().contains('croqui'))
+                  label: (state.tipoVistoria
+                              .toLowerCase()
+                              .contains('cautelar') ||
+                          state.tipoVistoria.toLowerCase().contains('croqui'))
                       ? 'Número do Laudo'
                       : 'Número do Registro',
-                  value: state.numeroLaudo.isNotEmpty ? state.numeroLaudo : 'Carregando...'),
+                  value: state.numeroLaudo.isNotEmpty
+                      ? state.numeroLaudo
+                      : 'Carregando...'),
               const Divider(height: 1),
               _InfoRow(
                 icon: Icons.access_time_rounded,
@@ -91,7 +94,8 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
           const SizedBox(height: 14),
 
           // ── Cliente ──────────────────────────────────────────────────────
-          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
+          if (!state.isChecklist &&
+              state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
             TextFormField(
               controller: _clienteCtrl,
               textCapitalization: TextCapitalization.words,
@@ -111,7 +115,8 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
                 labelText: 'Unidade / Empresa',
-                prefixIcon: Icon(Icons.business_rounded, color: AppTheme.primary),
+                prefixIcon:
+                    Icon(Icons.business_rounded, color: AppTheme.primary),
               ),
               onChanged: (v) {
                 state.unidade = v;
@@ -132,13 +137,15 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
             textCapitalization: TextCapitalization.words,
             decoration: const InputDecoration(
               labelText: 'Nome do Vistoriador',
-              prefixIcon: Icon(Icons.engineering_rounded, color: AppTheme.primary),
+              prefixIcon:
+                  Icon(Icons.engineering_rounded, color: AppTheme.primary),
             ),
             onChanged: (v) {
               state.vistoriadorNome = v;
             },
           ),
-          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
+          if (!state.isChecklist &&
+              state.tipoEnum != TipoVistoria.vistoriaEntrada) ...[
             const SizedBox(height: 14),
             TextFormField(
               controller: _vistoriadorCpfCtrl,
@@ -147,7 +154,8 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               decoration: const InputDecoration(
                 labelText: 'CPF do Vistoriador',
                 hintText: '000.000.000-00',
-                prefixIcon: Icon(Icons.credit_card_rounded, color: AppTheme.primary),
+                prefixIcon:
+                    Icon(Icons.credit_card_rounded, color: AppTheme.primary),
               ),
               onChanged: (v) {
                 state.vistoriadorCpf = v;
@@ -248,8 +256,8 @@ class _InfoRow extends StatelessWidget {
           Icon(icon, size: 18, color: AppTheme.textSecondary),
           const SizedBox(width: 10),
           Text(label,
-              style: const TextStyle(
-                  fontSize: 13, color: AppTheme.textSecondary)),
+              style:
+                  const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
           const Spacer(),
           Text(
             value,

@@ -38,10 +38,12 @@ Future<void> initDependencies() async {
 
   // ── Radar Consultas ───────────────────────────────────────────────────────
   sl.registerLazySingleton<RadarRepository>(
-    () => RadarRepository(supabase: sl<SupabaseClient>(), localDao: sl<AutocredDao>()),
+    () => RadarRepository(
+        supabase: sl<SupabaseClient>(), localDao: sl<AutocredDao>()),
   );
   sl.registerLazySingleton<RadarService>(
-    () => RadarService(supabase: sl<SupabaseClient>(), repository: sl<RadarRepository>()),
+    () => RadarService(
+        supabase: sl<SupabaseClient>(), repository: sl<RadarRepository>()),
   );
 
   // ── Mock ──────────────────────────────────────────────────────────────────

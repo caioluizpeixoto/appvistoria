@@ -10,102 +10,123 @@ class StepChecklistOpcional extends StatefulWidget {
   State<StepChecklistOpcional> createState() => _StepChecklistOpcionalState();
 }
 
-class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with AutomaticKeepAliveClientMixin {
+class _StepChecklistOpcionalState extends State<StepChecklistOpcional>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
 
-  final Map<String, List<String>> _categoriasCaminhao = {
+  final Map<String, List<String>> _categoriasVistoria = {
     'PNEUS/RODAS': [
-      'PNEU DIANTEIRO ESQUERDO', 'RODA DIANTEIRA ESQUERDA', 'CALOTA DIANTEIRA ESQUERDA',
-      'PNEU TRASEIRO ESQUERDO', 'RODA TRASEIRA ESQUERDA', 'CALOTA TRASEIRA ESQUERDA',
-      'PNEU ESTEPE', 'RODA ESTEPE',
-      'PNEU TRASEIRO DIREITO', 'RODA TRASEIRA DIREITA', 'CALOTA TRASEIRA DIREITA',
-      'PNEU DIANTEIRO DIREITO', 'RODA DIANTEIRA DIREITA', 'CALOTA DIANTEIRA DIREITA'
+      'PNEU DIANTEIRO ESQUERDO',
+      'RODA DIANTEIRA ESQUERDA',
+      'CALOTA DIANTEIRA ESQUERDA',
+      'PNEU TRASEIRO ESQUERDO',
+      'RODA TRASEIRA ESQUERDA',
+      'CALOTA TRASEIRA ESQUERDA',
+      'PNEU ESTEPE',
+      'RODA ESTEPE',
+      'PNEU TRASEIRO DIREITO',
+      'RODA TRASEIRA DIREITA',
+      'CALOTA TRASEIRA DIREITA',
+      'PNEU DIANTEIRO DIREITO',
+      'RODA DIANTEIRA DIREITA',
+      'CALOTA DIANTEIRA DIREITA'
     ],
     'PARTE DIANTEIRA': [
-      'CAPÔ', 'FAROL DIREITO', 'LANTERNA DIREITA', 'FAROL DE MILHA DIR.',
-      'PARA-CHOQUE', 'GRADE', 'PARA-BRISA', 'FAROL ESQUERDO', 'LANTERNA ESQUERDA', 'FAROL DE MILHA ESQUERDO'
+      'CAPÔ',
+      'FAROL DIREITO',
+      'LANTERNA DIREITA',
+      'FAROL DE MILHA DIR.',
+      'PARA-CHOQUE',
+      'GRADE',
+      'PARA-BRISA',
+      'FAROL ESQUERDO',
+      'LANTERNA ESQUERDA',
+      'FAROL DE MILHA ESQUERDO'
     ],
     'LATERAL ESQUERDA': [
-      'LATERAL', 'VIDRO VIGIA', 'VIDRO TRASEIRO', 'PORTA TRASEIRA', 'VIDRO DIANTEIRO',
-      'PORTA DIANTEIRA', 'ESPELHO RETROVISOR', 'PARA-LAMA'
+      'LATERAL',
+      'VIDRO VIGIA',
+      'VIDRO TRASEIRO',
+      'PORTA TRASEIRA',
+      'VIDRO DIANTEIRO',
+      'PORTA DIANTEIRA',
+      'ESPELHO RETROVISOR',
+      'PARA-LAMA'
     ],
     'LATERAL DIREITA': [
-      'LATERAL', 'VIDRO VIGIA', 'VIDRO TRASEIRO', 'PORTA TRASEIRA', 'VIDRO DIANTEIRO',
-      'PORTA DIANTEIRA', 'ESPELHO RETROVISOR', 'PARA-LAMA'
+      'LATERAL',
+      'VIDRO VIGIA',
+      'VIDRO TRASEIRO',
+      'PORTA TRASEIRA',
+      'VIDRO DIANTEIRO',
+      'PORTA DIANTEIRA',
+      'ESPELHO RETROVISOR',
+      'PARA-LAMA'
     ],
     'TRASEIRA': [
-      'LANTERNA DE NEBLINA ESQ.', 'LANTERNA DE NEBLINA DIR.', 'CAPÔ TRASEIRO/TAMPA',
-      'LUZ DA PLACA', 'VIDRO VIGIA', 'LIMPADOR TRASEIRO', 'LANTERNA ESQUERDA', 'LANTERNA DIREITA',
-      'PARA-CHOQUE', 'TETO'
+      'LANTERNA DE NEBLINA ESQ.',
+      'LANTERNA DE NEBLINA DIR.',
+      'CAPÔ TRASEIRO/TAMPA',
+      'LUZ DA PLACA',
+      'VIDRO VIGIA',
+      'LIMPADOR TRASEIRO',
+      'LANTERNA ESQUERDA',
+      'LANTERNA DIREITA',
+      'PARA-CHOQUE',
+      'TETO'
     ],
     'EQUIPAMENTOS': [
-      'AR CONDICIONADO', 'VIDROS ELÉTRICOS', 'TRAVAS ELÉTRICAS', 'ALARME', 'PAINEL DE INSTRUMENTOS',
-      'PRESENÇA DE ODOR ?', 'VOLANTE', 'ANTENA', 'ALTO-FALANTES', 'RÁDIO CD PLAYER', 'RÁDIO DVD', 'TELAS AUXILIARES ?'
+      'AR CONDICIONADO',
+      'VIDROS ELÉTRICOS',
+      'TRAVAS ELÉTRICAS',
+      'ALARME',
+      'PAINEL DE INSTRUMENTOS',
+      'PRESENÇA DE ODOR ?',
+      'VOLANTE',
+      'ANTENA',
+      'ALTO-FALANTES',
+      'RÁDIO CD PLAYER',
+      'RÁDIO DVD',
+      'TELAS AUXILIARES ?'
     ],
     'BANCOS E REVESTIMENTOS': [
-      'BANCO TRASEIRO', 'BANCO D.D.', 'BANCO D.E.', 'TAPETES', 'REVESTIMENTO DO TETO',
-      'REVESTIMENTO PORTA D.D.', 'REVESTIMENTO PORTA T.D.', 'REVESTIMENTO PORTA T.E.', 'REVESTIMENTO PORTA D.E.'
+      'BANCO TRASEIRO',
+      'BANCO D.D.',
+      'BANCO D.E.',
+      'TAPETES',
+      'REVESTIMENTO DO TETO',
+      'REVESTIMENTO PORTA D.D.',
+      'REVESTIMENTO PORTA T.D.',
+      'REVESTIMENTO PORTA T.E.',
+      'REVESTIMENTO PORTA D.E.'
     ],
     'EQUIPAMENTOS OBRIGATÓRIOS (SEGURANÇA)': [
-      'LAVADOR', 'LIMPADOR PARA-BRISA', 'FAROL DE NEBLINA', 'LUZ DE RÉ', 'LUZ DE FREIO',
-      'LANTERNA', 'FAROL', 'MANUAL DO PROPRIETÁRIO', 'CHAVE RESERVA', 'BLINDAGEM', 'TRIÂNGULO',
-      'MACACO', 'CHAVE DE RODA', 'ESTEPE', 'EXTINTOR'
+      'LAVADOR',
+      'LIMPADOR PARA-BRISA',
+      'FAROL DE NEBLINA',
+      'LUZ DE RÉ',
+      'LUZ DE FREIO',
+      'LANTERNA',
+      'FAROL',
+      'MANUAL DO PROPRIETÁRIO',
+      'CHAVE RESERVA',
+      'BLINDAGEM',
+      'TRIÂNGULO',
+      'MACACO',
+      'CHAVE DE RODA',
+      'ESTEPE',
+      'EXTINTOR'
     ],
     'ACIONAMENTO DO MOTOR': [
-      'BATERIA', 'NÍVEL DO ÓLEO', 'PARTIDA / ACIONAMENTO DO MOTOR'
-    ]
-  };
-
-  final Map<String, List<String>> _categoriasCarro = {
-    'ITENS DE INSPEÇÃO': [
-      'Buzina',
-      'Lanterna',
-      'Farol Baixo',
-      'Farol Alto',
-      'Luz de Freio',
-      'Break Light',
-      'Pisca Alerta',
-      'Setas de Direção',
-      'Luzes Internas',
-      'Luzes de Placa',
-      'Luzes de Ré',
-      'Limpador de Para-brisa',
-      'Retrovisores',
-      'Macaco',
-      'Triângulo de Sinalização',
-      'Chave de Roda',
-      'Estepe (Calibragem e Condições)',
-      'Cintos de Segurança',
-      'Maçanetas e Fechaduras',
-      'Escapamento',
-      'Adesivos (Refletivos e Identificação, quando aplicável)',
-      'Condições dos Bancos',
-      'Quebra-sol (Motorista e Passageiro)',
-      'Ar-condicionado',
-      'Tapetes e Forros',
-      'Pneus (Calibragem e Condições)',
-      'Profundidade dos Sulcos dos Pneus (TWI)',
-      'Óleo do Motor (Nível)',
-      'Fluido de Freio (Nível)',
-      'Água do Limpador',
-      'Fluido de Arrefecimento (Radiador)',
-      'Freios (Inclusive o Freio de Estacionamento)',
-      'Painel de Instrumentos (Luzes de Advertência)',
-      'Para-brisa (Trincas e Condições)',
-      'Vidros e Películas',
-      'Vidros Elétricos',
-      'Travas Elétricas',
-      'Bateria (Fixação e Polos)',
-      'Ausência de Vazamentos (Óleo, Água, Combustível)'
+      'BATERIA',
+      'NÍVEL DO ÓLEO',
+      'PARTIDA / ACIONAMENTO DO MOTOR'
     ]
   };
 
   Map<String, List<String>> _getCategorias(VistoriaWizardState state) {
-    if (state.tipoVistoria.toLowerCase().contains('caminh')) {
-      return _categoriasCaminhao;
-    }
-    return _categoriasCarro;
+    return _categoriasVistoria;
   }
 
   @override
@@ -134,7 +155,8 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
                     children: [
                       const Text(
                         'Realizar Checklist Opcional?',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -165,7 +187,6 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
               ],
             ),
           ),
-          
           if (state.realizarChecklistOpcional) ...[
             const SizedBox(height: 16),
             ...categorias.entries.map((entry) {
@@ -182,21 +203,27 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
                     children: [
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
                           color: AppTheme.primary.withValues(alpha: 0.1),
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                          border: const Border(bottom: BorderSide(color: AppTheme.border)),
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8)),
+                          border: const Border(
+                              bottom: BorderSide(color: AppTheme.border)),
                         ),
                         child: Text(
                           entry.key,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.primary),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.primary),
                         ),
                       ),
                       ...entry.value.map((item) {
                         final val = state.checklistOpcional[item] ?? 'OK';
                         return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -204,23 +231,32 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
                                 children: [
                                   Expanded(
                                     flex: 3,
-                                    child: Text(item, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                                    child: Text(item,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     flex: 4,
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 12),
                                       decoration: BoxDecoration(
-                                        border: Border.all(color: Colors.grey[300]!),
+                                        border: Border.all(
+                                            color: Colors.grey[300]!),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: DropdownButtonHideUnderline(
                                         child: DropdownButton<String>(
                                           isExpanded: true,
                                           value: val,
-                                          style: const TextStyle(fontSize: 13, color: Colors.black),
-                                          items: ['OK', 'NÃO OK', 'NÃO POSSUI'].map((st) {
+                                          style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black),
+                                          items: VistoriaWizardState
+                                              .statusChecklistOpcional
+                                              .map((st) {
                                             return DropdownMenuItem(
                                               value: st,
                                               child: Text(st),
@@ -229,9 +265,18 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
                                           onChanged: (newVal) {
                                             if (newVal != null) {
                                               setState(() {
-                                                state.checklistOpcional[item] = newVal;
-                                                if (newVal != 'NÃO OK') {
-                                                  state.checklistOpcionalMotivos.remove(item);
+                                                state.checklistOpcional[item] =
+                                                    newVal;
+                                                if ([
+                                                  'OK',
+                                                  'NÃO POSSUI',
+                                                  'POSSUI E FUNCIONA',
+                                                  'FUNCIONA',
+                                                  'SEM DESGASTE',
+                                                  'MANUAL'
+                                                ].contains(newVal)) {
+                                                  state.checklistOpcionalMotivos
+                                                      .remove(item);
                                                 }
                                               });
                                             }
@@ -242,18 +287,28 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional> with Auto
                                   ),
                                 ],
                               ),
-                              if (val == 'NÃO OK')
+                              if (![
+                                'OK',
+                                'NÃO POSSUI',
+                                'POSSUI E FUNCIONA',
+                                'FUNCIONA',
+                                'SEM DESGASTE',
+                                'MANUAL'
+                              ].contains(val))
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: TextFormField(
-                                    initialValue: state.checklistOpcionalMotivos[item] ?? '',
+                                    initialValue:
+                                        state.checklistOpcionalMotivos[item] ??
+                                            '',
                                     decoration: const InputDecoration(
                                       labelText: 'Motivo',
                                       border: OutlineInputBorder(),
                                       isDense: true,
                                     ),
                                     onChanged: (text) {
-                                      state.checklistOpcionalMotivos[item] = text;
+                                      state.checklistOpcionalMotivos[item] =
+                                          text;
                                     },
                                   ),
                                 ),

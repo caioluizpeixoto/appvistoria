@@ -166,7 +166,8 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
                   const SizedBox(height: 16),
 
                   // ── Checklist de fotos ──────────────────────────────────
-                  if (_state != null) _FotosChecklist(state: _state!),
+                  if (_state != null && _state!.fotosObrigatorias.isNotEmpty)
+                    _FotosChecklist(state: _state!),
 
                   const SizedBox(height: 16),
 
@@ -254,16 +255,13 @@ class _StatusCard extends StatelessWidget {
           Text(
             statusFinal.toUpperCase(),
             style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: Colors.white),
+                fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
           ),
           const SizedBox(height: 12),
           Row(
             children: [
               _StatChip(
-                  icon: Icons.photo_camera_rounded,
-                  label: '$totalFotos fotos'),
+                  icon: Icons.photo_camera_rounded, label: '$totalFotos fotos'),
               const SizedBox(width: 8),
               _StatChip(
                   icon: Icons.warning_rounded,
@@ -306,19 +304,30 @@ class _StatChip extends StatelessWidget {
 class _VeiculoCard extends StatelessWidget {
   final Veiculo veiculo;
   const _VeiculoCard({required this.veiculo});
+
+  bool _hasVal(String? val) =>
+      val != null && val.trim().isNotEmpty && val.trim() != '-';
+
   @override
   Widget build(BuildContext context) {
+    final marcaModelo =
+        '${veiculo.marca ?? ''} ${veiculo.modelo ?? ''}'.trim();
+
     return _Card(
       title: 'Dados do Veículo',
       icon: Icons.directions_car_rounded,
       children: [
-        _Row('Placa', veiculo.placa),
-        _Row('Marca/Modelo', '${veiculo.marca ?? '-'} ${veiculo.modelo ?? ''}'),
-        _Row('Chassi no Veículo', veiculo.chassiVeiculo ?? '-'),
-        _Row('Chassi na BIN', veiculo.chassiBin ?? '-'),
-        _Row('Motor no Veículo', veiculo.motorVeiculo ?? '-'),
-        _Row('Motor na BIN', veiculo.motorBin ?? '-'),
-        _Row('KM', veiculo.km?.toString() ?? '-'),
+        if (_hasVal(veiculo.placa)) _Row('Placa', veiculo.placa),
+        if (_hasVal(marcaModelo)) _Row('Marca/Modelo', marcaModelo),
+        if (_hasVal(veiculo.chassiVeiculo))
+          _Row('Chassi no Veículo', veiculo.chassiVeiculo!),
+        if (_hasVal(veiculo.chassiBin))
+          _Row('Chassi na BIN', veiculo.chassiBin!),
+        if (_hasVal(veiculo.motorVeiculo))
+          _Row('Motor no Veículo', veiculo.motorVeiculo!),
+        if (_hasVal(veiculo.motorBin)) _Row('Motor na BIN', veiculo.motorBin!),
+        if (_hasVal(veiculo.km?.toString()))
+          _Row('KM', veiculo.km!.toString()),
       ],
     );
   }
@@ -339,7 +348,9 @@ class _FotosChecklist extends StatelessWidget {
           child: Row(
             children: [
               Icon(
-                has ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                has
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
                 size: 18,
                 color: has ? AppTheme.conforme : AppTheme.naoConforme,
               ),
@@ -369,13 +380,16 @@ class _DivergenciasCard extends StatelessWidget {
       title: '⚠️ Divergências Encontradas',
       icon: Icons.warning_rounded,
       color: AppTheme.naoConforme,
-      children: divergentes.map((d) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Text(
-              '• ${d.replaceAll('_', ' ')}',
-              style: const TextStyle(fontSize: 13, color: AppTheme.naoConforme),
-            ),
-          )).toList(),
+      children: divergentes
+          .map((d) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  '• ${d.replaceAll('_', ' ')}',
+                  style: const TextStyle(
+                      fontSize: 13, color: AppTheme.naoConforme),
+                ),
+              ))
+          .toList(),
     );
   }
 }
@@ -409,9 +423,7 @@ class _Card extends StatelessWidget {
               const SizedBox(width: 8),
               Text(title,
                   style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: c)),
+                      fontSize: 14, fontWeight: FontWeight.w700, color: c)),
             ],
           ),
           const SizedBox(height: 12),

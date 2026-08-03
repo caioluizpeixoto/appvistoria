@@ -19,7 +19,8 @@ class StepFotosExtras extends StatefulWidget {
 class _StepFotosExtrasState extends State<StepFotosExtras> {
   final _imagePicker = ImagePicker();
 
-  Future<void> _adicionarFoto(VistoriaWizardState state, ImageSource source) async {
+  Future<void> _adicionarFoto(
+      VistoriaWizardState state, ImageSource source) async {
     final xFile = await _imagePicker.pickImage(
       source: source,
       imageQuality: 80,
@@ -48,7 +49,8 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
     // Copia para diretório persistente
     final tempFile = File(croppedFile.path);
     final appDir = await getApplicationDocumentsDirectory();
-    final fileName = 'vistoria_img_extra_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
+    final fileName =
+        'vistoria_img_extra_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
     final savedFile = await tempFile.copy('${appDir.path}/$fileName');
 
     // Pede título e categoria
@@ -108,7 +110,16 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                     labelText: 'Categoria',
                     border: OutlineInputBorder(),
                   ),
-                  items: ['Avaria','Estrutura','Pintura','Documento','Interior','Motor','Chassi','Outro']
+                  items: [
+                    'Avaria',
+                    'Estrutura',
+                    'Pintura',
+                    'Documento',
+                    'Interior',
+                    'Motor',
+                    'Chassi',
+                    'Outro'
+                  ]
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
                   onChanged: (v) => setStateDialog(() {
@@ -182,8 +193,7 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
           children: [
             Expanded(
               child: ElevatedButton.icon(
-                onPressed: () =>
-                    _adicionarFoto(state, ImageSource.camera),
+                onPressed: () => _adicionarFoto(state, ImageSource.camera),
                 icon: const Icon(Icons.camera_alt_rounded),
                 label: const Text('Câmera'),
               ),
@@ -191,8 +201,7 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
             const SizedBox(width: 10),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () =>
-                    _adicionarFoto(state, ImageSource.gallery),
+                onPressed: () => _adicionarFoto(state, ImageSource.gallery),
                 icon: const Icon(Icons.photo_library_rounded),
                 label: const Text('Galeria'),
               ),
@@ -213,8 +222,7 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                 Text('Nenhuma foto extra adicionada',
                     style: TextStyle(color: AppTheme.textSecondary)),
                 Text('Adicione fotos de avarias, documentos, etc.',
-                    style: TextStyle(
-                        fontSize: 12, color: AppTheme.textHint)),
+                    style: TextStyle(fontSize: 12, color: AppTheme.textHint)),
               ],
             ),
           )
@@ -245,7 +253,8 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                         width: 90,
                         height: 90,
                         color: Colors.grey[200],
-                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                        child:
+                            const Icon(Icons.broken_image, color: Colors.grey),
                       ),
                     ),
                   ),
@@ -255,7 +264,9 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          foto['titulo']!.isEmpty ? 'Sem título' : foto['titulo']!,
+                          foto['titulo']!.isEmpty
+                              ? 'Sem título'
+                              : foto['titulo']!,
                           style: const TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w600),
                         ),

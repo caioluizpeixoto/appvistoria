@@ -12,7 +12,8 @@ class HistoricoConsultasScreen extends StatefulWidget {
   const HistoricoConsultasScreen({super.key});
 
   @override
-  State<HistoricoConsultasScreen> createState() => _HistoricoConsultasScreenState();
+  State<HistoricoConsultasScreen> createState() =>
+      _HistoricoConsultasScreenState();
 }
 
 class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
@@ -49,7 +50,8 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
     if (!item.permiteRetificacao) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Prazo de 72h expirado. É necessário realizar nova consulta.'),
+          content: Text(
+              'Prazo de 72h expirado. É necessário realizar nova consulta.'),
           backgroundColor: AppTheme.naoConforme,
         ),
       );
@@ -77,7 +79,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                   itemBuilder: (context, index) {
                     final item = _historico[index];
                     final formatador = DateFormat('dd/MM/yyyy HH:mm');
-                    
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
@@ -95,10 +97,13 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    item.placa?.isNotEmpty == true ? item.placa! : (item.chassi ?? 'Sem Placa/Chassi'),
+                                    item.placa?.isNotEmpty == true
+                                        ? item.placa!
+                                        : (item.chassi ?? 'Sem Placa/Chassi'),
                                     style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w800,
@@ -106,15 +111,22 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: item.permiteRetificacao ? AppTheme.conformeLight : AppTheme.naoConformeLight,
+                                      color: item.permiteRetificacao
+                                          ? AppTheme.conformeLight
+                                          : AppTheme.naoConformeLight,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      item.permiteRetificacao ? 'No Prazo (72h)' : 'Expirado',
+                                      item.permiteRetificacao
+                                          ? 'No Prazo (72h)'
+                                          : 'Expirado',
                                       style: TextStyle(
-                                        color: item.permiteRetificacao ? AppTheme.conforme : AppTheme.naoConforme,
+                                        color: item.permiteRetificacao
+                                            ? AppTheme.conforme
+                                            : AppTheme.naoConforme,
                                         fontSize: 12,
                                         fontWeight: FontWeight.w700,
                                       ),
@@ -134,7 +146,8 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                 const SizedBox(height: 12),
                                 Row(
                                   children: const [
-                                    Icon(Icons.edit_document, size: 16, color: AppTheme.primary),
+                                    Icon(Icons.edit_document,
+                                        size: 16, color: AppTheme.primary),
                                     SizedBox(width: 6),
                                     Text(
                                       'Retificar / Continuar Vistoria',
@@ -147,22 +160,29 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                   ],
                                 ),
                               ],
-                              if (item.arquivoPesquisaUrl != null && item.arquivoPesquisaUrl!.isNotEmpty) ...[
+                              if (item.arquivoPesquisaUrl != null &&
+                                  item.arquivoPesquisaUrl!.isNotEmpty) ...[
                                 const SizedBox(height: 12),
                                 InkWell(
                                   onTap: () async {
-                                    final uri = Uri.parse(item.arquivoPesquisaUrl!);
+                                    final uri =
+                                        Uri.parse(item.arquivoPesquisaUrl!);
                                     try {
-                                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      await launchUrl(uri,
+                                          mode: LaunchMode.externalApplication);
                                     } catch (e) {
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível abrir o link.')));
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                                content: Text(
+                                                    'Não foi possível abrir o link.')));
                                       }
                                     }
                                   },
                                   child: Row(
                                     children: const [
-                                      Icon(Icons.picture_as_pdf_rounded, size: 16, color: AppTheme.conforme),
+                                      Icon(Icons.picture_as_pdf_rounded,
+                                          size: 16, color: AppTheme.conforme),
                                       SizedBox(width: 6),
                                       Text(
                                         'Ver Relatório Radar Consultas',

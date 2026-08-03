@@ -19,10 +19,10 @@ class Vistoriadores extends Table {
 class Vistorias extends Table {
   TextColumn get id => text()();
   TextColumn get numeroLaudo => text().unique()();
-  TextColumn get status =>
-      text().withDefault(const Constant('em_andamento'))();
+  TextColumn get status => text().withDefault(const Constant('em_andamento'))();
   // Novo: tipo de vistoria, cliente, unidade
-  TextColumn get tipoVistoria => text().withDefault(const Constant('cautelar_carro'))();
+  TextColumn get tipoVistoria =>
+      text().withDefault(const Constant('cautelar_carro'))();
   TextColumn get clienteNome => text().nullable()();
   TextColumn get unidade => text().nullable()();
   // Novo: parecer técnico e status final (quando concluído)
@@ -73,8 +73,7 @@ class Veiculos extends Table {
   TextColumn get uf => text().nullable()();
   // Novo: número GRV
   TextColumn get numeroGrv => text().nullable()();
-  TextColumn get tipo =>
-      text().withDefault(const Constant('automovel'))();
+  TextColumn get tipo => text().withDefault(const Constant('automovel'))();
   BoolColumn get motorDivergente =>
       boolean().withDefault(const Constant(false))();
   BoolColumn get chassiDivergente =>
@@ -92,8 +91,7 @@ class ItensVistoria extends Table {
   TextColumn get vistoriaId => text().references(Vistorias, #id)();
   TextColumn get categoria => text()();
   TextColumn get nome => text()();
-  TextColumn get status =>
-      text().withDefault(const Constant('pendente'))();
+  TextColumn get status => text().withDefault(const Constant('pendente'))();
   TextColumn get observacao => text().nullable()();
   // Novo: etapa do wizard à qual pertence
   TextColumn get etapa => text().nullable()();
@@ -129,8 +127,7 @@ class ItensPintura extends Table {
   TextColumn get id => text()();
   TextColumn get vistoriaId => text().references(Vistorias, #id)();
   TextColumn get peca => text()();
-  TextColumn get status =>
-      text().withDefault(const Constant('original'))();
+  TextColumn get status => text().withDefault(const Constant('original'))();
   IntColumn get espessuraMicra => integer().nullable()();
   TextColumn get observacao => text().nullable()();
   // Novo: foto opcional
@@ -145,8 +142,7 @@ class ItensEstrutura extends Table {
   TextColumn get id => text()();
   TextColumn get vistoriaId => text().references(Vistorias, #id)();
   TextColumn get peca => text()();
-  TextColumn get status =>
-      text().withDefault(const Constant('sem_reparo'))();
+  TextColumn get status => text().withDefault(const Constant('sem_reparo'))();
   TextColumn get observacao => text().nullable()();
   // Novo: foto opcional
   TextColumn get fotoUrl => text().nullable()();
@@ -159,9 +155,11 @@ class ItensEstrutura extends Table {
 class VidrosVistoria extends Table {
   TextColumn get id => text()();
   TextColumn get vistoriaId => text().references(Vistorias, #id)();
-  TextColumn get posicao => text()(); // ex: 'dianteiro_direito', 'frontal', etc.
+  TextColumn get posicao =>
+      text()(); // ex: 'dianteiro_direito', 'frontal', etc.
   TextColumn get codigoEncontrado => text().nullable()();
-  TextColumn get status => text().withDefault(const Constant('nao_analisado'))();
+  TextColumn get status =>
+      text().withDefault(const Constant('nao_analisado'))();
   TextColumn get observacao => text().nullable()();
   TextColumn get fotoUrl => text().nullable()();
 

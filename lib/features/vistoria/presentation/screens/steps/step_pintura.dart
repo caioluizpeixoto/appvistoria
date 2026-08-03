@@ -54,8 +54,13 @@ class StepPintura extends StatelessWidget {
     if (status.isEmpty) return AppTheme.naoAplicavel;
     final s = status.toLowerCase();
     if (s.contains('original')) return AppTheme.conforme;
-    if (s.contains('substituído') || s.contains('danificado') || s.contains('massa')) return AppTheme.naoConforme;
-    if (s.contains('repintura') || s.contains('amassado') || s.contains('riscado') || s.contains('envelopado')) return AppTheme.comObs;
+    if (s.contains('substituído') ||
+        s.contains('danificado') ||
+        s.contains('massa')) return AppTheme.naoConforme;
+    if (s.contains('repintura') ||
+        s.contains('amassado') ||
+        s.contains('riscado') ||
+        s.contains('envelopado')) return AppTheme.comObs;
     return AppTheme.textSecondary;
   }
 
@@ -67,15 +72,15 @@ class StepPintura extends StatelessWidget {
     final repinturas = _pecas
         .where((id) => state.getStatus(id).toLowerCase().contains('repintura'))
         .length;
-    final originais = _pecas
-        .where((id) => state.getStatus(id) == 'Pintura original')
-        .length;
+    final originais =
+        _pecas.where((id) => state.getStatus(id) == 'Pintura original').length;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         // ── Resumo visual ──────────────────────────────────────────────────
-        _PinturaResumoCard(originais: originais, repinturas: repinturas, total: _pecas.length),
+        _PinturaResumoCard(
+            originais: originais, repinturas: repinturas, total: _pecas.length),
         const SizedBox(height: 8),
 
         // ── Lista de itens ─────────────────────────────────────────────────
@@ -91,15 +96,15 @@ class StepPintura extends StatelessWidget {
         _AiImagePreview(
           marca: state.marca,
           modelo: state.modelo,
-          ano: state.anoModelo.isNotEmpty ? state.anoModelo : state.anoFabricacao,
+          ano: state.anoModelo.isNotEmpty
+              ? state.anoModelo
+              : state.anoFabricacao,
           pecas: _pecas,
           statusFn: state.getStatus,
           initialBase64: state.aiImage3dBase64,
           isGenerating: state.isGeneratingAiImage,
         ),
         const SizedBox(height: 16),
-
-
       ],
     );
   }
@@ -109,7 +114,8 @@ class _PinturaResumoCard extends StatelessWidget {
   final int originais;
   final int repinturas;
   final int total;
-  const _PinturaResumoCard({required this.originais, required this.repinturas, required this.total});
+  const _PinturaResumoCard(
+      {required this.originais, required this.repinturas, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -122,17 +128,21 @@ class _PinturaResumoCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.format_paint_rounded, color: AppTheme.primary, size: 26),
+          const Icon(Icons.format_paint_rounded,
+              color: AppTheme.primary, size: 26),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Análise de Pintura e Lataria',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
-                Text('$originais originais · $repinturas repinturas · ${total - originais - repinturas} outros',
-                    style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                Text(
+                    '$originais originais · $repinturas repinturas · ${total - originais - repinturas} outros',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppTheme.textSecondary)),
               ],
             ),
           ),
@@ -168,7 +178,10 @@ class _DiagramaPintura extends StatelessWidget {
       child: Column(
         children: [
           const Text('Mapa de Pintura',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 6,
@@ -184,7 +197,8 @@ class _DiagramaPintura extends StatelessWidget {
                   border: Border.all(color: color.withValues(alpha: 0.4)),
                 ),
                 child: Text(
-                  labels[id]!.replaceAll('Para-lama', 'P-lama')
+                  labels[id]!
+                      .replaceAll('Para-lama', 'P-lama')
                       .replaceAll('Dianteiro', 'Diant.')
                       .replaceAll('Traseiro', 'Tras.')
                       .replaceAll(' Direito', ' D.')
@@ -226,9 +240,14 @@ class _Legenda extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+        Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+                color: color, borderRadius: BorderRadius.circular(2))),
         const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
+        Text(label,
+            style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary)),
       ],
     );
   }
@@ -260,7 +279,8 @@ class _AiImagePreview extends StatefulWidget {
 class _AiImagePreviewState extends State<_AiImagePreview> {
   String? _base64Image;
   String? _errorMessage;
-  final TextEditingController _customInstructionController = TextEditingController();
+  final TextEditingController _customInstructionController =
+      TextEditingController();
 
   @override
   void initState() {
@@ -282,7 +302,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
     'peca_lateral_traseira_esquerda': 'rear left (driver side) quarter panel',
     'peca_tampa_traseira': 'rear trunk / tailgate',
     'peca_teto': 'roof',
-    'peca_lateral_traseira_direita': 'rear right (passenger side) quarter panel',
+    'peca_lateral_traseira_direita':
+        'rear right (passenger side) quarter panel',
     'peca_porta_traseira_direita': 'rear right (passenger side) door',
     'peca_porta_dianteira_direita': 'front right (passenger side) door',
     'peca_paralama_dianteiro_direito': 'front right (passenger side) fender',
@@ -290,7 +311,7 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
 
   Future<void> _gerarImagem() async {
     final wizardState = context.read<VistoriaWizardState>();
-    
+
     // Check if already generating to prevent double calls
     if (wizardState.isGeneratingAiImage) return;
 
@@ -305,12 +326,17 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
       for (final pecaId in widget.pecas) {
         final status = widget.statusFn(pecaId).toLowerCase();
         String? color;
-        if (status.contains('substituído') || status.contains('danificado') || status.contains('massa')) {
+        if (status.contains('substituído') ||
+            status.contains('danificado') ||
+            status.contains('massa')) {
           color = 'red';
-        } else if (status.contains('repintura') || status.contains('amassado') || status.contains('riscado') || status.contains('envelopado')) {
+        } else if (status.contains('repintura') ||
+            status.contains('amassado') ||
+            status.contains('riscado') ||
+            status.contains('envelopado')) {
           color = 'yellow';
         }
-        
+
         if (color != null && _partToEnglish.containsKey(pecaId)) {
           partsToColor.add({
             'part': _partToEnglish[pecaId]!,
@@ -322,11 +348,13 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
       final dio = Dio(
         BaseOptions(
           connectTimeout: const Duration(seconds: 120),
-          receiveTimeout: const Duration(seconds: 300), // Aumentado para 5 minutos
+          receiveTimeout:
+              const Duration(seconds: 300), // Aumentado para 5 minutos
           sendTimeout: const Duration(seconds: 120),
         ),
       );
-      final url = 'https://cmcpmppgpbrufrxznost.supabase.co/functions/v1/gerar-imagem-veiculo';
+      final url =
+          'https://cmcpmppgpbrufrxznost.supabase.co/functions/v1/gerar-imagem-veiculo';
       final apiKey = 'sb_publishable_C2JRdVkSfBaVeNE904dfTg_KTg6oksq';
 
       final customInstruction = _customInstructionController.text.trim();
@@ -345,7 +373,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
           'model': widget.modelo.isNotEmpty ? widget.modelo : 'Compass',
           'year': widget.ano.isNotEmpty ? widget.ano : '2022',
           'parts': partsToColor,
-          if (customInstruction.isNotEmpty) 'customInstruction': customInstruction,
+          if (customInstruction.isNotEmpty)
+            'customInstruction': customInstruction,
         },
       );
 
@@ -356,9 +385,12 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
         } catch (_) {}
       }
 
-      if (response.statusCode == 200 && responseData != null && responseData is Map && responseData['base64'] != null) {
+      if (response.statusCode == 200 &&
+          responseData != null &&
+          responseData is Map &&
+          responseData['base64'] != null) {
         var b64 = responseData['base64'] as String;
-        
+
         // Limpar prefixo data URI se existir
         if (b64.contains(',')) {
           b64 = b64.split(',').last;
@@ -371,7 +403,7 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
         }
 
         wizardState.aiImage3dBase64 = b64;
-        
+
         if (mounted) {
           setState(() {
             _base64Image = b64;
@@ -385,8 +417,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
         final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
         if (mounted) {
           setState(() {
-            _errorMessage = isHtml 
-                ? 'Tempo limite esgotado no servidor. Clique em "Regerar com Ajustes" para tentar novamente.' 
+            _errorMessage = isHtml
+                ? 'Tempo limite esgotado no servidor. Clique em "Regerar com Ajustes" para tentar novamente.'
                 : 'Erro ao gerar imagem: $rawErr';
           });
         }
@@ -399,8 +431,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
       final isHtml = rawErr.contains('<html>') || rawErr.contains('502');
       if (mounted) {
         setState(() {
-          _errorMessage = isHtml 
-              ? 'Tempo limite esgotado no servidor (502). Clique em "Regerar com Ajustes" para tentar novamente.' 
+          _errorMessage = isHtml
+              ? 'Tempo limite esgotado no servidor (502). Clique em "Regerar com Ajustes" para tentar novamente.'
               : 'Erro do Servidor: $rawErr';
         });
       }
@@ -433,7 +465,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
             children: [
               const Icon(Icons.auto_awesome, color: AppTheme.primary, size: 20),
               const SizedBox(width: 8),
-              const Text('Ilustração 3D Técnica (IA)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              const Text('Ilustração 3D Técnica (IA)',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             ],
           ),
           const SizedBox(height: 4),
@@ -458,7 +491,8 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
           if (_errorMessage != null)
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Text(_errorMessage!, style: const TextStyle(color: AppTheme.naoConforme)),
+              child: Text(_errorMessage!,
+                  style: const TextStyle(color: AppTheme.naoConforme)),
             ),
           if (_base64Image != null) ...[
             const SizedBox(height: 12),
@@ -466,25 +500,62 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
               controller: _customInstructionController,
               decoration: InputDecoration(
                 labelText: 'Ajuste / Correção para a IA (Opcional)',
-                hintText: 'Ex: "destacar mais a repintura amarela do capô", "deixar a roda original"',
-                prefixIcon: const Icon(Icons.edit_note_rounded, color: AppTheme.primary),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                hintText:
+                    'Ex: "destacar mais a repintura amarela do capô", "deixar a roda original"',
+                prefixIcon: const Icon(Icons.edit_note_rounded,
+                    color: AppTheme.primary),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 isDense: true,
               ),
               style: const TextStyle(fontSize: 12),
             ),
           ],
           const SizedBox(height: 12),
-          
-          ElevatedButton.icon(
-            onPressed: widget.isGenerating ? null : _gerarImagem,
-            icon: Icon(_base64Image == null ? Icons.auto_awesome : Icons.refresh_rounded),
-            label: Text(_base64Image == null ? 'Gerar Imagem 3D (IA)' : 'Regerar com Ajustes'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.isGenerating ? null : () {
+                    setState(() {
+                      _base64Image = null;
+                      _errorMessage = null;
+                    });
+                    context.read<VistoriaWizardState>().aiImage3dBase64 = null;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Uso de Imagem 2D confirmado. Pode prosseguir no botão ao final da página.'),
+                        backgroundColor: AppTheme.conforme,
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.image),
+                  label: const Text('Usar 2D Padrão', style: TextStyle(fontSize: 12)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: widget.isGenerating ? null : _gerarImagem,
+                  icon: Icon(_base64Image == null
+                      ? Icons.auto_awesome
+                      : Icons.refresh_rounded),
+                  label: Text(
+                    _base64Image == null ? 'Gerar 3D (IA)' : 'Regerar 3D (IA)',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

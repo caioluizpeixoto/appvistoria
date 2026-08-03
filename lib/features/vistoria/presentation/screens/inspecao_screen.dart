@@ -18,7 +18,8 @@ class InspecaoScreen extends StatefulWidget {
   State<InspecaoScreen> createState() => _InspecaoScreenState();
 }
 
-class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProviderStateMixin {
+class _InspecaoScreenState extends State<InspecaoScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _dao = sl<VistoriaDao>();
   final _ocrService = sl<OcrService>();
@@ -30,29 +31,94 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
   bool _isLoading = true;
 
   final List<Map<String, dynamic>> _identificacaoItems = [
-    {'id': 'placa_dianteira', 'label': 'Placa Dianteira', 'mandatory': true, 'ocr': true},
-    {'id': 'placa_traseira', 'label': 'Placa Traseira', 'mandatory': true, 'ocr': false},
+    {
+      'id': 'placa_dianteira',
+      'label': 'Placa Dianteira',
+      'mandatory': true,
+      'ocr': true
+    },
+    {
+      'id': 'placa_traseira',
+      'label': 'Placa Traseira',
+      'mandatory': true,
+      'ocr': false
+    },
     {'id': 'chassi', 'label': 'Chassi', 'mandatory': true, 'ocr': true},
     {'id': 'motor', 'label': 'Motor', 'mandatory': true, 'ocr': true},
-    {'id': 'etiqueta_chassi', 'label': 'Etiqueta do Chassi', 'mandatory': true, 'ocr': false},
-    {'id': 'etiqueta_coluna', 'label': 'Etiqueta da Coluna', 'mandatory': true, 'ocr': false},
+    {
+      'id': 'etiqueta_chassi',
+      'label': 'Etiqueta do Chassi',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'etiqueta_coluna',
+      'label': 'Etiqueta da Coluna',
+      'mandatory': true,
+      'ocr': false
+    },
   ];
 
   final List<Map<String, dynamic>> _externasItems = [
     {'id': 'frente', 'label': 'Frente', 'mandatory': true, 'ocr': false},
     {'id': 'traseira', 'label': 'Traseira', 'mandatory': true, 'ocr': false},
-    {'id': 'lateral_direita', 'label': 'Lateral Direita', 'mandatory': true, 'ocr': false},
-    {'id': 'lateral_esquerda', 'label': 'Lateral Esquerda', 'mandatory': true, 'ocr': false},
-    {'id': 'diag_frente_dir', 'label': 'Diagonal Frente Direita', 'mandatory': true, 'ocr': false},
-    {'id': 'diag_frente_esq', 'label': 'Diagonal Frente Esquerda', 'mandatory': true, 'ocr': false},
-    {'id': 'diag_tras_dir', 'label': 'Diagonal Traseira Direita', 'mandatory': true, 'ocr': false},
-    {'id': 'diag_tras_esq', 'label': 'Diagonal Traseira Esquerda', 'mandatory': true, 'ocr': false},
+    {
+      'id': 'lateral_direita',
+      'label': 'Lateral Direita',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'lateral_esquerda',
+      'label': 'Lateral Esquerda',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'diag_frente_dir',
+      'label': 'Diagonal Frente Direita',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'diag_frente_esq',
+      'label': 'Diagonal Frente Esquerda',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'diag_tras_dir',
+      'label': 'Diagonal Traseira Direita',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'diag_tras_esq',
+      'label': 'Diagonal Traseira Esquerda',
+      'mandatory': true,
+      'ocr': false
+    },
   ];
 
   final List<Map<String, dynamic>> _internasItems = [
-    {'id': 'painel_ligado', 'label': 'Painel Ligado', 'mandatory': true, 'ocr': false},
-    {'id': 'quilometragem', 'label': 'Quilometragem', 'mandatory': true, 'ocr': false},
-    {'id': 'interior_frontal', 'label': 'Interior Frontal', 'mandatory': true, 'ocr': false},
+    {
+      'id': 'painel_ligado',
+      'label': 'Painel Ligado',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'quilometragem',
+      'label': 'Quilometragem',
+      'mandatory': true,
+      'ocr': false
+    },
+    {
+      'id': 'interior_frontal',
+      'label': 'Interior Frontal',
+      'mandatory': true,
+      'ocr': false
+    },
   ];
 
   @override
@@ -65,7 +131,7 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
   Future<void> _carregarDados() async {
     final veiculo = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
     final fotos = await _dao.listarFotosPorVistoria(widget.vistoriaId);
-    
+
     // Load previously saved photos
     final Map<String, String> photosMap = {};
     for (var f in fotos) {
@@ -103,13 +169,17 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('OCR: Texto identificado -> $extracted'), backgroundColor: AppTheme.conforme),
+              SnackBar(
+                  content: Text('OCR: Texto identificado -> $extracted'),
+                  backgroundColor: AppTheme.conforme),
             );
           }
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('OCR: Padrão não encontrado na imagem'), backgroundColor: AppTheme.comObs),
+              const SnackBar(
+                  content: Text('OCR: Padrão não encontrado na imagem'),
+                  backgroundColor: AppTheme.comObs),
             );
           }
         }
@@ -119,7 +189,7 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
     // 2. Compress e Upload
     final compressedFile = await _imageService.compressImage(file);
     final finalFile = compressedFile ?? file;
-    
+
     // Atualiza UI com foto local
     setState(() {
       _uploadedPhotos[itemId] = finalFile.absolute.path;
@@ -140,28 +210,35 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
       legenda: itemId.replaceAll('_', ' ').toUpperCase(),
       pathLocal: drift.Value(finalFile.absolute.path),
       urlSupabase: drift.Value(url),
-      storagePath: drift.Value('${widget.vistoriaId}/fotos/${finalFile.uri.pathSegments.last}'),
+      storagePath: drift.Value(
+          '${widget.vistoriaId}/fotos/${finalFile.uri.pathSegments.last}'),
     ));
-    
+
     if (url != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto enviada pra nuvem com sucesso!'), backgroundColor: AppTheme.conforme),
+        const SnackBar(
+            content: Text('Foto enviada pra nuvem com sucesso!'),
+            backgroundColor: AppTheme.conforme),
       );
     }
   }
 
   Widget _buildOcrResult(String itemId, String label) {
-    if (!_ocrResults.containsKey(itemId) || _veiculo == null) return const SizedBox.shrink();
-    
+    if (!_ocrResults.containsKey(itemId) || _veiculo == null)
+      return const SizedBox.shrink();
+
     final extracted = _ocrResults[itemId]!;
     String expected = '';
-    
+
     if (itemId == 'chassi') expected = _veiculo!.chassiVeiculo ?? '';
     if (itemId == 'placa_dianteira') expected = _veiculo!.placa;
     if (itemId == 'motor') expected = _veiculo!.motorVeiculo ?? '';
 
-    bool isMatch = extracted.replaceAll('-', '') == expected.replaceAll('-', '');
-    if (expected.isEmpty) isMatch = true; // Se não temos o dado oficial, aceitamos o OCR como verdade temporária
+    bool isMatch =
+        extracted.replaceAll('-', '') == expected.replaceAll('-', '');
+    if (expected.isEmpty)
+      isMatch =
+          true; // Se não temos o dado oficial, aceitamos o OCR como verdade temporária
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -174,18 +251,22 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Resultado OCR ($label)', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text('Resultado OCR ($label)',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('Encontrado: $extracted'),
           if (expected.isNotEmpty) Text('Esperado: $expected'),
           const SizedBox(height: 8),
           Row(
             children: [
-              Icon(isMatch ? Icons.check_circle : Icons.warning, color: isMatch ? Colors.green : Colors.orange, size: 20),
+              Icon(isMatch ? Icons.check_circle : Icons.warning,
+                  color: isMatch ? Colors.green : Colors.orange, size: 20),
               const SizedBox(width: 8),
               Text(
                 isMatch ? 'Compatível' : 'Divergente',
-                style: TextStyle(color: isMatch ? Colors.green : Colors.orange, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                    color: isMatch ? Colors.green : Colors.orange,
+                    fontWeight: FontWeight.bold),
               ),
             ],
           )
@@ -209,7 +290,8 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
               isMandatory: item['mandatory'],
               enableOcr: item['ocr'],
               initialPhotoPath: _uploadedPhotos[itemId],
-              onPhotoCaptured: (file) => _processPhoto(itemId, file, item['ocr']),
+              onPhotoCaptured: (file) =>
+                  _processPhoto(itemId, file, item['ocr']),
               onPhotoDeleted: () {
                 setState(() {
                   _uploadedPhotos.remove(itemId);
@@ -225,17 +307,26 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
   }
 
   Future<void> _validarEConcluir() async {
-    final allItems = [..._identificacaoItems, ..._externasItems, ..._internasItems];
-    final missing = allItems.where((i) => i['mandatory'] == true && !_uploadedPhotos.containsKey(i['id'])).toList();
+    final allItems = [
+      ..._identificacaoItems,
+      ..._externasItems,
+      ..._internasItems
+    ];
+    final missing = allItems
+        .where((i) =>
+            i['mandatory'] == true && !_uploadedPhotos.containsKey(i['id']))
+        .toList();
 
     if (missing.isNotEmpty) {
       showDialog(
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Fotos Obrigatórias Faltando'),
-          content: Text('Você precisa capturar as seguintes fotos:\n\n${missing.map((e) => '- ${e['label']}').join('\n')}'),
+          content: Text(
+              'Você precisa capturar as seguintes fotos:\n\n${missing.map((e) => '- ${e['label']}').join('\n')}'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('OK')),
+            TextButton(
+                onPressed: () => Navigator.pop(c), child: const Text('OK')),
           ],
         ),
       );
@@ -244,8 +335,9 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
 
     // Se tudo certo, gera o PDF ou finaliza
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gerando laudo em PDF... aguarde.')));
-    
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Gerando laudo em PDF... aguarde.')));
+
     try {
       final pdfService = sl<PdfGeneratorService>();
       final vistoria = await _dao.buscarPorId(widget.vistoriaId);
@@ -259,7 +351,8 @@ class _InspecaoScreenState extends State<InspecaoScreen> with SingleTickerProvid
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao gerar PDF: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Erro ao gerar PDF: $e')));
       }
     }
   }

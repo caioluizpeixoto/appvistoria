@@ -55,14 +55,16 @@ class _StepObservacoesState extends State<StepObservacoes> {
               decoration: BoxDecoration(
                 color: AppTheme.naoConformeLight,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.naoConforme.withValues(alpha: 0.4)),
+                border: Border.all(
+                    color: AppTheme.naoConforme.withValues(alpha: 0.4)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.warning_rounded, color: AppTheme.naoConforme, size: 20),
+                      Icon(Icons.warning_rounded,
+                          color: AppTheme.naoConforme, size: 20),
                       SizedBox(width: 8),
                       Text('Divergências Detectadas',
                           style: TextStyle(
@@ -88,7 +90,8 @@ class _StepObservacoesState extends State<StepObservacoes> {
           _buildTextArea(
             controller: _veiculoCtrl,
             label: 'Observações do Veículo',
-            hint: 'Descreva condições gerais do veículo, estado de conservação...',
+            hint:
+                'Descreva condições gerais do veículo, estado de conservação...',
             icon: Icons.directions_car_rounded,
             onChanged: (v) => state.observacoesVeiculo = v,
           ),
@@ -108,7 +111,8 @@ class _StepObservacoesState extends State<StepObservacoes> {
           _buildTextArea(
             controller: _divergenciasCtrl,
             label: 'Divergências Encontradas',
-            hint: 'Descreva todas as divergências identificadas durante a vistoria...',
+            hint:
+                'Descreva todas as divergências identificadas durante a vistoria...',
             icon: Icons.warning_amber_rounded,
             color: AppTheme.naoConforme,
             onChanged: (v) => state.divergenciasEncontradas = v,
@@ -156,9 +160,7 @@ class _StepObservacoesState extends State<StepObservacoes> {
                 const SizedBox(width: 8),
                 Text(label,
                     style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: c)),
+                        fontSize: 14, fontWeight: FontWeight.w600, color: c)),
               ],
             ),
           ),

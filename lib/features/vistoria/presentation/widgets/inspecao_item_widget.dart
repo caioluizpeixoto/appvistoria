@@ -54,24 +54,28 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = context.read<VistoriaWizardState>();
       _obsController.text = state.getObs(widget.itemId);
-      
+
       var cod = state.getCodigo(widget.itemId);
       if (cod.isEmpty) {
         if (widget.itemId == 'foto_placa') {
           cod = state.placa;
         } else if (widget.itemId == 'chassi_gravacao') {
-          cod = state.chassiBin.isNotEmpty ? state.chassiBin : state.chassiVeiculo;
+          cod = state.chassiBin.isNotEmpty
+              ? state.chassiBin
+              : state.chassiVeiculo;
         } else if (widget.itemId == 'motor_gravacao') {
           cod = state.motorBin.isNotEmpty ? state.motorBin : state.motorVeiculo;
         } else if (widget.itemId == 'cambio_gravacao') {
-          cod = state.cambioBin.isNotEmpty ? state.cambioBin : state.cambioVeiculo;
+          cod = state.cambioBin.isNotEmpty
+              ? state.cambioBin
+              : state.cambioVeiculo;
         }
-        
+
         if (cod.isNotEmpty) {
           state.setCodigo(widget.itemId, cod);
         }
       }
-      
+
       _codigoController.text = cod;
       if (cod.isEmpty) {
         _isEditingCodigo = true; // Se vazio, já começa liberado para digitar
@@ -150,8 +154,10 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     try {
       final byteData = await rootBundle.load('assets/images/app_icon.png');
       final appDir = await getApplicationDocumentsDirectory();
-      final tempFile = File('${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
-      await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+      final tempFile = File(
+          '${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
 
       final state = context.read<VistoriaWizardState>();
       state.addFotoLocal(widget.itemId, tempFile.path);
@@ -185,7 +191,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
             ),
             const SizedBox(height: 16),
             ListTile(
-              leading: const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
+              leading:
+                  const Icon(Icons.camera_alt_rounded, color: AppTheme.primary),
               title: const Text('Tirar foto'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -193,7 +200,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library_rounded, color: AppTheme.primary),
+              leading: const Icon(Icons.photo_library_rounded,
+                  color: AppTheme.primary),
               title: const Text('Escolher da galeria'),
               onTap: () {
                 Navigator.pop(ctx);
@@ -252,7 +260,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                 ),
                 if (widget.obrigatoria)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: AppTheme.naoConformeLight,
                       borderRadius: BorderRadius.circular(20),
@@ -280,7 +289,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                 decoration: BoxDecoration(
                   color: AppTheme.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppTheme.primary.withValues(alpha: 0.2)),
+                  border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
@@ -351,11 +361,13 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                             width: 100,
                             height: 120,
                             fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
                               width: 100,
                               height: 120,
                               color: Colors.grey[200],
-                              child: const Icon(Icons.broken_image, color: Colors.grey),
+                              child: const Icon(Icons.broken_image,
+                                  color: Colors.grey),
                             ),
                           ),
                         ),
@@ -426,21 +438,23 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                           ? null
                           : () => _pickImage(ImageSource.gallery),
                       icon: const Icon(Icons.photo_library_rounded, size: 18),
-                      label: const Text('Galeria',
-                          style: TextStyle(fontSize: 13)),
+                      label:
+                          const Text('Galeria', style: TextStyle(fontSize: 13)),
                     ),
                   ),
                 ],
               ),
             ),
-          
+
           if (fotos.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
               child: TextButton.icon(
                 onPressed: _uploading ? null : _fillDummyPhoto,
-                icon: const Icon(Icons.bug_report, size: 16, color: Colors.grey),
-                label: const Text('Preencher com foto fictícia (Teste)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                icon:
+                    const Icon(Icons.bug_report, size: 16, color: Colors.grey),
+                label: const Text('Preencher com foto fictícia (Teste)',
+                    style: TextStyle(color: Colors.grey, fontSize: 12)),
               ),
             ),
 
@@ -453,28 +467,37 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                 readOnly: !_isEditingCodigo,
                 textCapitalization: TextCapitalization.characters,
                 style: TextStyle(
-                  color: !_isEditingCodigo ? AppTheme.textSecondary : AppTheme.textPrimary,
-                  fontWeight: !_isEditingCodigo ? FontWeight.w600 : FontWeight.normal,
+                  color: !_isEditingCodigo
+                      ? AppTheme.textSecondary
+                      : AppTheme.textPrimary,
+                  fontWeight:
+                      !_isEditingCodigo ? FontWeight.w600 : FontWeight.normal,
                 ),
                 decoration: InputDecoration(
                   labelText: widget.codigoLabel ?? 'Código encontrado',
                   hintText: widget.codigoHint,
                   filled: !_isEditingCodigo,
-                  fillColor: !_isEditingCodigo ? AppTheme.surfaceVariant : AppTheme.surface,
-                  prefixIcon:
-                      Icon(Icons.qr_code_rounded, size: 18, color: !_isEditingCodigo ? AppTheme.textSecondary : AppTheme.primary),
+                  fillColor: !_isEditingCodigo
+                      ? AppTheme.surfaceVariant
+                      : AppTheme.surface,
+                  prefixIcon: Icon(Icons.qr_code_rounded,
+                      size: 18,
+                      color: !_isEditingCodigo
+                          ? AppTheme.textSecondary
+                          : AppTheme.primary),
                   suffixIcon: !_isEditingCodigo
                       ? IconButton(
-                          icon: const Icon(Icons.edit_rounded, size: 20, color: AppTheme.primary),
+                          icon: const Icon(Icons.edit_rounded,
+                              size: 20, color: AppTheme.primary),
                           tooltip: 'Editar ${widget.codigoLabel ?? "código"}',
-                          onPressed: () => setState(() => _isEditingCodigo = true),
+                          onPressed: () =>
+                              setState(() => _isEditingCodigo = true),
                         )
                       : null,
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
-                onChanged: (v) =>
-                    state.setCodigo(widget.itemId, v),
+                onChanged: (v) => state.setCodigo(widget.itemId, v),
               ),
             ),
 
@@ -491,12 +514,14 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                   size: 18,
                   color: _statusColor(statusAtual),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
               items: [
                 ...widget.statusOptions,
-                if (statusAtual.isNotEmpty && !widget.statusOptions.contains(statusAtual)) statusAtual,
+                if (statusAtual.isNotEmpty &&
+                    !widget.statusOptions.contains(statusAtual))
+                  statusAtual,
               ].map((s) {
                 return DropdownMenuItem(
                   value: s,
@@ -574,27 +599,49 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   Color _statusColor(String status) {
     if (status.isEmpty) return AppTheme.textHint;
     final s = status.toLowerCase();
-    
+
     // NÃO CONFORME (Vermelho)
-    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
-        s.contains('não original') || s.contains('substituído') || s.contains('ausente') ||
-        s.contains('danificad') || s.contains('colisão') || s.contains('ilegível') || s.contains('não localizad')) {
+    if (s.contains('divergente') ||
+        s.contains('adulteração') ||
+        s.contains('reprovado') ||
+        s.contains('não original') ||
+        s.contains('substituído') ||
+        s.contains('ausente') ||
+        s.contains('danificad') ||
+        s.contains('colisão') ||
+        s.contains('ilegível') ||
+        s.contains('não localizad')) {
       return AppTheme.naoConforme;
     }
-    
+
     // COM OBSERVAÇÃO (Laranja/Amarelo)
-    if (s.contains('reparo') || s.contains('repintura') || s.contains('observação') || 
-        s.contains('envelopado') || s.contains('amassado') || s.contains('riscado') ||
-        s.contains('soldado') || s.contains('avaria') || s.contains('massa') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso') || s.contains('inexistente') || s.contains('remarcad')) {
+    if (s.contains('reparo') ||
+        s.contains('repintura') ||
+        s.contains('observação') ||
+        s.contains('envelopado') ||
+        s.contains('amassado') ||
+        s.contains('riscado') ||
+        s.contains('soldado') ||
+        s.contains('avaria') ||
+        s.contains('massa') ||
+        s.contains('obstruído') ||
+        s.contains('alongado') ||
+        s.contains('consideração') ||
+        s.contains('sem acesso') ||
+        s.contains('inexistente') ||
+        s.contains('remarcad')) {
       return AppTheme.comObs;
     }
-    
+
     // CONFORME (Verde)
-    if (s.contains('original') || s.contains('perfeito') || s.contains('padr') || 
-        s.contains('regular') || s.contains('sem reparo')) {
+    if (s.contains('original') ||
+        s.contains('perfeito') ||
+        s.contains('padr') ||
+        s.contains('regular') ||
+        s.contains('sem reparo')) {
       return AppTheme.conforme;
     }
-    
+
     // NEUTRO (Cinza) - outros
     return AppTheme.textSecondary;
   }
@@ -602,10 +649,16 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   IconData _statusIcon(String status) {
     if (status.isEmpty) return Icons.help_outline_rounded;
     final s = status.toLowerCase();
-    
+
     // NÃO CONFORME
-    if (s.contains('divergente') || s.contains('adulteração') || s.contains('reprovado') ||
-        s.contains('não original') || s.contains('ausente') || s.contains('colisão') || s.contains('ilegível') || s.contains('não localizad')) {
+    if (s.contains('divergente') ||
+        s.contains('adulteração') ||
+        s.contains('reprovado') ||
+        s.contains('não original') ||
+        s.contains('ausente') ||
+        s.contains('colisão') ||
+        s.contains('ilegível') ||
+        s.contains('não localizad')) {
       return Icons.cancel_rounded;
     }
     if (s.contains('substituído')) {
@@ -619,16 +672,29 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     if (s.contains('reparo') || s.contains('soldado') || s.contains('avaria')) {
       return Icons.build_circle_rounded;
     }
-    if (s.contains('repintura') || s.contains('massa') || s.contains('envelopado')) {
+    if (s.contains('repintura') ||
+        s.contains('massa') ||
+        s.contains('envelopado')) {
       return Icons.format_paint_rounded;
     }
-    if (s.contains('observação') || s.contains('amassado') || s.contains('riscado') || s.contains('obstruído') || s.contains('alongado') || s.contains('consideração') || s.contains('sem acesso') || s.contains('inexistente') || s.contains('remarcad')) {
+    if (s.contains('observação') ||
+        s.contains('amassado') ||
+        s.contains('riscado') ||
+        s.contains('obstruído') ||
+        s.contains('alongado') ||
+        s.contains('consideração') ||
+        s.contains('sem acesso') ||
+        s.contains('inexistente') ||
+        s.contains('remarcad')) {
       return Icons.warning_rounded;
     }
 
     // CONFORME
-    if (s.contains('original') || s.contains('perfeito') || s.contains('padr') || 
-        s.contains('regular') || s.contains('sem reparo')) {
+    if (s.contains('original') ||
+        s.contains('perfeito') ||
+        s.contains('padr') ||
+        s.contains('regular') ||
+        s.contains('sem reparo')) {
       return Icons.check_circle_rounded;
     }
 

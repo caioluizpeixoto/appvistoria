@@ -10,8 +10,7 @@ class AppConstants {
         categoria: 'identificacao', nome: 'Gravação do chassi', ordem: 3),
     ItemTemplate(
         categoria: 'identificacao', nome: 'Gravação do motor', ordem: 4),
-    ItemTemplate(
-        categoria: 'identificacao', nome: 'KM / Hodômetro', ordem: 5),
+    ItemTemplate(categoria: 'identificacao', nome: 'KM / Hodômetro', ordem: 5),
     ItemTemplate(
         categoria: 'identificacao',
         nome: 'Etiqueta de identificação',
@@ -19,8 +18,7 @@ class AppConstants {
     ItemTemplate(
         categoria: 'identificacao', nome: 'Cinto de segurança', ordem: 7),
     // ── Vidros ───────────────────────────────────────────────────────────────
-    ItemTemplate(
-        categoria: 'vidros', nome: 'Gravação vidro frontal', ordem: 1),
+    ItemTemplate(categoria: 'vidros', nome: 'Gravação vidro frontal', ordem: 1),
     ItemTemplate(
         categoria: 'vidros', nome: 'Gravação vidro traseiro', ordem: 2),
     ItemTemplate(
@@ -41,52 +39,31 @@ class AppConstants {
         ordem: 6),
     // ── Estrutura ────────────────────────────────────────────────────────────
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina dianteira direita',
-        ordem: 1),
+        categoria: 'estrutura', nome: 'Longarina dianteira direita', ordem: 1),
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina dianteira esquerda',
-        ordem: 2),
+        categoria: 'estrutura', nome: 'Longarina dianteira esquerda', ordem: 2),
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina centro direita',
-        ordem: 3),
+        categoria: 'estrutura', nome: 'Longarina centro direita', ordem: 3),
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina centro esquerda',
-        ordem: 4),
+        categoria: 'estrutura', nome: 'Longarina centro esquerda', ordem: 4),
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina traseira direita',
-        ordem: 5),
+        categoria: 'estrutura', nome: 'Longarina traseira direita', ordem: 5),
     ItemTemplate(
-        categoria: 'estrutura',
-        nome: 'Longarina traseira esquerda',
-        ordem: 6),
-    ItemTemplate(
-        categoria: 'estrutura', nome: 'Painel dianteiro', ordem: 7),
-    ItemTemplate(
-        categoria: 'estrutura', nome: 'Painel traseiro', ordem: 8),
+        categoria: 'estrutura', nome: 'Longarina traseira esquerda', ordem: 6),
+    ItemTemplate(categoria: 'estrutura', nome: 'Painel dianteiro', ordem: 7),
+    ItemTemplate(categoria: 'estrutura', nome: 'Painel traseiro', ordem: 8),
     ItemTemplate(categoria: 'estrutura', nome: 'Teto', ordem: 9),
     ItemTemplate(categoria: 'estrutura', nome: 'Assoalho', ordem: 10),
     // ── Extras ───────────────────────────────────────────────────────────────
-    ItemTemplate(
-        categoria: 'extras',
-        nome: 'Painel de instrumentos',
-        ordem: 1),
-    ItemTemplate(
-        categoria: 'extras', nome: 'Frente esquerda 45°', ordem: 2),
-    ItemTemplate(
-        categoria: 'extras', nome: 'Traseira 45°', ordem: 3),
+    ItemTemplate(categoria: 'extras', nome: 'Painel de instrumentos', ordem: 1),
+    ItemTemplate(categoria: 'extras', nome: 'Frente esquerda 45°', ordem: 2),
+    ItemTemplate(categoria: 'extras', nome: 'Traseira 45°', ordem: 3),
   ];
 
   static const List<ItemTemplate> itensCaminhao = [
     ...itensAutomovel,
-    ItemTemplate(
-        categoria: 'extras', nome: 'Painel corta-fogo', ordem: 10),
-    ItemTemplate(
-        categoria: 'extras', nome: 'Plaqueta da cabine', ordem: 11),
+    ItemTemplate(categoria: 'extras', nome: 'Painel corta-fogo', ordem: 10),
+    ItemTemplate(categoria: 'extras', nome: 'Plaqueta da cabine', ordem: 11),
     ItemTemplate(
         categoria: 'vidros',
         nome: 'Para-brisa (original/não original)',
@@ -97,24 +74,19 @@ class AppConstants {
 
   static const List<ItemTemplate> itensMoto = [
     ItemTemplate(categoria: 'identificacao', nome: 'CRLV', ordem: 1),
-    ItemTemplate(
-        categoria: 'identificacao', nome: 'Placa e lacre', ordem: 2),
+    ItemTemplate(categoria: 'identificacao', nome: 'Placa e lacre', ordem: 2),
     ItemTemplate(
         categoria: 'identificacao', nome: 'Gravação do chassi', ordem: 3),
     ItemTemplate(
         categoria: 'identificacao', nome: 'Gravação do motor', ordem: 4),
-    ItemTemplate(
-        categoria: 'identificacao', nome: 'KM / Hodômetro', ordem: 5),
-    ItemTemplate(
-        categoria: 'extras', nome: 'Painel de instrumentos', ordem: 1),
-    ItemTemplate(
-        categoria: 'extras', nome: 'Quadro / chassi', ordem: 2),
+    ItemTemplate(categoria: 'identificacao', nome: 'KM / Hodômetro', ordem: 5),
+    ItemTemplate(categoria: 'extras', nome: 'Painel de instrumentos', ordem: 1),
+    ItemTemplate(categoria: 'extras', nome: 'Quadro / chassi', ordem: 2),
   ];
 
   static const List<ItemTemplate> itensUtilitario = [
     ...itensAutomovel,
-    ItemTemplate(
-        categoria: 'extras', nome: 'Plaqueta do veículo', ordem: 5),
+    ItemTemplate(categoria: 'extras', nome: 'Plaqueta do veículo', ordem: 5),
     ItemTemplate(
         categoria: 'extras', nome: 'Gravação de chassis adicional', ordem: 6),
   ];

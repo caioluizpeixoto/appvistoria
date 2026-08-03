@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../database/app_database.dart';
 import '../../features/vistoria/domain/vistoria_type.dart';
 import '../../features/vistoria/domain/vistoria_wizard_state.dart';
+import '../../features/vistoria/domain/checklist_definitions.dart';
 
 Future<String?> generateChecklistPdf({
   required Vistoria vistoria,
@@ -18,16 +19,23 @@ Future<String?> generateChecklistPdf({
     author: vistoria.vistoriadorNome ?? 'Sistema',
   );
 
-  final isPesado = TipoVistoria.fromString(vistoria.tipoVistoria ?? '') == TipoVistoria.checklistPesado;
-  final isChecklist = TipoVistoria.fromString(vistoria.tipoVistoria ?? '') == TipoVistoria.checklistPesado || TipoVistoria.fromString(vistoria.tipoVistoria ?? '') == TipoVistoria.checklistPasseio || TipoVistoria.fromString(vistoria.tipoVistoria ?? '') == TipoVistoria.vistoriaEntrada;
+  final tipoEnum = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
+  final isPesado = tipoEnum == TipoVistoria.checklistPesado;
+  final isOnibus = tipoEnum == TipoVistoria.checklistOnibus;
+  final isMicroOnibus = tipoEnum == TipoVistoria.checklistMicroOnibus;
+  final isChecklistPasseio = tipoEnum == TipoVistoria.checklistPasseio;
+  final isChecklist = isPesado ||
+      isChecklistPasseio ||
+      isOnibus ||
+      isMicroOnibus ||
+      tipoEnum == TipoVistoria.vistoriaEntrada;
+  final isDynamicChecklist = isPesado || isOnibus || isMicroOnibus;
 
   pw.ImageProvider? logoImage;
   try {
     final logoBytes = await rootBundle.load('assets/images/topo.pdf.png');
     logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
   } catch (_) {}
-
-
 
   pw.ImageProvider? assinaturaImage;
   if (wizardState?.assinaturaPath != null) {
@@ -62,245 +70,310 @@ Future<String?> generateChecklistPdf({
   final fontBold = pw.Font.helveticaBold();
 
   // Helper para construir grupos de itens
-  pw.Widget buildItemCategory(String title, Map<String, String> items) {
-    if (wizardState == null) return pw.SizedBox();
+  List<pw.Widget> buildItemCategory(String title, Map<String, String> items) {
+    if (wizardState == null) return [];
 
     // Filtra os itens que têm algum status
-    final validItems = items.entries.where((e) => wizardState.getStatus(e.key).isNotEmpty).toList();
-    if (validItems.isEmpty) return pw.SizedBox();
+    final validItems = items.entries
+        .where((e) => wizardState.getStatus(e.key).isNotEmpty)
+        .toList();
+    if (validItems.isEmpty) return [];
 
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 15),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            color: primaryColor,
-            width: double.infinity,
-            child: pw.Text(
-              title.toUpperCase(),
-              style: pw.TextStyle(font: fontBold, color: PdfColors.white, fontSize: 12),
-            ),
-          ),
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey300),
-            ),
-            child: pw.Column(
-              children: validItems.asMap().entries.map((entry) {
-                final idx = entry.key;
-                final mapEntry = entry.value;
-                final itemId = mapEntry.key;
-                final itemLabel = mapEntry.value;
-                final status = wizardState.getStatus(itemId);
-                
-                PdfColor statusColor = PdfColors.black;
-                if (status == 'Conforme' || status == 'Sim' || status == 'Funcionando' || status == 'Possui / Escritório') statusColor = conformeColor;
-                if (status == 'Não Conforme' || status == 'Danificado') statusColor = naoConformeColor;
-                if (status == 'Não Possui' || status == 'Não' || status == 'Inexistente' || status == 'Não Tem') statusColor = naoPossuiColor;
-                if (status == 'Está com Cliente') statusColor = PdfColor.fromInt(0xFFFFA500);
-
-                return pw.Container(
-                  color: idx % 2 == 0 ? PdfColors.white : lightBg,
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Expanded(
-                        child: pw.Text(itemLabel, style: pw.TextStyle(font: fontRegular, fontSize: 10, color: secondaryColor)),
-                      ),
-                      pw.Text(
-                        status.toUpperCase(),
-                        style: pw.TextStyle(font: fontBold, fontSize: 10, color: statusColor),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          )
-        ],
+    return [
+      pw.Container(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        color: primaryColor,
+        width: double.infinity,
+        child: pw.Text(
+          title.toUpperCase(),
+          style: pw.TextStyle(
+              font: fontBold, color: PdfColors.white, fontSize: 12),
+        ),
       ),
-    );
+      pw.Table(
+        border: pw.TableBorder.all(color: PdfColors.grey300),
+        columnWidths: {
+          0: const pw.FlexColumnWidth(3),
+          1: const pw.FlexColumnWidth(1),
+        },
+        children: validItems.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final mapEntry = entry.value;
+          final itemId = mapEntry.key;
+          final itemLabel = mapEntry.value;
+          final status = wizardState.getStatus(itemId);
+
+          PdfColor statusColor = PdfColors.black;
+          if (status == 'Conforme' ||
+              status == 'Sim' ||
+              status == 'Funcionando' ||
+              status == 'Possui / Escritório')
+            statusColor = conformeColor;
+          if (status == 'Não Conforme' || status == 'Danificado')
+            statusColor = naoConformeColor;
+          if (status == 'Não Possui' ||
+              status == 'Não' ||
+              status == 'Inexistente' ||
+              status == 'Não Tem') statusColor = naoPossuiColor;
+          if (status == 'Está com Cliente')
+            statusColor = PdfColor.fromInt(0xFFFFA500);
+
+          return pw.TableRow(
+            decoration: pw.BoxDecoration(
+              color: idx % 2 == 0 ? PdfColors.white : lightBg,
+            ),
+            children: [
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: pw.Text(itemLabel,
+                    style: pw.TextStyle(
+                        font: fontRegular,
+                        fontSize: 10,
+                        color: secondaryColor)),
+              ),
+              pw.Padding(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: pw.Text(
+                  status.toUpperCase(),
+                  textAlign: pw.TextAlign.right,
+                  style: pw.TextStyle(
+                      font: fontBold, fontSize: 10, color: statusColor),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+      pw.SizedBox(height: 15),
+    ];
   }
 
   // Página 1: Relatório e Checklist
-  pdf.addPage(
-    pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(32),
-      header: (context) {
-        return pw.Container(
-          margin: const pw.EdgeInsets.only(bottom: 20),
-          child: pw.Column(
-            children: [
-              if (logoImage != null)
-                pw.Container(
-                  width: double.infinity,
-                  height: 120, // Limite de altura
-                  margin: const pw.EdgeInsets.only(bottom: 12),
-                  child: pw.Image(logoImage, fit: pw.BoxFit.contain),
-                ),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text(logoImage == null ? 'LOGO' : '', style: pw.TextStyle(font: fontBold, fontSize: 24)),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('CHECKLIST VEICULAR', style: pw.TextStyle(font: fontBold, fontSize: 18, color: primaryColor)),
-                      pw.SizedBox(height: 4),
-                      pw.Text('Data: ${vistoria.dataHora.day.toString().padLeft(2, '0')}/${vistoria.dataHora.month.toString().padLeft(2, '0')}/${vistoria.dataHora.year}', style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-                      pw.Text('Laudo: ${vistoria.numeroLaudo}', style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
-                    ],
-                  ),
-                ],
+  pdf.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(32),
+    header: (context) {
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 20),
+        child: pw.Column(
+          children: [
+            if (logoImage != null)
+              pw.Container(
+                width: double.infinity,
+                height: 120, // Limite de altura
+                margin: const pw.EdgeInsets.only(bottom: 12),
+                child: pw.Image(logoImage, fit: pw.BoxFit.contain),
               ),
-            ],
-          ),
-        );
-      },
-      footer: (context) {
-        return pw.Container(
-          alignment: pw.Alignment.centerRight,
-          margin: const pw.EdgeInsets.only(top: 10),
-          child: pw.Text(
-            'Página ${context.pageNumber} de ${context.pagesCount}',
-            style: pw.TextStyle(font: fontRegular, fontSize: 10, color: PdfColors.grey),
-          ),
-        );
-      },
-      build: (context) {
-        return [
-          // Informações do Veículo
-          pw.Container(
-            padding: const pw.EdgeInsets.all(12),
-            decoration: pw.BoxDecoration(
-              color: lightBg,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-              border: pw.Border.all(color: primaryColor, width: 1),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text('DADOS DO VEÍCULO', style: pw.TextStyle(font: fontBold, fontSize: 12, color: primaryColor)),
-                pw.SizedBox(height: 8),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                pw.Text(logoImage == null ? 'LOGO' : '',
+                    style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
-                    pw.Expanded(child: pw.Text('PLACA: ${wizardState?.placa.isNotEmpty == true ? wizardState!.placa : (veiculo.placa ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
-                    pw.Expanded(child: pw.Text('MARCA/MODELO: ${wizardState?.marca.isNotEmpty == true ? wizardState!.marca : (veiculo.marca ?? '')} ${wizardState?.modelo.isNotEmpty == true ? wizardState!.modelo : (veiculo.modelo ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
-                    pw.Expanded(child: pw.Text('COR: ${wizardState?.cor.isNotEmpty == true ? wizardState!.cor : (veiculo.cor ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
-                  ],
-                ),
-                pw.SizedBox(height: 4),
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Expanded(child: pw.Text('CHASSI: ${wizardState?.chassiVeiculo.isNotEmpty == true ? wizardState!.chassiVeiculo : (veiculo.chassiVeiculo ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
-                    pw.Expanded(child: pw.Text('RENAVAM: ${wizardState?.renavam.isNotEmpty == true ? wizardState!.renavam : (veiculo.renavam ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
-                    pw.Expanded(child: pw.Text('KM: ${wizardState?.km.isNotEmpty == true ? wizardState!.km : (veiculo.km ?? '')}', style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                    pw.Text('CHECKLIST VEICULAR',
+                        style: pw.TextStyle(
+                            font: fontBold, fontSize: 18, color: primaryColor)),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                        'Data: ${vistoria.dataHora.day.toString().padLeft(2, '0')}/${vistoria.dataHora.month.toString().padLeft(2, '0')}/${vistoria.dataHora.year}',
+                        style:
+                            pw.TextStyle(fontSize: 10, color: secondaryColor)),
+                    pw.Text('Laudo: ${vistoria.numeroLaudo}',
+                        style:
+                            pw.TextStyle(fontSize: 10, color: secondaryColor)),
                   ],
                 ),
               ],
             ),
+          ],
+        ),
+      );
+    },
+    footer: (context) {
+      return pw.Container(
+        alignment: pw.Alignment.centerRight,
+        margin: const pw.EdgeInsets.only(top: 10),
+        child: pw.Text(
+          'Página ${context.pageNumber} de ${context.pagesCount}',
+          style: pw.TextStyle(
+              font: fontRegular, fontSize: 10, color: PdfColors.grey),
+        ),
+      );
+    },
+    build: (context) {
+      return [
+        // Informações do Veículo
+        pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            color: lightBg,
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+            border: pw.Border.all(color: primaryColor, width: 1),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('DADOS DO VEÍCULO',
+                  style: pw.TextStyle(
+                      font: fontBold, fontSize: 12, color: primaryColor)),
+              pw.SizedBox(height: 8),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Expanded(
+                      child: pw.Text(
+                          'PLACA: ${wizardState?.placa.isNotEmpty == true ? wizardState!.placa : (veiculo.placa ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                  pw.Expanded(
+                      child: pw.Text(
+                          'MARCA/MODELO: ${wizardState?.marca.isNotEmpty == true ? wizardState!.marca : (veiculo.marca ?? '')} ${wizardState?.modelo.isNotEmpty == true ? wizardState!.modelo : (veiculo.modelo ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                  pw.Expanded(
+                      child: pw.Text(
+                          'COR: ${wizardState?.cor.isNotEmpty == true ? wizardState!.cor : (veiculo.cor ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                ],
+              ),
+              pw.SizedBox(height: 4),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Expanded(
+                      child: pw.Text(
+                          'CHASSI: ${wizardState?.chassiVeiculo.isNotEmpty == true ? wizardState!.chassiVeiculo : (veiculo.chassiVeiculo ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                  pw.Expanded(
+                      child: pw.Text(
+                          'RENAVAM: ${wizardState?.renavam.isNotEmpty == true ? wizardState!.renavam : (veiculo.renavam ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                  pw.Expanded(
+                      child: pw.Text(
+                          'KM: ${wizardState?.km.isNotEmpty == true ? wizardState!.km : (veiculo.km ?? '')}',
+                          style: pw.TextStyle(font: fontBold, fontSize: 11))),
+                ],
+              ),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 20),
+
+        // Medidas e Complementos (Caminhões)
+        if (isPesado &&
+            wizardState != null &&
+            wizardState.medidasComplementos.values
+                .any((v) => v.isNotEmpty)) ...[
+          pw.Text('MEDIDAS E COMPLEMENTOS',
+              style: pw.TextStyle(
+                  font: fontBold, fontSize: 12, color: primaryColor)),
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300)),
+            child: pw.Wrap(
+              spacing: 20,
+              runSpacing: 8,
+              children: wizardState.medidasComplementos.entries
+                  .where((e) => e.value.isNotEmpty)
+                  .map((e) {
+                return pw.SizedBox(
+                  width: 200,
+                  child: pw.Text('${_formatKey(e.key)}: ${e.value}',
+                      style: pw.TextStyle(font: fontRegular, fontSize: 10)),
+                );
+              }).toList(),
+            ),
           ),
           pw.SizedBox(height: 20),
+        ],
 
-          // Medidas e Complementos (Caminhões)
-          if (isPesado && wizardState != null && wizardState.medidasComplementos.values.any((v) => v.isNotEmpty)) ...[
-            pw.Text('MEDIDAS E COMPLEMENTOS', style: pw.TextStyle(font: fontBold, fontSize: 12, color: primaryColor)),
-            pw.SizedBox(height: 8),
-            pw.Container(
-              padding: const pw.EdgeInsets.all(8),
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
-              child: pw.Wrap(
-                spacing: 20,
-                runSpacing: 8,
-                children: wizardState.medidasComplementos.entries.where((e) => e.value.isNotEmpty).map((e) {
-                  return pw.SizedBox(
-                    width: 200,
-                    child: pw.Text('${_formatKey(e.key)}: ${e.value}', style: pw.TextStyle(font: fontRegular, fontSize: 10)),
-                  );
-                }).toList(),
-              ),
+        // Listas de Checklist
+        if (isDynamicChecklist)
+          ...getChecklistCategories(tipoEnum).entries.expand((cat) {
+            return buildItemCategory(cat.key, cat.value);
+          }).toList()
+        else ...[
+          ...buildItemCategory(
+              'Itens Externos e Equipamentos', _getItensVeiculo(isPesado)),
+          ...buildItemCategory(
+              isPesado ? 'Descrição Cabine' : 'Interior do Veículo',
+              _getItensCabine(isPesado)),
+          if (isPesado) ...buildItemCategory('Itens Carreta', _getItensCarreta()),
+          if (isPesado) ...buildItemCategory('Baterias', _getBaterias()),
+          ...buildItemCategory('Itens Escritório', _getItensEscritorio(isPesado)),
+        ],
+
+        pw.SizedBox(height: 30),
+
+        // Assinaturas
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+          children: [
+            pw.Column(
+              children: [
+                if (assinaturaImage != null)
+                  pw.Container(
+                    height: 50,
+                    width: 150,
+                    child: pw.Image(assinaturaImage, fit: pw.BoxFit.contain),
+                  )
+                else
+                  pw.SizedBox(height: 50),
+                pw.Container(width: 200, height: 1, color: PdfColors.black),
+                pw.SizedBox(height: 4),
+                pw.Text('VISTORIADOR: ${vistoria.vistoriadorNome ?? ''}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 10)),
+              ],
             ),
-            pw.SizedBox(height: 20),
-          ],
-
-          // Listas de Checklist
-          buildItemCategory('Itens Externos e Equipamentos', _getItensVeiculo(isPesado)),
-          buildItemCategory(isPesado ? 'Descrição Cabine' : 'Interior do Veículo', _getItensCabine(isPesado)),
-          if (isPesado) buildItemCategory('Itens Carreta', _getItensCarreta()),
-          if (isPesado) buildItemCategory('Baterias', _getBaterias()),
-          buildItemCategory('Itens Escritório', _getItensEscritorio(isPesado)),
-
-          pw.SizedBox(height: 30),
-
-          // Assinaturas
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-            children: [
+            if (!isChecklist)
               pw.Column(
                 children: [
-                  if (assinaturaImage != null)
+                  if (assinaturaClienteImage != null)
                     pw.Container(
                       height: 50,
                       width: 150,
-                      child: pw.Image(assinaturaImage, fit: pw.BoxFit.contain),
+                      child: pw.Image(assinaturaClienteImage,
+                          fit: pw.BoxFit.contain),
                     )
                   else
                     pw.SizedBox(height: 50),
                   pw.Container(width: 200, height: 1, color: PdfColors.black),
                   pw.SizedBox(height: 4),
-                  pw.Text('VISTORIADOR: ${vistoria.vistoriadorNome ?? ''}', style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                  pw.Text('CLIENTE: ${vistoria.clienteNome ?? ''}',
+                      style: pw.TextStyle(font: fontBold, fontSize: 10)),
                 ],
               ),
-              if (!isChecklist)
-                pw.Column(
-                  children: [
-                    if (assinaturaClienteImage != null)
-                      pw.Container(
-                        height: 50,
-                        width: 150,
-                        child: pw.Image(assinaturaClienteImage, fit: pw.BoxFit.contain),
-                      )
-                    else
-                      pw.SizedBox(height: 50),
-                    pw.Container(width: 200, height: 1, color: PdfColors.black),
-                    pw.SizedBox(height: 4),
-                    pw.Text('CLIENTE: ${vistoria.clienteNome ?? ''}', style: pw.TextStyle(font: fontBold, fontSize: 10)),
-                  ],
-                ),
-            ],
-          ),
-        ];
-      },
-    )
-  );
+          ],
+        ),
+      ];
+    },
+  ));
 
   // Anexos (Fotos)
   if (wizardState != null) {
     final fotosComImagens = wizardState.fotosLocais.entries
-      .where((e) => e.value.isNotEmpty)
-      .toList();
-    
+        .where((e) => e.value.isNotEmpty)
+        .toList();
+
     if (fotosComImagens.isNotEmpty) {
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          header: (context) {
-            return pw.Container(
-              margin: const pw.EdgeInsets.only(bottom: 20),
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Text('ANEXOS FOTOGRÁFICOS', style: pw.TextStyle(font: fontBold, fontSize: 16, color: primaryColor)),
-            );
-          },
-          build: (context) {
-            List<pw.Widget> photoWidgets = [];
-            
+      pdf.addPage(pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) {
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 20),
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text('ANEXOS FOTOGRÁFICOS',
+                style: pw.TextStyle(
+                    font: fontBold, fontSize: 16, color: primaryColor)),
+          );
+        },
+        build: (context) {
+          List<pw.Widget> photoWidgets = [];
+
+          /* TEMPORARIAMENTE REMOVIDO PARA ACELERAR O PDF
             for (final entry in fotosComImagens) {
               final item = entry.key;
               for (final path in entry.value) {
@@ -332,17 +405,22 @@ Future<String?> generateChecklistPdf({
                 } catch (_) {}
               }
             }
+            */
+          if (photoWidgets.isEmpty) {
+            photoWidgets.add(pw.Text(
+                'Fotos foram temporariamente ocultadas para acelerar a geração do laudo.',
+                style: pw.TextStyle(color: PdfColors.grey)));
+          }
 
-            return [
-              pw.Wrap(
-                spacing: 20,
-                runSpacing: 20,
-                children: photoWidgets,
-              )
-            ];
-          },
-        )
-      );
+          return [
+            pw.Wrap(
+              spacing: 20,
+              runSpacing: 20,
+              children: photoWidgets,
+            )
+          ];
+        },
+      ));
     }
   }
 
@@ -363,18 +441,30 @@ String widgetId(Vistoria vistoria) => vistoria.id;
 
 String _formatKey(String key) {
   switch (key) {
-    case 'dataTrocaOleo': return 'Data Troca Óleo';
-    case 'kmTrocaOleo': return 'KM Troca Óleo';
-    case 'tipoTrocaMotor': return 'Troca Motor';
-    case 'tipoTrocaCambio': return 'Troca Câmbio';
-    case 'tipoTrocaDiferencial': return 'Troca Diferencial';
-    case 'implementoDescricao': return 'Desc. Implemento';
-    case 'implementoMarca': return 'Marca Implemento';
-    case 'implementoEntreEixo': return 'Entre Eixos';
-    case 'implementoComprimento': return 'Comprimento';
-    case 'implementoLargura': return 'Largura';
-    case 'implementoAltura': return 'Altura';
-    default: return key;
+    case 'dataTrocaOleo':
+      return 'Data Troca Óleo';
+    case 'kmTrocaOleo':
+      return 'KM Troca Óleo';
+    case 'tipoTrocaMotor':
+      return 'Troca Motor';
+    case 'tipoTrocaCambio':
+      return 'Troca Câmbio';
+    case 'tipoTrocaDiferencial':
+      return 'Troca Diferencial';
+    case 'implementoDescricao':
+      return 'Desc. Implemento';
+    case 'implementoMarca':
+      return 'Marca Implemento';
+    case 'implementoEntreEixo':
+      return 'Entre Eixos';
+    case 'implementoComprimento':
+      return 'Comprimento';
+    case 'implementoLargura':
+      return 'Largura';
+    case 'implementoAltura':
+      return 'Altura';
+    default:
+      return key;
   }
 }
 

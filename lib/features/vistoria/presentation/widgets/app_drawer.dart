@@ -23,7 +23,8 @@ class AppDrawer extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 ListTile(
-                  leading: const Icon(Icons.fact_check_rounded, color: AppTheme.textSecondary),
+                  leading: const Icon(Icons.fact_check_rounded,
+                      color: AppTheme.textSecondary),
                   title: const Text(
                     'Laudos Locais',
                     style: TextStyle(
@@ -38,7 +39,8 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.cloud_sync_rounded, color: AppTheme.textSecondary),
+                  leading: const Icon(Icons.cloud_sync_rounded,
+                      color: AppTheme.textSecondary),
                   title: const Text(
                     'Histórico de Consultas',
                     style: TextStyle(
@@ -170,9 +172,10 @@ class _DrawerFooter extends StatelessWidget {
               final authBloc = context.read<AuthBloc>();
               // Fechar o drawer primeiro
               Navigator.pop(context);
-              
+
               showDialog(
-                context: context, // Nota: idealmente não se usa context após pop, mas como o flutter ainda encontra o navigator raiz, funciona.
+                context:
+                    context, // Nota: idealmente não se usa context após pop, mas como o flutter ainda encontra o navigator raiz, funciona.
                 builder: (dialogCtx) => AlertDialog(
                   title: const Text('Sair'),
                   content: const Text('Deseja encerrar a sessão?'),

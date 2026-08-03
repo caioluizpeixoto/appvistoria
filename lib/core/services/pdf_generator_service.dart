@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -23,6 +24,16 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'pdf_checklist_generator.dart';
 import '../../features/consulta_bin/domain/entities/radar_veiculo.dart';
+
+Uint8List _processGrayscaleImage(Uint8List uint8list) {
+  final decodedImage = img.decodeImage(uint8list);
+  if (decodedImage != null) {
+    img.grayscale(decodedImage);
+    final bwBytes = img.encodePng(decodedImage);
+    return Uint8List.fromList(bwBytes);
+  }
+  return uint8list;
+}
 
 // ── Paleta PDF ──────────────────────────────────────────────────────────────
 const _kBlack = PdfColor.fromInt(0xFF222222);
@@ -143,12 +154,7 @@ class PdfGeneratorService {
       final uint8list = logoBytes.buffer.asUint8List();
       logoImage = pw.MemoryImage(uint8list);
 
-      final decodedImage = img.decodeImage(uint8list);
-      if (decodedImage != null) {
-        img.grayscale(decodedImage);
-        final bwBytes = img.encodePng(decodedImage);
-        marcaAguaBw = pw.MemoryImage(Uint8List.fromList(bwBytes));
-      }
+      marcaAguaBw = logoImage;
     } catch (_) {}
 
     pw.ImageProvider? carroEstruturaImage;
@@ -228,6 +234,7 @@ class PdfGeneratorService {
         'traseira_esquerda',
         'traseira_direita',
       ],
+      /* TEMPORARIAMENTE REMOVIDO PARA ACELERAR O PDF
       'FOTOS PRINCIPAIS - VIDROS': [
         'vidro_frontal',
         if (wizardState?.getStatus('vidro_traseiro').toUpperCase() !=
@@ -291,6 +298,7 @@ class PdfGeneratorService {
           'peca_porta_dianteira_direita',
           'peca_paralama_dianteiro_direito',
         ],
+      */
     };
 
     bool hasAnyPhoto = false;
@@ -370,6 +378,7 @@ class PdfGeneratorService {
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Expanded(
+                      flex: 4,
                       child: pw.Container(
                           padding: const pw.EdgeInsets.all(6),
                           decoration: pw.BoxDecoration(
@@ -393,6 +402,7 @@ class PdfGeneratorService {
                               ]))),
                   pw.SizedBox(width: 8),
                   pw.Expanded(
+                      flex: 6,
                       child: pw.Container(
                           padding: const pw.EdgeInsets.all(6),
                           decoration: pw.BoxDecoration(
@@ -499,7 +509,8 @@ class PdfGeneratorService {
               ));
               widgets.add(pw.SizedBox(height: 6));
 
-              pw.Widget buildPhotoItem(Map<String, dynamic> f) {
+              pw.Widget buildPhotoItem(Map<String, dynamic> f,
+                  {bool isLarge = false}) {
                 final label = (f['label'] as String? ?? '').toUpperCase();
                 pw.Widget imageWidget;
 
@@ -539,8 +550,8 @@ class PdfGeneratorService {
                 }
 
                 return pw.Container(
-                  width: 270.0,
-                  height: 180.0,
+                  width: isLarge ? 270.0 : 170.0,
+                  height: isLarge ? 180.0 : 113.0,
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
                     color: PdfColors.white,
@@ -575,8 +586,12 @@ class PdfGeneratorService {
                 final titulo = section['titulo'] as String;
                 final fotos = section['fotos'] as List<Map<String, dynamic>>;
 
-                final firstRow = fotos.take(2).toList();
-                final rest = fotos.skip(2).toList();
+                final isIdentificacao =
+                    titulo.toUpperCase().contains('IDENTIFICA');
+                final itemsPerRow = isIdentificacao ? 2 : 3;
+
+                final firstRow = fotos.take(itemsPerRow).toList();
+                final rest = fotos.skip(itemsPerRow).toList();
 
                 widgets.add(pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -600,7 +615,10 @@ class PdfGeneratorService {
                             pw.Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: firstRow.map(buildPhotoItem).toList(),
+                              children: firstRow
+                                  .map((f) => buildPhotoItem(f,
+                                      isLarge: isIdentificacao))
+                                  .toList(),
                             ),
                           ]))
                     ]));
@@ -610,7 +628,9 @@ class PdfGeneratorService {
                   widgets.add(pw.Wrap(
                     spacing: 8,
                     runSpacing: 8,
-                    children: rest.map(buildPhotoItem).toList(),
+                    children: rest
+                        .map((f) => buildPhotoItem(f, isLarge: isIdentificacao))
+                        .toList(),
                   ));
                 }
 
@@ -744,6 +764,16 @@ class PdfGeneratorService {
       ));
     }
 
+    if (wizardState?.realizarChecklistOpcional == true) {
+      pdf.addPage(_buildPageChecklistOpcional(
+        state: wizardState!,
+        vistoria: vistoria,
+        styles: styles,
+        logo: logoImage,
+        backgroundImage: bgImage,
+      ));
+    }
+
     if (!hasAnyPhoto) {
       pdf.addPage(pw.Page(
           pageFormat: PdfPageFormat.a4,
@@ -789,9 +819,9 @@ class PdfGeneratorService {
           'fuel': veiculo.combustivel ?? '',
           'engine': veiculo.motorVeiculo ?? '',
           if (apontamentosList.isNotEmpty) 'apontamentos': apontamentosList,
-          'uf': await _obterUfPorGps() ?? veiculo.uf ?? '',
+          'uf': veiculo.uf ?? '',
         },
-      ).timeout(const Duration(seconds: 60));
+      ).timeout(const Duration(seconds: 45));
 
       if (resFicha.status == 200 && resFicha.data != null) {
         final data =
@@ -846,7 +876,8 @@ class PdfGeneratorService {
 
     try {
       final storagePath = '${vistoria.id}/${vistoria.numeroLaudo}.pdf';
-      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+      // Removido o 'await' para que o upload ocorra em segundo plano e não trave a geração local
+      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
             storagePath,
             finalBytes,
             fileOptions:
@@ -964,49 +995,63 @@ class PdfGeneratorService {
 
   pw.Widget _buildHeader(
       Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo,
-      {VistoriaWizardState? state}) {
+      {VistoriaWizardState? state, bool showQr = false}) {
     return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 12),
-      child: pw.Column(
+      margin: const pw.EdgeInsets.only(bottom: 4),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
-          // Banner/Logo full width
+          // Logo on the left side, horizontally aligned with texts
           if (logo != null)
             pw.Container(
-              width: double.infinity,
-              height: 90, // Reduzido para evitar que a logo com bordas transparentes empurre o conteúdo
-              margin: const pw.EdgeInsets.only(bottom: 12),
+              width: 200,
+              height: 100,
+              margin: const pw.EdgeInsets.only(right: 12),
               child: pw.Image(logo, fit: pw.BoxFit.contain),
             ),
-          pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              // Numero do Laudo
-              pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  mainAxisAlignment: pw.MainAxisAlignment.center,
-                  children: [
-                    pw.Text('LAUDO CAUTELAR',
-                        style: pw.TextStyle(
-                            font: styles.bold, fontSize: 14, color: _kBlack)),
-                    pw.SizedBox(height: 4),
-                    pw.Text('Número do Laudo: ${vistoria.numeroLaudo}',
-                        style: pw.TextStyle(
-                            font: styles.bold, fontSize: 10, color: _kGreyDark)),
-                  ],
-                ),
-              ),
-              // QR Code
-              pw.BarcodeWidget(
-                barcode: pw.Barcode.qrCode(),
-                data: Supabase.instance.client.storage
-                    .from('laudos-pdf')
-                    .getPublicUrl('${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
-                width: 50,
-                height: 50,
-              ),
-            ],
+          // Numero do Laudo
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              mainAxisAlignment: pw.MainAxisAlignment.center,
+              children: [
+                pw.Text('LAUDO CAUTELAR',
+                    style: pw.TextStyle(
+                        font: styles.bold, fontSize: 14, color: _kBlack)),
+                pw.SizedBox(height: 4),
+                pw.Text('Número do Laudo: ${vistoria.numeroLaudo}',
+                    style: pw.TextStyle(
+                        font: styles.bold, fontSize: 10, color: _kGreyDark)),
+              ],
+            ),
           ),
+          // QR Code Estilizado (Apenas se showQr for true)
+          if (showQr)
+            pw.Container(
+              padding: const pw.EdgeInsets.all(3),
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: _kGreyDark, width: 1),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Column(
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: [
+                  pw.BarcodeWidget(
+                    barcode: pw.Barcode.qrCode(),
+                    data: Supabase.instance.client.storage
+                        .from('laudos-pdf')
+                        .getPublicUrl(
+                            '${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
+                    width: 40,
+                    height: 40,
+                  ),
+                  pw.SizedBox(height: 2),
+                  pw.Text('VERIFICAR',
+                      style: pw.TextStyle(
+                          font: styles.bold, fontSize: 5, color: _kBlack)),
+                ],
+              ),
+            ),
         ],
       ),
     );
@@ -1098,13 +1143,17 @@ class PdfGeneratorService {
     pw.ImageProvider? marcaAgua,
     RadarVeiculo? radarVeiculo,
   }) async {
-    final bgColor = PdfColor.fromHex('0B3B24'); // Verde muito escuro (cabeçalho)
+    final bgColor =
+        PdfColor.fromHex('0B3B24'); // Verde muito escuro (cabeçalho)
     final bannerColor = PdfColor.fromHex('1F5E3D');
     final iconBlockGreen = PdfColor.fromHex('1F5E3D');
     final iconBlockRed = PdfColor.fromHex('C62828');
     final zebraGrey = PdfColor.fromHex('F5F5F5');
     final greyBorder = PdfColor.fromHex('E0E0E0');
     final textColor = PdfColor.fromHex('424242');
+    final limeGreen = PdfColor.fromHex('8CC63F');
+    final warningYellow = PdfColor.fromHex('FBB03B');
+    final dangerRed = PdfColor.fromHex('EE4036');
 
     // Material SVGs
     final String svgCarShield =
@@ -1152,9 +1201,9 @@ class PdfGeneratorService {
         border = pw.Border.all(color: greyBorder, width: 1);
       }
 
-      final String finalSvg =
-          svgRaw.replaceAll('{color}', bgType == 'white' ? '#424242' : '#ffffff');
-      
+      final String finalSvg = svgRaw.replaceAll(
+          '{color}', bgType == 'white' ? '#424242' : '#ffffff');
+
       // Calculate block width for 5 items per row: (A4 width 595 - 40px margins - 4*6px spacing) / 5 = 106
       return pw.Container(
         width: 106,
@@ -1304,7 +1353,9 @@ class PdfGeneratorService {
                           if (logo == null)
                             pw.Text('PRIME AUTO',
                                 style: pw.TextStyle(
-                                    color: PdfColors.white, font: styles.bold, fontSize: 24)),
+                                    color: PdfColors.white,
+                                    font: styles.bold,
+                                    fontSize: 24)),
                           pw.SizedBox(height: 8),
                           pw.Text('PERÍCIA CAUTELAR',
                               style: pw.TextStyle(
@@ -1385,197 +1436,246 @@ class PdfGeneratorService {
                             horizontal: 20, vertical: 8),
                         child: pw.Column(
                           children: [
-                      buildBanner(
-                          'INFORMAÇÕES BASEADAS NA CONSULTA AO VEÍCULO'),
-                      
-                      // Grid of 10 Blocks (5 cols x 2 rows)
-                      pw.Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        alignment: pw.WrapAlignment.start,
-                        children: [
-                          buildBlock('RESTRIÇÕES',
-                              hasRestricoes ? 'red' : 'green', svgCarShield),
-                          buildBlock('DÉBITOS E\nMULTAS',
-                              hasDebitos ? 'red' : 'green', svgReceipt),
-                          buildBlock(
-                              'LEILÃO /\nSINISTRO',
-                              (hasLeilao || hasSinistro) ? 'red' : 'green',
-                              svgLeilao),
-                          buildBlock('HISTÓRICO\nDE FURTO', hasRoubo ? 'red' : 'green', svgShieldSearch),
-                          buildBlock('ROUBO /\nFURTO',
-                              hasRoubo ? 'red' : 'green', svgCarWarning),
-                          buildBlock('FINANCIAMENTO',
-                              hasRestricaoFin ? 'red' : 'green', svgBank),
-                          buildBlock('COMUNICAÇÃO\nDE VENDA',
-                              hasComunicacao ? 'red' : 'green', svgHandshake),
-                          buildBlock(
-                              'IPVA\n(ÚLTIMOS 5 ANOS)',
-                              res['debitosipva'] == 'Sim' ? 'red' : 'green',
-                              svgCalendar),
-                          buildBlock('RECALL', hasRecall ? 'red' : 'green',
-                              svgCarWrench),
-                          buildBlock('ALERTA DE\nINDÍCIO', 'green',
-                              svgWarningTriangle),
-                        ],
+                            buildBanner(
+                                'INFORMAÇÕES BASEADAS NA CONSULTA AO VEÍCULO'),
+
+                            // Grid of 10 Blocks (5 cols x 2 rows)
+                            pw.Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              alignment: pw.WrapAlignment.start,
+                              children: [
+                                buildBlock(
+                                    'RESTRIÇÕES',
+                                    hasRestricoes ? 'red' : 'green',
+                                    svgCarShield),
+                                buildBlock('DÉBITOS E\nMULTAS',
+                                    hasDebitos ? 'red' : 'green', svgReceipt),
+                                buildBlock(
+                                    'LEILÃO /\nSINISTRO',
+                                    (hasLeilao || hasSinistro)
+                                        ? 'red'
+                                        : 'green',
+                                    svgLeilao),
+                                buildBlock(
+                                    'HISTÓRICO\nDE FURTO',
+                                    hasRoubo ? 'red' : 'green',
+                                    svgShieldSearch),
+                                buildBlock('ROUBO /\nFURTO',
+                                    hasRoubo ? 'red' : 'green', svgCarWarning),
+                                buildBlock('FINANCIAMENTO',
+                                    hasRestricaoFin ? 'red' : 'green', svgBank),
+                                buildBlock(
+                                    'COMUNICAÇÃO\nDE VENDA',
+                                    hasComunicacao ? 'red' : 'green',
+                                    svgHandshake),
+                                buildBlock(
+                                    'IPVA\n(ÚLTIMOS 5 ANOS)',
+                                    res['debitosipva'] == 'Sim'
+                                        ? 'red'
+                                        : 'green',
+                                    svgCalendar),
+                                buildBlock('RECALL',
+                                    hasRecall ? 'red' : 'green', svgCarWrench),
+                                buildBlock('ALERTA DE\nINDÍCIO', 'green',
+                                    svgWarningTriangle),
+                              ],
+                            ),
+
+                            pw.SizedBox(height: 6),
+                            pw.Text('DADOS DO VEÍCULO',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 9,
+                                    color: limeGreen),
+                                textAlign: pw.TextAlign.left),
+                            pw.Divider(color: greyBorder, height: 4),
+
+                            buildRow(
+                                'PLACA:',
+                                veiculo.placa.toUpperCase(),
+                                'ANO FAB/MOD:',
+                                '${veiculo.anoFabricacao}/${veiculo.anoModelo}',
+                                true),
+                            buildRow(
+                                'RENAVAM:',
+                                veiculo.renavam?.toUpperCase() ??
+                                    'NÃO INFORMADO',
+                                'MARCA:',
+                                veiculo.marca?.toUpperCase() ?? '',
+                                false),
+                            buildRow(
+                                'Nº CHASSI:',
+                                veiculo.chassiVeiculo?.toUpperCase() ??
+                                    'NÃO INFORMADO',
+                                'MODELO:',
+                                veiculo.modelo?.toUpperCase() ?? '',
+                                true),
+                            buildRow(
+                                'Nº MOTOR:',
+                                veiculo.motorVeiculo?.toUpperCase() ??
+                                    'NÃO INFORMADO',
+                                'COR:',
+                                veiculo.cor?.toUpperCase() ?? '',
+                                false),
+                            buildRow(
+                                '',
+                                '',
+                                'COMBUSTÍVEL:',
+                                res['combustivel']?.toString().toUpperCase() ??
+                                    veiculo.combustivel?.toUpperCase() ??
+                                    'NÃO INFORMADO',
+                                true),
+                            buildRow(
+                                '',
+                                '',
+                                'CATEGORIA:',
+                                res['categoria']?.toString().toUpperCase() ??
+                                    'PARTICULAR',
+                                false),
+
+                            pw.SizedBox(height: 6),
+                            pw.Text('RESTRIÇÕES',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 9,
+                                    color: limeGreen),
+                                textAlign: pw.TextAlign.left),
+                            pw.Divider(color: greyBorder, height: 4),
+                            buildRow(
+                                'RESTRIÇÃO FINANCEIRA:',
+                                hasRestricaoFin ? 'SIM' : 'NÃO',
+                                'RESTRIÇÃO TRIBUTÁRIA:',
+                                res['restricaotributaria'] != null
+                                    ? 'SIM'
+                                    : 'NÃO',
+                                true),
+                            buildRow(
+                                'RESTRIÇÃO JUDICIAL:',
+                                res['restricaojudicial'] != null
+                                    ? 'SIM'
+                                    : 'NÃO',
+                                'RESTRIÇÃO AMBIENTAL:',
+                                res['restricaoambiental'] != null
+                                    ? 'SIM'
+                                    : 'NÃO',
+                                false),
+                            buildRow(
+                                'RESTRIÇÃO ADMINISTRATIVA:',
+                                res['restricaoadministrativa'] != null
+                                    ? 'SIM'
+                                    : 'NÃO',
+                                'RESTRIÇÃO POLICIAL:',
+                                'NÃO',
+                                true),
+
+                            pw.SizedBox(height: 6),
+                            pw.Text('HISTÓRICO',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 9,
+                                    color: limeGreen),
+                                textAlign: pw.TextAlign.left),
+                            pw.Divider(color: greyBorder, height: 4),
+                            buildRow(
+                                'LEILÃO / SINISTRO:',
+                                (hasLeilao || hasSinistro)
+                                    ? 'CONSTA'
+                                    : 'NÃO CONSTA',
+                                'COMUNICAÇÃO DE VENDA:',
+                                hasComunicacao ? 'CONSTA' : 'NÃO CONSTA',
+                                true),
+                            buildRow(
+                                'ROUBO / FURTO:',
+                                hasRoubo ? 'CONSTA' : 'NÃO CONSTA',
+                                'RECUPERAÇÃO DE ROUBO/FURTO:',
+                                'NÃO CONSTA',
+                                false),
+
+                            pw.SizedBox(height: 6),
+                            pw.Text('DÉBITOS E MULTAS',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 9,
+                                    color: limeGreen),
+                                textAlign: pw.TextAlign.left),
+                            pw.Divider(color: greyBorder, height: 4),
+                            buildRow(
+                                'IPVA (ÚLTIMOS 5 ANOS):',
+                                res['debitosipva'] == 'Sim'
+                                    ? 'CONSTA'
+                                    : 'QUITADO',
+                                'DÉBITOS:',
+                                res['debitos'] == true
+                                    ? 'CONSTA'
+                                    : 'NÃO CONSTA',
+                                true),
+                            buildRow(
+                                'MULTAS:',
+                                res['multas'] == true ? 'CONSTA' : 'NÃO CONSTA',
+                                'LICENCIAMENTO:',
+                                'QUITADO',
+                                false),
+
+                            pw.SizedBox(height: 6),
+                            pw.Text('OUTRAS INFORMAÇÕES',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 9,
+                                    color: limeGreen),
+                                textAlign: pw.TextAlign.left),
+                            pw.Divider(color: greyBorder, height: 4),
+                            buildRow(
+                                'SITUAÇÃO:',
+                                res['situacao']?.toString().toUpperCase() ??
+                                    'CIRCULAÇÃO',
+                                'CAPACIDADE:',
+                                res['capacidade_passageiros']?.toString() ??
+                                    '5 PESSOAS',
+                                true),
+                            buildRow(
+                                'ESPÉCIE:',
+                                res['especie']?.toString().toUpperCase() ??
+                                    'PASSAGEIRO',
+                                'POTÊNCIA:',
+                                res['potencia']?.toString() ?? '',
+                                false),
+                            buildRow(
+                                'TIPO DE VEÍCULO:',
+                                veiculo.tipo.toUpperCase(),
+                                'CILINDRADAS:',
+                                res['cilindradas']?.toString() ?? '',
+                                true),
+                            buildRow(
+                                'MUNICÍPIO/UF:',
+                                '${veiculo.municipio ?? res['municipio']} / ${veiculo.uf ?? res['uf']}'
+                                    .toUpperCase(),
+                                'PESO BRUTO:',
+                                res['pbt']?.toString() ?? '',
+                                false),
+
+                            pw.SizedBox(height: 16),
+                            pw.Text(
+                                '* ESTA CONSULTA NÃO SUBSTITUI A VISTORIA FÍSICA DO VEÍCULO.',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 8,
+                                    color: bannerColor)),
+                            pw.Text(
+                                'As informações apresentadas neste relatório são baseadas em dados disponibilizados por órgãos oficiais e fontes privadas na data da consulta.',
+                                style: pw.TextStyle(
+                                    fontSize: 7, color: textColor)),
+                            pw.SizedBox(height: 4),
+                          ],
+                        ),
                       ),
-
-                      pw.SizedBox(height: 6),
-                      buildBanner('DADOS DO VEÍCULO'),
-
-                      buildRow(
-                          'PLACA:',
-                          veiculo.placa.toUpperCase(),
-                          'ANO FAB/MOD:',
-                          '${veiculo.anoFabricacao}/${veiculo.anoModelo}',
-                          true),
-                      buildRow(
-                          'RENAVAM:',
-                          veiculo.renavam?.toUpperCase() ?? 'NÃO INFORMADO',
-                          'MARCA:',
-                          veiculo.marca?.toUpperCase() ?? '',
-                          false),
-                      buildRow(
-                          'Nº CHASSI:',
-                          veiculo.chassiVeiculo?.toUpperCase() ??
-                              'NÃO INFORMADO',
-                          'MODELO:',
-                          veiculo.modelo?.toUpperCase() ?? '',
-                          true),
-                      buildRow(
-                          'Nº MOTOR:',
-                          veiculo.motorVeiculo?.toUpperCase() ??
-                              'NÃO INFORMADO',
-                          'COR:',
-                          veiculo.cor?.toUpperCase() ?? '',
-                          false),
-                      buildRow('', '', 'COMBUSTÍVEL:',
-                          res['combustivel']?.toString().toUpperCase() ?? veiculo.combustivel?.toUpperCase() ?? 'NÃO INFORMADO', true),
-                      buildRow(
-                          '',
-                          '',
-                          'CATEGORIA:',
-                          res['categoria']?.toString().toUpperCase() ??
-                              'PARTICULAR',
-                          false),
-
-                      pw.SizedBox(height: 6),
-                      pw.Text('RESTRIÇÕES',
-                          style: pw.TextStyle(font: styles.bold, fontSize: 9, color: textColor),
-                          textAlign: pw.TextAlign.left),
-                      pw.Divider(color: greyBorder, height: 4),
-                      buildRow(
-                          'RESTRIÇÃO FINANCEIRA:',
-                          hasRestricaoFin ? 'SIM' : 'NÃO',
-                          'RESTRIÇÃO TRIBUTÁRIA:',
-                          res['restricaotributaria'] != null ? 'SIM' : 'NÃO',
-                          true),
-                      buildRow(
-                          'RESTRIÇÃO JUDICIAL:',
-                          res['restricaojudicial'] != null ? 'SIM' : 'NÃO',
-                          'RESTRIÇÃO AMBIENTAL:',
-                          res['restricaoambiental'] != null ? 'SIM' : 'NÃO',
-                          false),
-                      buildRow(
-                          'RESTRIÇÃO ADMINISTRATIVA:',
-                          res['restricaoadministrativa'] != null
-                              ? 'SIM'
-                              : 'NÃO',
-                          'RESTRIÇÃO POLICIAL:',
-                          'NÃO',
-                          true),
-
-                      pw.SizedBox(height: 6),
-                      pw.Text('HISTÓRICO',
-                          style: pw.TextStyle(font: styles.bold, fontSize: 9, color: textColor),
-                          textAlign: pw.TextAlign.left),
-                      pw.Divider(color: greyBorder, height: 4),
-                      buildRow(
-                          'LEILÃO / SINISTRO:',
-                          (hasLeilao || hasSinistro) ? 'CONSTA' : 'NÃO CONSTA',
-                          'COMUNICAÇÃO DE VENDA:',
-                          hasComunicacao ? 'CONSTA' : 'NÃO CONSTA',
-                          true),
-                      buildRow(
-                          'ROUBO / FURTO:',
-                          hasRoubo ? 'CONSTA' : 'NÃO CONSTA',
-                          'RECUPERAÇÃO DE ROUBO/FURTO:',
-                          'NÃO CONSTA',
-                          false),
-
-                      pw.SizedBox(height: 6),
-                      pw.Text('DÉBITOS E MULTAS',
-                          style: pw.TextStyle(font: styles.bold, fontSize: 9, color: textColor),
-                          textAlign: pw.TextAlign.left),
-                      pw.Divider(color: greyBorder, height: 4),
-                      buildRow(
-                          'IPVA (ÚLTIMOS 5 ANOS):',
-                          res['debitosipva'] == 'Sim' ? 'CONSTA' : 'QUITADO',
-                          'DÉBITOS:',
-                          res['debitos'] == true ? 'CONSTA' : 'NÃO CONSTA',
-                          true),
-                      buildRow(
-                          'MULTAS:',
-                          res['multas'] == true ? 'CONSTA' : 'NÃO CONSTA',
-                          'LICENCIAMENTO:',
-                          'QUITADO',
-                          false),
-
-                      pw.SizedBox(height: 6),
-                      pw.Text('OUTRAS INFORMAÇÕES',
-                          style: pw.TextStyle(font: styles.bold, fontSize: 9, color: textColor),
-                          textAlign: pw.TextAlign.left),
-                      pw.Divider(color: greyBorder, height: 4),
-                      buildRow(
-                          'SITUAÇÃO:',
-                          res['situacao']?.toString().toUpperCase() ??
-                              'CIRCULAÇÃO',
-                          'CAPACIDADE:',
-                          res['capacidade_passageiros']?.toString() ??
-                              '5 PESSOAS',
-                          true),
-                      buildRow(
-                          'ESPÉCIE:',
-                          res['especie']?.toString().toUpperCase() ??
-                              'PASSAGEIRO',
-                          'POTÊNCIA:',
-                          res['potencia']?.toString() ?? '',
-                          false),
-                      buildRow(
-                          'TIPO DE VEÍCULO:',
-                          veiculo.tipo.toUpperCase(),
-                          'CILINDRADAS:',
-                          res['cilindradas']?.toString() ?? '',
-                          true),
-                      buildRow(
-                          'MUNICÍPIO/UF:',
-                          '${veiculo.municipio ?? res['municipio']} / ${veiculo.uf ?? res['uf']}'
-                              .toUpperCase(),
-                          'PESO BRUTO:',
-                          res['pbt']?.toString() ?? '',
-                          false),
-
-                      pw.SizedBox(height: 16),
-                      pw.Text(
-                          '* ESTA CONSULTA NÃO SUBSTITUI A VISTORIA FÍSICA DO VEÍCULO.',
-                          style: pw.TextStyle(
-                              font: styles.bold,
-                              fontSize: 8,
-                              color: bannerColor)),
-                      pw.Text(
-                          'As informações apresentadas neste relatório são baseadas em dados disponibilizados por órgãos oficiais e fontes privadas na data da consulta.',
-                          style: pw.TextStyle(fontSize: 7, color: textColor)),
-                      pw.SizedBox(height: 4),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
-          ),
-        ],
-      ),
-    ],
-  );
+          ],
+        );
       },
     );
   }
@@ -1598,7 +1698,6 @@ class PdfGeneratorService {
         computedStatus = state.statusSugerido;
       }
     }
-
     final limeGreen = PdfColor.fromHex('8CC63F');
     final warningYellow = PdfColor.fromHex('FBB03B');
     final dangerRed = PdfColor.fromHex('EE4036');
@@ -1747,11 +1846,11 @@ class PdfGeneratorService {
                     children: [
                       if (logo != null)
                         pw.Container(
-                            width: 200,
-                            height: 100,
+                            width: 300,
+                            height: 160,
                             child: pw.Image(logo, fit: pw.BoxFit.contain))
                       else
-                        pw.SizedBox(width: 200),
+                        pw.SizedBox(width: 300),
                       pw.Column(children: [
                         pw.Text('LAUDO CAUTELAR',
                             style: pw.TextStyle(
@@ -1774,14 +1873,30 @@ class PdfGeneratorService {
                         ),
                       ]),
                       pw.Container(
-                        width: 50,
-                        height: 50,
-                        child: pw.BarcodeWidget(
-                          barcode: pw.Barcode.qrCode(),
-                          data: Supabase.instance.client.storage
-                              .from('laudos-pdf')
-                              .getPublicUrl(
-                                  '${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
+                        padding: const pw.EdgeInsets.all(3),
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(color: _kGreyDark, width: 1),
+                          borderRadius: pw.BorderRadius.circular(4),
+                        ),
+                        child: pw.Column(
+                          mainAxisAlignment: pw.MainAxisAlignment.center,
+                          children: [
+                            pw.BarcodeWidget(
+                              barcode: pw.Barcode.qrCode(),
+                              data: Supabase.instance.client.storage
+                                  .from('laudos-pdf')
+                                  .getPublicUrl(
+                                      '${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
+                              width: 40,
+                              height: 40,
+                            ),
+                            pw.SizedBox(height: 2),
+                            pw.Text('VERIFICAR',
+                                style: pw.TextStyle(
+                                    font: styles.bold,
+                                    fontSize: 5,
+                                    color: _kBlack)),
+                          ],
                         ),
                       ),
                     ]),
@@ -1819,8 +1934,7 @@ class PdfGeneratorService {
                         width: 52,
                         height: 52,
                         decoration: pw.BoxDecoration(
-                            color: statusColor,
-                            shape: pw.BoxShape.circle),
+                            color: statusColor, shape: pw.BoxShape.circle),
                         child: pw.Center(
                             child: pw.SvgImage(
                                 svg: statusIcon, width: 30, height: 30)),
@@ -1836,8 +1950,7 @@ class PdfGeneratorService {
                                     fontSize: 12,
                                     color: PdfColors.grey600)),
                             pw.SizedBox(height: 2),
-                            pw.Text(
-                                computedStatus.toUpperCase(),
+                            pw.Text(computedStatus.toUpperCase(),
                                 style: pw.TextStyle(
                                     font: styles.bold,
                                     fontSize: 18,
@@ -1847,7 +1960,7 @@ class PdfGeneratorService {
                                 'Conclusão baseada na análise dos itens verificados',
                                 style: pw.TextStyle(
                                     font: styles.regular,
-                                    fontSize: 9, 
+                                    fontSize: 9,
                                     color: PdfColors.grey500)),
                           ],
                         ),
@@ -2036,6 +2149,8 @@ class PdfGeneratorService {
     int yellows = itens.where((e) => e['status'] == 1).length;
     int reds = itens.where((e) => e['status'] == 2).length;
     int total = itens.length;
+    final double itemFontSize = total > 18 ? 5.5 : 7.5;
+    final double itemBottomPadding = total > 18 ? 1.5 : 4.0;
 
     return pw.Expanded(
         child: pw.Padding(
@@ -2061,7 +2176,8 @@ class PdfGeneratorService {
                         if (statusVal == 2) dotColor = dangerRed;
 
                         return pw.Padding(
-                            padding: const pw.EdgeInsets.only(bottom: 4),
+                            padding:
+                                pw.EdgeInsets.only(bottom: itemBottomPadding),
                             child: pw.Row(
                                 crossAxisAlignment:
                                     pw.CrossAxisAlignment.center,
@@ -2079,7 +2195,7 @@ class PdfGeneratorService {
                                               font: (statusVal != 0)
                                                   ? styles.bold
                                                   : styles.regular,
-                                              fontSize: 7.5,
+                                              fontSize: itemFontSize,
                                               color: (statusVal != 0)
                                                   ? PdfColors.black
                                                   : PdfColors.grey800))),
@@ -2191,7 +2307,7 @@ class PdfGeneratorService {
             pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                _buildHeader(vistoria, styles, logo, state: state),
+                _buildHeader(vistoria, styles, logo, state: state, showQr: true),
                 _buildBlackBar(
                     'VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
 
@@ -2466,20 +2582,256 @@ class PdfGeneratorService {
   pw.Widget _buildKvSmall(String k, String v, _PdfStyles styles) {
     return pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 2),
-        child: pw.Row(children: [
-          pw.Text(k,
-              style: pw.TextStyle(
-                  font: styles.bold, fontSize: 7.5, color: PdfColors.black)),
-          pw.SizedBox(width: 4),
-          pw.Expanded(
-              child: pw.Text(v,
-                  style: pw.TextStyle(
-                      font: styles.regular,
-                      fontSize: 7.5,
-                      color: PdfColors.grey700),
-                  maxLines: 1,
-                  overflow: pw.TextOverflow.clip)),
-        ]));
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(k,
+                style: pw.TextStyle(
+                    font: styles.bold, fontSize: 7.5, color: PdfColors.black)),
+            pw.SizedBox(width: 4),
+            pw.Expanded(
+                child: pw.Text(v,
+                    style: pw.TextStyle(
+                        font: styles.regular,
+                        fontSize: 7.5,
+                        color: PdfColors.grey700))),
+          ],
+        ));
+  }
+
+  pw.Page _buildPageChecklistOpcional({
+    required VistoriaWizardState state,
+    required Vistoria vistoria,
+    required _PdfStyles styles,
+    pw.ImageProvider? logo,
+    pw.ImageProvider? backgroundImage,
+  }) {
+    final bannerColor = PdfColor.fromHex('D9D9D9');
+
+    final leftCategories = [
+      'PNEUS/RODAS',
+      'PARTE DIANTEIRA',
+      'LATERAL ESQUERDA',
+      'LATERAL DIREITA',
+      'TRASEIRA'
+    ];
+    final rightCategories = [
+      'EQUIPAMENTOS',
+      'BANCOS E REVESTIMENTOS',
+      'EQUIPAMENTOS OBRIGATÓRIOS (SEGURANÇA)',
+      'ACIONAMENTO DO MOTOR'
+    ];
+
+    pw.Widget buildCategoryBlock(String cat) {
+      final map = {
+        'PNEUS/RODAS': [
+          'PNEU DIANTEIRO ESQUERDO',
+          'RODA DIANTEIRA ESQUERDA',
+          'CALOTA DIANTEIRA ESQUERDA',
+          'PNEU TRASEIRO ESQUERDO',
+          'RODA TRASEIRA ESQUERDA',
+          'CALOTA TRASEIRA ESQUERDA',
+          'PNEU ESTEPE',
+          'RODA ESTEPE',
+          'PNEU TRASEIRO DIREITO',
+          'RODA TRASEIRA DIREITA',
+          'CALOTA TRASEIRA DIREITA',
+          'PNEU DIANTEIRO DIREITO',
+          'RODA DIANTEIRA DIREITA',
+          'CALOTA DIANTEIRA DIREITA'
+        ],
+        'PARTE DIANTEIRA': [
+          'CAPÔ',
+          'FAROL DIREITO',
+          'LANTERNA DIREITA',
+          'FAROL DE MILHA DIR.',
+          'PARA-CHOQUE',
+          'GRADE',
+          'PARA-BRISA',
+          'FAROL ESQUERDO',
+          'LANTERNA ESQUERDA',
+          'FAROL DE MILHA ESQUERDO'
+        ],
+        'LATERAL ESQUERDA': [
+          'LATERAL',
+          'VIDRO VIGIA',
+          'VIDRO TRASEIRO',
+          'PORTA TRASEIRA',
+          'VIDRO DIANTEIRO',
+          'PORTA DIANTEIRA',
+          'ESPELHO RETROVISOR',
+          'PARA-LAMA'
+        ],
+        'LATERAL DIREITA': [
+          'LATERAL',
+          'VIDRO VIGIA',
+          'VIDRO TRASEIRO',
+          'PORTA TRASEIRA',
+          'VIDRO DIANTEIRO',
+          'PORTA DIANTEIRA',
+          'ESPELHO RETROVISOR',
+          'PARA-LAMA'
+        ],
+        'TRASEIRA': [
+          'LANTERNA DE NEBLINA ESQ.',
+          'LANTERNA DE NEBLINA DIR.',
+          'CAPÔ TRASEIRO/TAMPA',
+          'LUZ DA PLACA',
+          'VIDRO VIGIA',
+          'LIMPADOR TRASEIRO',
+          'LANTERNA ESQUERDA',
+          'LANTERNA DIREITA',
+          'PARA-CHOQUE',
+          'TETO'
+        ],
+        'EQUIPAMENTOS': [
+          'AR CONDICIONADO',
+          'VIDROS ELÉTRICOS',
+          'TRAVAS ELÉTRICAS',
+          'ALARME',
+          'PAINEL DE INSTRUMENTOS',
+          'PRESENÇA DE ODOR ?',
+          'VOLANTE',
+          'ANTENA',
+          'ALTO-FALANTES',
+          'RÁDIO CD PLAYER',
+          'RÁDIO DVD',
+          'TELAS AUXILIARES ?'
+        ],
+        'BANCOS E REVESTIMENTOS': [
+          'BANCO TRASEIRO',
+          'BANCO D.D.',
+          'BANCO D.E.',
+          'TAPETES',
+          'REVESTIMENTO DO TETO',
+          'REVESTIMENTO PORTA D.D.',
+          'REVESTIMENTO PORTA T.D.',
+          'REVESTIMENTO PORTA T.E.',
+          'REVESTIMENTO PORTA D.E.'
+        ],
+        'EQUIPAMENTOS OBRIGATÓRIOS (SEGURANÇA)': [
+          'LAVADOR',
+          'LIMPADOR PARA-BRISA',
+          'FAROL DE NEBLINA',
+          'LUZ DE RÉ',
+          'LUZ DE FREIO',
+          'LANTERNA',
+          'FAROL',
+          'MANUAL DO PROPRIETÁRIO',
+          'CHAVE RESERVA',
+          'BLINDAGEM',
+          'TRIÂNGULO',
+          'MACACO',
+          'CHAVE DE RODA',
+          'ESTEPE',
+          'EXTINTOR'
+        ],
+        'ACIONAMENTO DO MOTOR': [
+          'BATERIA',
+          'NÍVEL DO ÓLEO',
+          'PARTIDA / ACIONAMENTO DO MOTOR'
+        ]
+      };
+
+      final items = map[cat] ?? [];
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        children: [
+          pw.Container(
+            color: bannerColor,
+            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: pw.Text(cat,
+                style: pw.TextStyle(
+                    font: styles.bold, fontSize: 7, color: PdfColors.black)),
+          ),
+          ...items.map((item) {
+            final val = state.checklistOpcional[item] ?? 'OK';
+            final obs = state.checklistOpcionalMotivos[item];
+            final hasObs = obs != null && obs.isNotEmpty;
+            return pw.Container(
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 0.5),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text(item,
+                            style: pw.TextStyle(
+                                font: styles.regular, fontSize: 6.5)),
+                      ),
+                      pw.Text(val,
+                          style: pw.TextStyle(
+                              font: styles.regular, fontSize: 6.5)),
+                    ],
+                  ),
+                  if (hasObs)
+                    pw.Text('Obs: $obs',
+                        style: pw.TextStyle(
+                            font: styles.regular,
+                            fontSize: 5.5,
+                            color: PdfColors.grey700)),
+                ],
+              ),
+            );
+          }).toList(),
+          pw.SizedBox(height: 4),
+        ],
+      );
+    }
+
+    return pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(16),
+      build: (ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildHeader(vistoria, styles, logo, state: state, showQr: true),
+            _buildBlackBar(
+                'VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
+            _buildBlackBar('CHECKLIST', styles),
+            pw.SizedBox(height: 8),
+            pw.Expanded(
+              child: pw.Stack(
+                children: [
+                  if (backgroundImage != null)
+                    pw.Positioned.fill(
+                      child: pw.Opacity(
+                        opacity: 0.1,
+                        child:
+                            pw.Image(backgroundImage, fit: pw.BoxFit.contain),
+                      ),
+                    ),
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                          children:
+                              leftCategories.map(buildCategoryBlock).toList(),
+                        ),
+                      ),
+                      pw.SizedBox(width: 12),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                          children:
+                              rightCategories.map(buildCategoryBlock).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   pw.Page _buildPageAnalise({
@@ -3012,12 +3364,16 @@ class PdfGeneratorService {
     } else if (status.contains('CONFORME') ||
         status.contains('SEM REPARO') ||
         status.contains('ORIGINAL') ||
+        status.contains('PADRÕES') ||
         status == 'APROVADO') {
       color = _kGreen;
     } else if (status.contains('REPARO') ||
         status.contains('OBSERVAÇÕES') ||
         status.contains('AMASSADO') ||
-        status.contains('APONTAMENTOS')) {
+        status.contains('APONTAMENTOS') ||
+        status.contains('ALONGADO') ||
+        status.contains('CONSIDERAÇÃO') ||
+        status.contains('OBSTRUÍDO')) {
       color = _kOrange;
     }
 

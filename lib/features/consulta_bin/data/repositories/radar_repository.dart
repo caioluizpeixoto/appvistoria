@@ -26,8 +26,9 @@ class RadarRepository {
     try {
       // Salvamento local (offline first) usando a mesma tabela de consultas
       final localId = const Uuid().v4();
-      
-      await localDao.inserirOuAtualizarConsulta(ConsultasAutocredCompanion.insert(
+
+      await localDao
+          .inserirOuAtualizarConsulta(ConsultasAutocredCompanion.insert(
         id: localId,
         vistoriaId: drift.Value(vistoriaId),
         placa: drift.Value(placa),
@@ -46,20 +47,29 @@ class RadarRepository {
       if (userId == null) {
         return;
       }
-      
-      await supabase.from('autocred_consultas').insert({
-        'vistoria_id': (vistoriaId != null && vistoriaId.isNotEmpty) ? vistoriaId : null,
-        'user_id': userId,
-        'placa': placa,
-        'chassi': chassi,
-        'motor': motor,
-        'codigo_consulta': codigoConsulta,
-        'id_pesquisa_autocred': idPesquisaRadar,
-        'status': status,
-        'retorno_bruto': retornoBruto,
-        'dados_tratados': dadosTratados,
-        if (arquivoPesquisaUrl != null) 'arquivo_pesquisa_url': arquivoPesquisaUrl,
-      });
+
+      final isUuid = vistoriaId != null &&
+          RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$')
+              .hasMatch(vistoriaId);
+
+      try {
+        await supabase.from('autocred_consultas').insert({
+          'vistoria_id': isUuid ? vistoriaId : null,
+          'user_id': userId,
+          'placa': placa,
+          'chassi': chassi,
+          'motor': motor,
+          'codigo_consulta': codigoConsulta,
+          'id_pesquisa_autocred': idPesquisaRadar,
+          'status': status,
+          'retorno_bruto': retornoBruto,
+          'dados_tratados': dadosTratados,
+          if (arquivoPesquisaUrl != null)
+            'arquivo_pesquisa_url': arquivoPesquisaUrl,
+        });
+      } catch (cloudError) {
+        print('Erro ao salvar no supabase (ignorado): $cloudError');
+      }
     } catch (e) {
       print('Erro ao salvar histórico de consulta: $e');
       throw Exception('Erro interno ao salvar histórico: $e');
@@ -75,24 +85,32 @@ class RadarRepository {
   }) async {
     try {
       // Atualiza localmente
-      final localItem = await localDao.buscarConsultaPorIdPesquisa(idPesquisaRadar);
+      final localItem =
+          await localDao.buscarConsultaPorIdPesquisa(idPesquisaRadar);
       if (localItem != null) {
-        await localDao.inserirOuAtualizarConsulta(
-          ConsultasAutocredCompanion.insert(
-            id: localItem.id,
-            vistoriaId: drift.Value(localItem.vistoriaId),
-            placa: drift.Value(localItem.placa),
-            chassi: drift.Value(localItem.chassi),
-            motor: drift.Value(localItem.motor),
-            codigoConsulta: localItem.codigoConsulta,
-            idPesquisaAutocred: drift.Value(idPesquisaRadar),
-            status: status != null ? drift.Value(status) : drift.Value(localItem.status),
-            retornoBruto: retornoBruto != null ? drift.Value(retornoBruto) : drift.Value(localItem.retornoBruto),
-            dadosTratadosJson: dadosTratados != null ? drift.Value(jsonEncode(dadosTratados)) : drift.Value(localItem.dadosTratadosJson),
-            arquivoPesquisaUrl: arquivoPesquisaUrl != null ? drift.Value(arquivoPesquisaUrl) : drift.Value(localItem.arquivoPesquisaUrl),
-            createdAt: drift.Value(localItem.createdAt),
-          )
-        );
+        await localDao
+            .inserirOuAtualizarConsulta(ConsultasAutocredCompanion.insert(
+          id: localItem.id,
+          vistoriaId: drift.Value(localItem.vistoriaId),
+          placa: drift.Value(localItem.placa),
+          chassi: drift.Value(localItem.chassi),
+          motor: drift.Value(localItem.motor),
+          codigoConsulta: localItem.codigoConsulta,
+          idPesquisaAutocred: drift.Value(idPesquisaRadar),
+          status: status != null
+              ? drift.Value(status)
+              : drift.Value(localItem.status),
+          retornoBruto: retornoBruto != null
+              ? drift.Value(retornoBruto)
+              : drift.Value(localItem.retornoBruto),
+          dadosTratadosJson: dadosTratados != null
+              ? drift.Value(jsonEncode(dadosTratados))
+              : drift.Value(localItem.dadosTratadosJson),
+          arquivoPesquisaUrl: arquivoPesquisaUrl != null
+              ? drift.Value(arquivoPesquisaUrl)
+              : drift.Value(localItem.arquivoPesquisaUrl),
+          createdAt: drift.Value(localItem.createdAt),
+        ));
       }
 
       // Atualiza no Supabase
@@ -103,15 +121,20 @@ class RadarRepository {
       if (status != null) updates['status'] = status;
       if (retornoBruto != null) updates['retorno_bruto'] = retornoBruto;
       if (dadosTratados != null) updates['dados_tratados'] = dadosTratados;
-      if (arquivoPesquisaUrl != null) updates['arquivo_pesquisa_url'] = arquivoPesquisaUrl;
+      if (arquivoPesquisaUrl != null)
+        updates['arquivo_pesquisa_url'] = arquivoPesquisaUrl;
 
       if (updates.isEmpty) return;
 
-      await supabase
-          .from('autocred_consultas')
-          .update(updates)
-          .eq('id_pesquisa_autocred', idPesquisaRadar)
-          .eq('user_id', userId);
+      try {
+        await supabase
+            .from('autocred_consultas')
+            .update(updates)
+            .eq('id_pesquisa_autocred', idPesquisaRadar)
+            .eq('user_id', userId);
+      } catch (cloudError) {
+        print('Erro ao atualizar no supabase (ignorado): $cloudError');
+      }
     } catch (e) {
       print('Erro ao atualizar consulta: $e');
       throw Exception('Erro interno ao atualizar histórico: $e');
@@ -149,7 +172,8 @@ class RadarRepository {
     }
   }
 
-  Future<List<Map<String, dynamic>>> buscarConsultasRecentesNuvem(String coluna, String valor) async {
+  Future<List<Map<String, dynamic>>> buscarConsultasRecentesNuvem(
+      String coluna, String valor) async {
     try {
       // Retirado filtro de user_id para permitir compartilhamento entre celulares
       final response = await supabase

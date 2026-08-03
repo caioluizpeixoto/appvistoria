@@ -124,9 +124,8 @@ class _Header extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: comAlerta > 0
-            ? AppTheme.naoConformeLight
-            : AppTheme.conformeLight,
+        color:
+            comAlerta > 0 ? AppTheme.naoConformeLight : AppTheme.conformeLight,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: comAlerta > 0

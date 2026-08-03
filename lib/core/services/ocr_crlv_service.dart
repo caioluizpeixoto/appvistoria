@@ -44,11 +44,13 @@ class OcrCrlvService {
     final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
     try {
-      final RecognizedText recognizedText = await textRecognizer.processImage(inputImage);
+      final RecognizedText recognizedText =
+          await textRecognizer.processImage(inputImage);
       final String text = recognizedText.text.toUpperCase();
-      
+
       // Cleaned blocks for easier parsing
-      final List<String> blocks = recognizedText.blocks.map((b) => b.text.toUpperCase()).toList();
+      final List<String> blocks =
+          recognizedText.blocks.map((b) => b.text.toUpperCase()).toList();
 
       String placa = '';
       String renavam = '';
@@ -62,7 +64,8 @@ class OcrCrlvService {
       // Regex patterns
       final placaRegExp = RegExp(r'\b[A-Z]{3}[-]?[0-9][A-Z0-9][0-9]{2}\b');
       final renavamRegExp = RegExp(r'\b\d{11}\b');
-      final chassiRegExp = RegExp(r'\b[A-HJ-NPR-Z0-9]{17}\b'); // Chassi valid chars
+      final chassiRegExp =
+          RegExp(r'\b[A-HJ-NPR-Z0-9]{17}\b'); // Chassi valid chars
       final anoRegExp = RegExp(r'\b(19[8-9]\d|20[0-3]\d)\b'); // 1980 a 2039
 
       // Heuristics across all text blocks
@@ -107,7 +110,19 @@ class OcrCrlvService {
         }
 
         // COR
-        final coresConhecidas = ['BRANCA', 'PRETA', 'PRATA', 'CINZA', 'VERMELHA', 'AZUL', 'VERDE', 'AMARELA', 'MARROM', 'BEGE', 'FANTASIA'];
+        final coresConhecidas = [
+          'BRANCA',
+          'PRETA',
+          'PRATA',
+          'CINZA',
+          'VERMELHA',
+          'AZUL',
+          'VERDE',
+          'AMARELA',
+          'MARROM',
+          'BEGE',
+          'FANTASIA'
+        ];
         for (var c in coresConhecidas) {
           if (blockText.contains(c) && cor.isEmpty) {
             cor = c;
@@ -115,7 +130,16 @@ class OcrCrlvService {
         }
 
         // COMBUSTIVEL
-        final combConhecidos = ['ALCOOL/GASOLINA', 'ALCOOL/GASOL', 'ALCOOL', 'GASOLINA', 'DIESEL', 'FLEX', 'ELETRICO', 'HIBRIDO'];
+        final combConhecidos = [
+          'ALCOOL/GASOLINA',
+          'ALCOOL/GASOL',
+          'ALCOOL',
+          'GASOLINA',
+          'DIESEL',
+          'FLEX',
+          'ELETRICO',
+          'HIBRIDO'
+        ];
         for (var c in combConhecidos) {
           if (blockText.contains(c) && combustivel.isEmpty) {
             combustivel = c.replaceAll('ALCOOL', 'ÁLCOOL');
@@ -125,17 +149,21 @@ class OcrCrlvService {
         // MARCA/MODELO
         // Heuristics: usually starts with I/ or VW/, FIAT/, GM/, CHEVROLET/, FORD/ etc.
         // Or if block contains "MARCA/MODELO", we check the next block
-        if (blockText.contains('MARCA/MODELO') || blockText.contains('MARCA / MODELO')) {
+        if (blockText.contains('MARCA/MODELO') ||
+            blockText.contains('MARCA / MODELO')) {
           if (i + 1 < blocks.length) {
-             marca = blocks[i + 1].replaceAll('\n', ' ').trim();
-             // Clean some possible garbage
-             if (marca.contains('ESPECIE')) marca = marca.split('ESPECIE').first.trim();
+            marca = blocks[i + 1].replaceAll('\n', ' ').trim();
+            // Clean some possible garbage
+            if (marca.contains('ESPECIE'))
+              marca = marca.split('ESPECIE').first.trim();
           }
         } else if (marca.isEmpty) {
-           final m = RegExp(r'\b(VW/|FIAT/|GM/|CHEV/|FORD/|HONDA/|TOYOTA/|HYUNDAI/|RENAULT/|NISSAN/|JEEP/|I/)\S+').firstMatch(blockText);
-           if (m != null) {
-             marca = blockText; // Take the whole block since models have spaces
-           }
+          final m = RegExp(
+                  r'\b(VW/|FIAT/|GM/|CHEV/|FORD/|HONDA/|TOYOTA/|HYUNDAI/|RENAULT/|NISSAN/|JEEP/|I/)\S+')
+              .firstMatch(blockText);
+          if (m != null) {
+            marca = blockText; // Take the whole block since models have spaces
+          }
         }
       }
 

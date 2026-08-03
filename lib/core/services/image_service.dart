@@ -11,7 +11,8 @@ class ImageService {
   /// Comprime a imagem mantendo uma boa qualidade para OCR/Vistoria
   Future<File?> compressImage(File file) async {
     final filePath = file.absolute.path;
-    final outPath = '${filePath.substring(0, filePath.lastIndexOf('.'))}_compressed.jpg';
+    final outPath =
+        '${filePath.substring(0, filePath.lastIndexOf('.'))}_compressed.jpg';
 
     try {
       final result = await FlutterImageCompress.compressAndGetFile(
@@ -36,16 +37,18 @@ class ImageService {
     required File imageFile,
   }) async {
     try {
-      final fileName = '${DateTime.now().millisecondsSinceEpoch}${p.extension(imageFile.path)}';
+      final fileName =
+          '${DateTime.now().millisecondsSinceEpoch}${p.extension(imageFile.path)}';
       final storagePath = '$vistoriaId/$categoria/$fileName';
 
       await supabase.storage.from('vistorias').upload(
-        storagePath,
-        imageFile,
-        fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
-      );
+            storagePath,
+            imageFile,
+            fileOptions: const FileOptions(cacheControl: '3600', upsert: false),
+          );
 
-      final publicUrl = supabase.storage.from('vistorias').getPublicUrl(storagePath);
+      final publicUrl =
+          supabase.storage.from('vistorias').getPublicUrl(storagePath);
       return publicUrl;
     } catch (e) {
       print('Erro no upload da imagem: $e');

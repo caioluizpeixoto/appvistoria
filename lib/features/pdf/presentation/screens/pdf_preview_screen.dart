@@ -30,7 +30,8 @@ class PdfPreviewScreen extends StatelessWidget {
             tooltip: 'Compartilhar',
             onPressed: () {
               if (pdfPath != null && File(pdfPath!).existsSync()) {
-                Share.shareXFiles([XFile(pdfPath!)], text: 'Documento Vistoria');
+                Share.shareXFiles([XFile(pdfPath!)],
+                    text: 'Documento Vistoria');
               }
             },
           ),

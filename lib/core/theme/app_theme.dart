@@ -5,7 +5,8 @@ class AppTheme {
   AppTheme._();
 
   // ── Paleta de cores ──────────────────────────────────────────────────────────
-  static const Color primary = Color(0xFF16A34A); // Verde Moderno (Emerald/Green)
+  static const Color primary =
+      Color(0xFF16A34A); // Verde Moderno (Emerald/Green)
   static const Color primaryDark = Color(0xFF15803D); // Verde Escuro
   static const Color primaryLight = Color(0xFF4ADE80); // Verde Claro
   static const Color accent = Color(0xFF22C55E); // Verde Destaque
@@ -50,13 +51,25 @@ class AppTheme {
       scaffoldBackgroundColor: background,
       textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
         displayLarge: GoogleFonts.inter(
-            fontSize: 32, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+            fontSize: 32,
+            fontWeight: FontWeight.w700,
+            color: textPrimary,
+            letterSpacing: -0.5),
         displayMedium: GoogleFonts.inter(
-            fontSize: 24, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5),
+            fontSize: 24,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+            letterSpacing: -0.5),
         headlineLarge: GoogleFonts.inter(
-            fontSize: 22, fontWeight: FontWeight.w700, color: textPrimary, letterSpacing: -0.5),
+            fontSize: 22,
+            fontWeight: FontWeight.w700,
+            color: textPrimary,
+            letterSpacing: -0.5),
         headlineMedium: GoogleFonts.inter(
-            fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5),
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: textPrimary,
+            letterSpacing: -0.5),
         headlineSmall: GoogleFonts.inter(
             fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
         titleLarge: GoogleFonts.inter(
@@ -154,10 +167,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: naoConforme),
         ),
-        labelStyle:
-            GoogleFonts.inter(fontSize: 14, color: textSecondary),
-        hintStyle:
-            GoogleFonts.inter(fontSize: 14, color: textHint),
+        labelStyle: GoogleFonts.inter(fontSize: 14, color: textSecondary),
+        hintStyle: GoogleFonts.inter(fontSize: 14, color: textHint),
       ),
       cardTheme: CardThemeData(
         color: surface,
@@ -193,7 +204,8 @@ class AppTheme {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        contentTextStyle: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+        contentTextStyle:
+            GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: primary,

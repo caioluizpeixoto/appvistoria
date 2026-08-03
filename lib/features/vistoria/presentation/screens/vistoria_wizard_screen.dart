@@ -48,39 +48,53 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   final _dao = sl<VistoriaDao>();
   final _autocredDao = sl<AutocredDao>();
   bool _isSaving = false;
-  String _statusConsulta = 'nenhuma'; // 'pendente', 'concluida', 'erro', ou 'nenhuma'
+  String _statusConsulta =
+      'nenhuma'; // 'pendente', 'concluida', 'erro', ou 'nenhuma'
   StreamSubscription? _veiculoSub;
   StreamSubscription? _consultaSub;
 
   List<_StepInfo> get _activeSteps {
     final isChecklist = _wizardState.isChecklist;
     final isChecklistPesado = _wizardState.isChecklistPesado;
-    
+
     if (isChecklist) {
       return [
-        const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
-        const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
-        if (isChecklistPesado) const _StepInfo(titulo: 'Medidas e Complementos', icone: Icons.straighten_rounded),
-        const _StepInfo(titulo: 'Inspeção do Checklist', icone: Icons.fact_check_rounded),
+        const _StepInfo(
+            titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
+        const _StepInfo(
+            titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
+        if (isChecklistPesado)
+          const _StepInfo(
+              titulo: 'Medidas e Complementos',
+              icone: Icons.straighten_rounded),
+        const _StepInfo(
+            titulo: 'Inspeção do Checklist', icone: Icons.fact_check_rounded),
         const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
       ];
     }
 
     final temCroqui = _wizardState.temCroqui;
     final temAvarias = _wizardState.temAvarias;
-    
+
     return [
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
-      const _StepInfo(titulo: 'Fotos Externas', icone: Icons.photo_camera_rounded),
+      const _StepInfo(
+          titulo: 'Fotos Externas', icone: Icons.photo_camera_rounded),
       const _StepInfo(titulo: 'Vidros', icone: Icons.window_rounded),
       const _StepInfo(titulo: 'Painel / Hodômetro', icone: Icons.speed_rounded),
       const _StepInfo(titulo: 'Motor / Câmbio', icone: Icons.settings_rounded),
-      const _StepInfo(titulo: 'Etiquetas / Chassi', icone: Icons.qr_code_rounded),
-      if (temCroqui) const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
-      if (temAvarias) const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
-      const _StepInfo(titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
-      const _StepInfo(titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
-      const _StepInfo(titulo: 'Checklist Opcional', icone: Icons.checklist_rounded),
+      const _StepInfo(
+          titulo: 'Etiquetas / Chassi', icone: Icons.qr_code_rounded),
+      if (temCroqui)
+        const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
+      if (temAvarias)
+        const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
+      const _StepInfo(
+          titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
+      const _StepInfo(
+          titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
+      const _StepInfo(
+          titulo: 'Checklist Opcional', icone: Icons.checklist_rounded),
       const _StepInfo(titulo: 'Conclusão', icone: Icons.verified_rounded),
     ];
   }
@@ -95,50 +109,118 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     _pageController = PageController();
     _carregarEtapaAnterior();
 
-    _veiculoSub = _dao.watchVeiculoPorVistoria(widget.vistoriaId).listen((veiculo) {
+    _veiculoSub =
+        _dao.watchVeiculoPorVistoria(widget.vistoriaId).listen((veiculo) {
       if (veiculo != null && mounted) {
         bool changed = false;
         final s = _wizardState;
-        if (veiculo.placa.isNotEmpty) { s.placa = veiculo.placa; changed = true; }
-        if (veiculo.chassiVeiculo != null && veiculo.chassiVeiculo!.isNotEmpty) { s.chassiVeiculo = veiculo.chassiVeiculo!; changed = true; }
-        if (veiculo.chassiBin != null && veiculo.chassiBin!.isNotEmpty) { s.chassiBin = veiculo.chassiBin!; changed = true; }
-        if (veiculo.motorVeiculo != null && veiculo.motorVeiculo!.isNotEmpty) { s.motorVeiculo = veiculo.motorVeiculo!; changed = true; }
-        if (veiculo.motorBin != null && veiculo.motorBin!.isNotEmpty) { s.motorBin = veiculo.motorBin!; changed = true; }
-        if (veiculo.cambioVeiculo != null && veiculo.cambioVeiculo!.isNotEmpty) { s.cambioVeiculo = veiculo.cambioVeiculo!; changed = true; }
-        if (veiculo.cambioBin != null && veiculo.cambioBin!.isNotEmpty) { s.cambioBin = veiculo.cambioBin!; changed = true; }
-        if (veiculo.marca != null && veiculo.marca!.isNotEmpty) { s.marca = veiculo.marca!; changed = true; }
-        if (veiculo.modelo != null && veiculo.modelo!.isNotEmpty) { s.modelo = veiculo.modelo!; changed = true; }
-        if (veiculo.anoFabricacao != null && veiculo.anoFabricacao!.toString().isNotEmpty) { s.anoFabricacao = veiculo.anoFabricacao!.toString(); changed = true; }
-        if (veiculo.anoModelo != null && veiculo.anoModelo!.toString().isNotEmpty) { s.anoModelo = veiculo.anoModelo!.toString(); changed = true; }
-        if (veiculo.cor != null && veiculo.cor!.isNotEmpty) { s.cor = veiculo.cor!; changed = true; }
-        if (veiculo.renavam != null && veiculo.renavam!.isNotEmpty) { s.renavam = veiculo.renavam!; changed = true; }
-        if (veiculo.municipio != null && veiculo.municipio!.isNotEmpty) { s.municipio = veiculo.municipio!; changed = true; }
-        if (veiculo.uf != null && veiculo.uf!.isNotEmpty) { s.uf = veiculo.uf!; changed = true; }
-        if (veiculo.km != null && veiculo.km!.toString().isNotEmpty) { s.km = veiculo.km!.toString(); changed = true; }
-        if (veiculo.numeroGrv != null && veiculo.numeroGrv!.isNotEmpty) { s.numeroGrv = veiculo.numeroGrv!; changed = true; }
-        if (veiculo.combustivel != null && veiculo.combustivel!.isNotEmpty) { s.combustivel = veiculo.combustivel!; changed = true; }
-        if (veiculo.aiImage3dBase64 != null && veiculo.aiImage3dBase64!.isNotEmpty && veiculo.aiImage3dBase64 != s.aiImage3dBase64) { s.aiImage3dBase64 = veiculo.aiImage3dBase64!; changed = true; }
+        if (veiculo.placa.isNotEmpty) {
+          s.placa = veiculo.placa;
+          changed = true;
+        }
+        if (veiculo.chassiVeiculo != null &&
+            veiculo.chassiVeiculo!.isNotEmpty) {
+          s.chassiVeiculo = veiculo.chassiVeiculo!;
+          changed = true;
+        }
+        if (veiculo.chassiBin != null && veiculo.chassiBin!.isNotEmpty) {
+          s.chassiBin = veiculo.chassiBin!;
+          changed = true;
+        }
+        if (veiculo.motorVeiculo != null && veiculo.motorVeiculo!.isNotEmpty) {
+          s.motorVeiculo = veiculo.motorVeiculo!;
+          changed = true;
+        }
+        if (veiculo.motorBin != null && veiculo.motorBin!.isNotEmpty) {
+          s.motorBin = veiculo.motorBin!;
+          changed = true;
+        }
+        if (veiculo.cambioVeiculo != null &&
+            veiculo.cambioVeiculo!.isNotEmpty) {
+          s.cambioVeiculo = veiculo.cambioVeiculo!;
+          changed = true;
+        }
+        if (veiculo.cambioBin != null && veiculo.cambioBin!.isNotEmpty) {
+          s.cambioBin = veiculo.cambioBin!;
+          changed = true;
+        }
+        if (veiculo.marca != null && veiculo.marca!.isNotEmpty) {
+          s.marca = veiculo.marca!;
+          changed = true;
+        }
+        if (veiculo.modelo != null && veiculo.modelo!.isNotEmpty) {
+          s.modelo = veiculo.modelo!;
+          changed = true;
+        }
+        if (veiculo.anoFabricacao != null &&
+            veiculo.anoFabricacao!.toString().isNotEmpty) {
+          s.anoFabricacao = veiculo.anoFabricacao!.toString();
+          changed = true;
+        }
+        if (veiculo.anoModelo != null &&
+            veiculo.anoModelo!.toString().isNotEmpty) {
+          s.anoModelo = veiculo.anoModelo!.toString();
+          changed = true;
+        }
+        if (veiculo.cor != null && veiculo.cor!.isNotEmpty) {
+          s.cor = veiculo.cor!;
+          changed = true;
+        }
+        if (veiculo.renavam != null && veiculo.renavam!.isNotEmpty) {
+          s.renavam = veiculo.renavam!;
+          changed = true;
+        }
+        if (veiculo.municipio != null && veiculo.municipio!.isNotEmpty) {
+          s.municipio = veiculo.municipio!;
+          changed = true;
+        }
+        if (veiculo.uf != null && veiculo.uf!.isNotEmpty) {
+          s.uf = veiculo.uf!;
+          changed = true;
+        }
+        if (veiculo.km != null && veiculo.km!.toString().isNotEmpty) {
+          s.km = veiculo.km!.toString();
+          changed = true;
+        }
+        if (veiculo.numeroGrv != null && veiculo.numeroGrv!.isNotEmpty) {
+          s.numeroGrv = veiculo.numeroGrv!;
+          changed = true;
+        }
+        if (veiculo.combustivel != null && veiculo.combustivel!.isNotEmpty) {
+          s.combustivel = veiculo.combustivel!;
+          changed = true;
+        }
+        if (veiculo.aiImage3dBase64 != null &&
+            veiculo.aiImage3dBase64!.isNotEmpty &&
+            veiculo.aiImage3dBase64 != s.aiImage3dBase64) {
+          s.aiImage3dBase64 = veiculo.aiImage3dBase64!;
+          changed = true;
+        }
         if (changed) {
           s.forceUpdate();
         }
       }
     });
 
-    _consultaSub = _autocredDao.watchConsultaPorVistoria(widget.vistoriaId).listen((consulta) {
+    _consultaSub = _autocredDao
+        .watchConsultaPorVistoria(widget.vistoriaId)
+        .listen((consulta) {
       if (consulta != null && mounted) {
         _wizardState.arquivoPesquisaUrl = consulta.arquivoPesquisaUrl ?? '';
         var novoStatus = consulta.status;
         final retornoBruto = consulta.retornoBruto ?? "";
-        
+
         // Se no banco tá erro mas a msg for de andamento, tratamos visualmente como andamento
-        if (novoStatus == 'erro' && retornoBruto.contains('já está em andamento')) {
+        if (novoStatus == 'erro' &&
+            retornoBruto.contains('já está em andamento')) {
           novoStatus = 'andamento';
         }
 
         if (_statusConsulta == 'pendente' && novoStatus == 'concluida') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Pesquisa concluída! Os dados foram preenchidos.'),
+              content:
+                  Text('✅ Pesquisa concluída! Os dados foram preenchidos.'),
               backgroundColor: AppTheme.conforme,
               duration: Duration(seconds: 4),
             ),
@@ -165,7 +247,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     final placa = _wizardState.placa;
     if (placa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('A placa precisa estar preenchida para consultar.'), backgroundColor: AppTheme.naoConforme),
+        const SnackBar(
+            content: Text('A placa precisa estar preenchida para consultar.'),
+            backgroundColor: AppTheme.naoConforme),
       );
       return;
     }
@@ -198,45 +282,70 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     try {
       final service = sl<RadarService>();
-      final veiculoApi = await service.consultarVeiculo(
+      final veiculoApi = await service
+          .consultarVeiculo(
         produto: produto,
         param: 'placa',
         value: placa,
         vistoriaId: widget.vistoriaId,
         forcarNova: forcarNova,
-      ).timeout(const Duration(seconds: 90), onTimeout: () {
+      )
+          .timeout(const Duration(seconds: 90), onTimeout: () {
         throw Exception("Tempo limite de pesquisa excedido.");
       });
-      
+
       // Atualizar o banco de dados com os dados retornados
       final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
       if (veiculoDb != null) {
         await _dao.atualizarVeiculo(VeiculosCompanion(
           id: drift.Value(veiculoDb.id),
           vistoriaId: drift.Value(veiculoDb.vistoriaId),
-          placa: drift.Value(veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
-          chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
-          motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
-          marca: drift.Value(veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo.split(' ')[0] : veiculoDb.marca),
-          modelo: drift.Value(veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo : veiculoDb.modelo),
-          anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
-          anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
-          cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
-          renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
-          chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
-          motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
-          municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
-          uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+          placa: drift.Value(
+              veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
+          chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty
+              ? veiculoApi.chassi
+              : veiculoDb.chassiVeiculo),
+          motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
+              ? veiculoApi.motor
+              : veiculoDb.motorVeiculo),
+          marca: drift.Value(veiculoApi.marcaModelo.isNotEmpty
+              ? veiculoApi.marcaModelo.split(' ')[0]
+              : veiculoDb.marca),
+          modelo: drift.Value(veiculoApi.marcaModelo.isNotEmpty
+              ? veiculoApi.marcaModelo
+              : veiculoDb.modelo),
+          anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ??
+              veiculoDb.anoFabricacao),
+          anoModelo: drift.Value(
+              int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+          cor: drift.Value(
+              veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+          renavam: drift.Value(veiculoApi.renavam.isNotEmpty
+              ? veiculoApi.renavam
+              : veiculoDb.renavam),
+          chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty
+              ? veiculoApi.chassi
+              : veiculoDb.chassiBin),
+          motorBin: drift.Value(veiculoApi.motor.isNotEmpty
+              ? veiculoApi.motor
+              : veiculoDb.motorBin),
+          municipio: drift.Value(veiculoApi.municipio.isNotEmpty
+              ? veiculoApi.municipio
+              : veiculoDb.municipio),
+          uf: drift.Value(
+              veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
         ));
       }
-      
+
       if (mounted) {
         if (blockUI) Navigator.pop(context); // fecha dialog
         setState(() {
           _statusConsulta = 'concluida';
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Pesquisa atualizada!'), backgroundColor: AppTheme.conforme),
+          const SnackBar(
+              content: Text('✅ Pesquisa atualizada!'),
+              backgroundColor: AppTheme.conforme),
         );
       }
     } catch (e) {
@@ -259,8 +368,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(cleanError), 
-            backgroundColor: cleanError.contains('já está em andamento') ? Colors.orange[800] : AppTheme.naoConforme,
+            content: Text(cleanError),
+            backgroundColor: cleanError.contains('já está em andamento')
+                ? Colors.orange[800]
+                : AppTheme.naoConforme,
             duration: const Duration(seconds: 4),
           ),
         );
@@ -273,62 +384,67 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     return showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setStateBuilder) {
-            return AlertDialog(
-              title: const Text('Consultar Base', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Dica: Para apenas atualizar/puxar o resultado de uma consulta demorada, deixe a caixa abaixo DESMARCADA.', 
+        return StatefulBuilder(builder: (context, setStateBuilder) {
+          return AlertDialog(
+            title: const Text('Consultar Base',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                    'Dica: Para apenas atualizar/puxar o resultado de uma consulta demorada, deixe a caixa abaixo DESMARCADA.',
                     style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 16),
-                  ListTile(
-                    title: const Text('AUTO BIN (Simples)'),
-                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_bin', 'forcarNova': forcarNova}),
-                  ),
-                  ListTile(
-                    title: const Text('AUTO PERÍCIA'),
-                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_pericia', 'forcarNova': forcarNova}),
-                  ),
-                  ListTile(
-                    title: const Text('AUTO COMPLETA'),
-                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_completa', 'forcarNova': forcarNova}),
-                  ),
-                  ListTile(
-                    title: const Text('AUTO LEILÃO'),
-                    onTap: () => Navigator.pop(ctx, {'produto': 'auto_leilao', 'forcarNova': forcarNova}),
-                  ),
-                  const Divider(),
-                  CheckboxListTile(
-                    title: const Text('Forçar NOVA consulta', style: TextStyle(fontSize: 14)),
-                    subtitle: const Text('Faz uma nova busca na base (Pode demorar mais)', style: TextStyle(fontSize: 11)),
-                    value: forcarNova,
-                    onChanged: (val) {
-                      setStateBuilder(() {
-                        forcarNova = val ?? false;
-                      });
-                    },
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancelar'),
+                const SizedBox(height: 16),
+                ListTile(
+                  title: const Text('AUTO BIN (Simples)'),
+                  onTap: () => Navigator.pop(
+                      ctx, {'produto': 'auto_bin', 'forcarNova': forcarNova}),
+                ),
+                ListTile(
+                  title: const Text('AUTO PERÍCIA'),
+                  onTap: () => Navigator.pop(ctx,
+                      {'produto': 'auto_pericia', 'forcarNova': forcarNova}),
+                ),
+                ListTile(
+                  title: const Text('AUTO COMPLETA'),
+                  onTap: () => Navigator.pop(ctx,
+                      {'produto': 'auto_completa', 'forcarNova': forcarNova}),
+                ),
+                ListTile(
+                  title: const Text('AUTO LEILÃO'),
+                  onTap: () => Navigator.pop(ctx,
+                      {'produto': 'auto_leilao', 'forcarNova': forcarNova}),
+                ),
+                const Divider(),
+                CheckboxListTile(
+                  title: const Text('Forçar NOVA consulta',
+                      style: TextStyle(fontSize: 14)),
+                  subtitle: const Text(
+                      'Faz uma nova busca na base (Pode demorar mais)',
+                      style: TextStyle(fontSize: 11)),
+                  value: forcarNova,
+                  onChanged: (val) {
+                    setStateBuilder(() {
+                      forcarNova = val ?? false;
+                    });
+                  },
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
                 ),
               ],
-            );
-          }
-        );
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+            ],
+          );
+        });
       },
     );
   }
-
-
 
   Future<void> _carregarEtapaAnterior() async {
     final vistoria = await _dao.buscarPorId(widget.vistoriaId);
@@ -351,7 +467,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         }
       }
     }
-    
+
     // Carregar veículo (caso venha do histórico sem dadosIniciais)
     if (widget.dadosIniciais == null) {
       final veiculo = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
@@ -404,7 +520,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       } else {
         if (foto.pathLocal != null) {
           final itemId = foto.itemId ?? 'desconhecido';
-          _wizardState.fotosLocais.putIfAbsent(itemId, () => []).add(foto.pathLocal!);
+          _wizardState.fotosLocais
+              .putIfAbsent(itemId, () => [])
+              .add(foto.pathLocal!);
         }
       }
     }
@@ -487,7 +605,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         final itemId = entry.key;
         final status = entry.value;
         final obs = s.checklistObs[itemId] ?? '';
-        
+
         await _dao.inserirOuAtualizarItem(ItensVistoriaCompanion(
           id: drift.Value('${widget.vistoriaId}_$itemId'),
           vistoriaId: drift.Value(widget.vistoriaId),
@@ -532,7 +650,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           ));
         }
       }
-      
+
       // Fotos Extras
       for (int i = 0; i < s.fotosExtras.length; i++) {
         final extra = s.fotosExtras[i];
@@ -614,7 +732,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Vistoria: ${_wizardState.tipoVistoria}', style: const TextStyle(fontSize: 16)),
+        title: Text('Vistoria: ${_wizardState.tipoVistoria}',
+            style: const TextStyle(fontSize: 16)),
         content: const Text(
             'O progresso foi salvo. Você pode retomar depois pelo histórico.'),
         actions: [
@@ -623,7 +742,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
             child: const Text('Continuar'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
             onPressed: () {
               Navigator.pop(ctx);
               context.pop();
@@ -676,7 +796,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                     'wizardState': _wizardState,
                   });
                 },
-                child: const Text('Gerar mesmo assim', style: TextStyle(color: Colors.red)),
+                child: const Text('Gerar mesmo assim',
+                    style: TextStyle(color: Colors.red)),
               ),
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -689,20 +810,24 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
 
     // Tudo ok, verifica se já fez pesquisa (exceto para Checklists, que são manuais)
-    if (!_wizardState.isChecklist && (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro')) {
+    if (!_wizardState.isChecklist &&
+        (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro')) {
       final querPesquisar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Pesquisa de Veículo'),
-          content: const Text('Você não realizou a pesquisa na base para este veículo. Deseja selecionar o estilo de pesquisa antes de gerar o laudo?'),
+          content: const Text(
+              'Você não realizou a pesquisa na base para este veículo. Deseja selecionar o estilo de pesquisa antes de gerar o laudo?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Ir sem pesquisa', style: TextStyle(color: Colors.grey)),
+              child: const Text('Ir sem pesquisa',
+                  style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
+              style:
+                  ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
               child: const Text('Selecionar Pesquisa'),
             ),
           ],
@@ -721,8 +846,6 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       'wizardState': _wizardState,
     });
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -768,8 +891,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         child: Tooltip(
                           message: 'Pesquisando na base...',
                           child: SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 2),
                           ),
                         ),
                       ),
@@ -779,13 +904,15 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
-                          message: 'Pesquisa concluída. Clique para atualizar novamente.',
+                          message:
+                              'Pesquisa concluída. Clique para atualizar novamente.',
                           child: InkWell(
                             onTap: _retryRadarConsulta,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.cloud_done_rounded, color: Colors.greenAccent, size: 22),
+                              child: Icon(Icons.cloud_done_rounded,
+                                  color: Colors.greenAccent, size: 22),
                             ),
                           ),
                         ),
@@ -796,13 +923,15 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
-                          message: 'Consulta em andamento. Toque para verificar se terminou.',
+                          message:
+                              'Consulta em andamento. Toque para verificar se terminou.',
                           child: InkWell(
                             onTap: _retryRadarConsulta,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.hourglass_bottom_rounded, color: Colors.orangeAccent, size: 22),
+                              child: Icon(Icons.hourglass_bottom_rounded,
+                                  color: Colors.orangeAccent, size: 22),
                             ),
                           ),
                         ),
@@ -813,13 +942,15 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
-                          message: 'Erro na pesquisa. Tocar para tentar novamente.',
+                          message:
+                              'Erro na pesquisa. Tocar para tentar novamente.',
                           child: InkWell(
                             onTap: _retryRadarConsulta,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.cloud_off_rounded, color: Colors.redAccent, size: 22),
+                              child: Icon(Icons.cloud_off_rounded,
+                                  color: Colors.redAccent, size: 22),
                             ),
                           ),
                         ),
@@ -869,19 +1000,29 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                     itemCount: _activeSteps.length,
                     itemBuilder: (ctx, idx) {
                       final titulo = _activeSteps[idx].titulo;
-                      if (titulo == 'Dados Gerais') return const StepDadosGerais();
-                      if (titulo == 'Fotos Externas') return const StepFotosExternas();
+                      if (titulo == 'Dados Gerais')
+                        return const StepDadosGerais();
+                      if (titulo == 'Fotos Externas')
+                        return const StepFotosExternas();
                       if (titulo == 'Vidros') return const StepVidros();
-                      if (titulo == 'Painel / Hodômetro') return const StepPainelHodometro();
-                      if (titulo == 'Motor / Câmbio') return const StepMotorCambio();
-                      if (titulo == 'Etiquetas / Chassi') return const StepEtiquetasChassi();
+                      if (titulo == 'Painel / Hodômetro')
+                        return const StepPainelHodometro();
+                      if (titulo == 'Motor / Câmbio')
+                        return const StepMotorCambio();
+                      if (titulo == 'Etiquetas / Chassi')
+                        return const StepEtiquetasChassi();
                       if (titulo == 'Estrutura') return const StepEstrutura();
                       if (titulo == 'Pintura') return const StepPintura();
-                      if (titulo == 'Fotos Extras') return const StepFotosExtras();
-                      if (titulo == 'Dados do Veículo') return const StepDadosVeiculo();
-                      if (titulo == 'Checklist Opcional') return const StepChecklistOpcional();
-                      if (titulo == 'Medidas e Complementos') return const StepChecklistMedidas();
-                      if (titulo == 'Inspeção do Checklist') return const StepChecklistInspecao();
+                      if (titulo == 'Fotos Extras')
+                        return const StepFotosExtras();
+                      if (titulo == 'Dados do Veículo')
+                        return const StepDadosVeiculo();
+                      if (titulo == 'Checklist Opcional')
+                        return const StepChecklistOpcional();
+                      if (titulo == 'Medidas e Complementos')
+                        return const StepChecklistMedidas();
+                      if (titulo == 'Inspeção do Checklist')
+                        return const StepChecklistInspecao();
                       return const StepConclusao();
                     },
                   ),
@@ -958,11 +1099,11 @@ class _StepIndicatorRowState extends State<_StepIndicatorRow> {
     // O item inativo tem aproximadamente 46px de largura + 12px de margem = 58px.
     // Tenta centralizar a etapa atual subtraindo metade da largura da tela.
     final screenWidth = MediaQuery.of(context).size.width;
-    final offset = (widget.currentStep * 58.0) - (screenWidth / 2) + 50; 
-    
+    final offset = (widget.currentStep * 58.0) - (screenWidth / 2) + 50;
+
     final maxScroll = _scrollController.position.maxScrollExtent;
     final target = offset.clamp(0.0, maxScroll);
-    
+
     _scrollController.animateTo(
       target,
       duration: const Duration(milliseconds: 300),
@@ -994,17 +1135,14 @@ class _StepIndicatorRowState extends State<_StepIndicatorRow> {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
               margin: const EdgeInsets.only(right: 12),
-              padding: EdgeInsets.symmetric(horizontal: isActive ? 16 : 10, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                  horizontal: isActive ? 16 : 10, vertical: 8),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: isActive
-                    ? AppTheme.primary
-                    : AppTheme.surfaceVariant,
+                color: isActive ? AppTheme.primary : AppTheme.surfaceVariant,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: isActive
-                      ? AppTheme.primary
-                      : AppTheme.border,
+                  color: isActive ? AppTheme.primary : AppTheme.border,
                 ),
               ),
               child: Row(
@@ -1013,9 +1151,7 @@ class _StepIndicatorRowState extends State<_StepIndicatorRow> {
                   Icon(
                     widget.steps[i].icone,
                     size: 18,
-                    color: isActive
-                        ? Colors.white
-                        : AppTheme.textSecondary,
+                    color: isActive ? Colors.white : AppTheme.textSecondary,
                   ),
                   if (isActive) ...[
                     const SizedBox(width: 8),
@@ -1106,8 +1242,7 @@ class _WizardNavBar extends StatelessWidget {
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                backgroundColor:
-                    isLast ? AppTheme.conforme : AppTheme.primary,
+                backgroundColor: isLast ? AppTheme.conforme : AppTheme.primary,
               ),
               onPressed: isSaving ? null : onProximo,
               icon: Icon(

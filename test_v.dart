@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-String _v(Map<String, dynamic> data, List<String> keys, {String fallback = 'NAO'}) {
+String _v(Map<String, dynamic> data, List<String> keys,
+    {String fallback = 'NAO'}) {
   String? searchRecursive(dynamic node, String targetKey) {
     if (node is Map) {
       final lowerTarget = targetKey.toLowerCase();
@@ -23,14 +24,17 @@ String _v(Map<String, dynamic> data, List<String> keys, {String fallback = 'NAO'
     }
     return null;
   }
+
   for (var k in keys) {
     final result = searchRecursive(data, k);
     if (result != null) return result;
   }
   return fallback;
 }
+
 void main() {
-  final jsonString = '''{"consulta":{"resultados":[{"retorno":{"data":{"placa":"ABC1234","ipva":[{"basecalculo":"R\$ 1.000,00"}]}}}]}}''';
+  final jsonString =
+      '''{"consulta":{"resultados":[{"retorno":{"data":{"placa":"ABC1234","ipva":[{"basecalculo":"R\$ 1.000,00"}]}}}]}}''';
   final data = jsonDecode(jsonString);
   print('Placa: ' + _v(data, ['placa']));
   print('IPVA Base: ' + _v(data, ['ipva_basecalculo', 'basecalculo']));

@@ -41,7 +41,9 @@ class StepChecklistMedidas extends StatelessWidget {
                   Expanded(
                     child: TextFormField(
                       initialValue: state.medidasComplementos['dataTrocaOleo'],
-                      decoration: const InputDecoration(labelText: 'Data da Troca', hintText: 'Ex: 10/05/2023'),
+                      decoration: const InputDecoration(
+                          labelText: 'Data da Troca',
+                          hintText: 'Ex: 10/05/2023'),
                       onChanged: (val) {
                         state.medidasComplementos['dataTrocaOleo'] = val;
                         state.forceUpdate();
@@ -53,7 +55,8 @@ class StepChecklistMedidas extends StatelessWidget {
                     child: TextFormField(
                       initialValue: state.medidasComplementos['kmTrocaOleo'],
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'KM', hintText: 'Ex: 150000'),
+                      decoration: const InputDecoration(
+                          labelText: 'KM', hintText: 'Ex: 150000'),
                       onChanged: (val) {
                         state.medidasComplementos['kmTrocaOleo'] = val;
                         state.forceUpdate();
@@ -65,7 +68,8 @@ class StepChecklistMedidas extends StatelessWidget {
               const SizedBox(height: 16),
               TextFormField(
                 initialValue: state.medidasComplementos['tipoTrocaMotor'],
-                decoration: const InputDecoration(labelText: 'Tipo de Troca (Motor)'),
+                decoration:
+                    const InputDecoration(labelText: 'Tipo de Troca (Motor)'),
                 onChanged: (val) {
                   state.medidasComplementos['tipoTrocaMotor'] = val;
                   state.forceUpdate();
@@ -76,7 +80,8 @@ class StepChecklistMedidas extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['tipoTrocaCambio'],
+                      initialValue:
+                          state.medidasComplementos['tipoTrocaCambio'],
                       decoration: const InputDecoration(labelText: 'Câmbio'),
                       onChanged: (val) {
                         state.medidasComplementos['tipoTrocaCambio'] = val;
@@ -87,8 +92,10 @@ class StepChecklistMedidas extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['tipoTrocaDiferencial'],
-                      decoration: const InputDecoration(labelText: 'Diferencial'),
+                      initialValue:
+                          state.medidasComplementos['tipoTrocaDiferencial'],
+                      decoration:
+                          const InputDecoration(labelText: 'Diferencial'),
                       onChanged: (val) {
                         state.medidasComplementos['tipoTrocaDiferencial'] = val;
                         state.forceUpdate();
@@ -104,7 +111,9 @@ class StepChecklistMedidas extends StatelessWidget {
               _buildSectionTitle('Implemento'),
               TextFormField(
                 initialValue: state.medidasComplementos['implementoDescricao'],
-                decoration: const InputDecoration(labelText: 'Descrição', hintText: 'Ex: Baú Frigorífico, Carroceria Aberta, etc.'),
+                decoration: const InputDecoration(
+                    labelText: 'Descrição',
+                    hintText: 'Ex: Baú Frigorífico, Carroceria Aberta, etc.'),
                 onChanged: (val) {
                   state.medidasComplementos['implementoDescricao'] = val;
                   state.forceUpdate();
@@ -124,8 +133,10 @@ class StepChecklistMedidas extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['implementoEntreEixo'],
-                      decoration: const InputDecoration(labelText: 'Entre Eixo', hintText: 'Ex: 3,50m'),
+                      initialValue:
+                          state.medidasComplementos['implementoEntreEixo'],
+                      decoration: const InputDecoration(
+                          labelText: 'Entre Eixo', hintText: 'Ex: 3,50m'),
                       onChanged: (val) {
                         state.medidasComplementos['implementoEntreEixo'] = val;
                         state.forceUpdate();
@@ -135,10 +146,13 @@ class StepChecklistMedidas extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['implementoComprimento'],
-                      decoration: const InputDecoration(labelText: 'Comprimento', hintText: 'Ex: 6,00m'),
+                      initialValue:
+                          state.medidasComplementos['implementoComprimento'],
+                      decoration: const InputDecoration(
+                          labelText: 'Comprimento', hintText: 'Ex: 6,00m'),
                       onChanged: (val) {
-                        state.medidasComplementos['implementoComprimento'] = val;
+                        state.medidasComplementos['implementoComprimento'] =
+                            val;
                         state.forceUpdate();
                       },
                     ),
@@ -150,8 +164,10 @@ class StepChecklistMedidas extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['implementoLargura'],
-                      decoration: const InputDecoration(labelText: 'Largura', hintText: 'Ex: 2,50m'),
+                      initialValue:
+                          state.medidasComplementos['implementoLargura'],
+                      decoration: const InputDecoration(
+                          labelText: 'Largura', hintText: 'Ex: 2,50m'),
                       onChanged: (val) {
                         state.medidasComplementos['implementoLargura'] = val;
                         state.forceUpdate();
@@ -161,8 +177,10 @@ class StepChecklistMedidas extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      initialValue: state.medidasComplementos['implementoAltura'],
-                      decoration: const InputDecoration(labelText: 'Altura', hintText: 'Ex: 2,80m'),
+                      initialValue:
+                          state.medidasComplementos['implementoAltura'],
+                      decoration: const InputDecoration(
+                          labelText: 'Altura', hintText: 'Ex: 2,80m'),
                       onChanged: (val) {
                         state.medidasComplementos['implementoAltura'] = val;
                         state.forceUpdate();

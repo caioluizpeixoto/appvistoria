@@ -44,7 +44,7 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
 
   Future<void> _baixarEVisualizar(Map<String, dynamic> consulta) async {
     final token = consulta['token'];
-    
+
     if (token == null) return;
 
     // Se tiver o link de visualização, abre direto
@@ -55,7 +55,8 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Não foi possível abrir o link da consulta: $e')),
+            SnackBar(
+                content: Text('Não foi possível abrir o link da consulta: $e')),
           );
         }
       }
@@ -64,7 +65,7 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
     // Aproveita para baixar e fazer cache em background silenciosamente
     try {
       await _radarService.consultarVeiculo(
-        produto: 'auto_bin', 
+        produto: 'auto_bin',
         param: 'placa',
         value: consulta['parametro_valor'] ?? '',
         vistoriaId: '',
@@ -92,7 +93,9 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _consultas.isEmpty
-              ? const Center(child: Text('Nenhuma consulta encontrada na sua conta Radar.'))
+              ? const Center(
+                  child:
+                      Text('Nenhuma consulta encontrada na sua conta Radar.'))
               : ListView.builder(
                   itemCount: _consultas.length,
                   itemBuilder: (context, index) {
@@ -104,7 +107,8 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
                     }
 
                     return Card(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       elevation: 2,
                       child: ListTile(
                         leading: Container(
@@ -113,19 +117,26 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
                             color: AppTheme.primary.withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.history, color: AppTheme.primary),
+                          child: const Icon(Icons.history,
+                              color: AppTheme.primary),
                         ),
-                        title: Text('${c['parametro']}: ${c['parametro_valor']}'),
+                        title:
+                            Text('${c['parametro']}: ${c['parametro_valor']}'),
                         subtitle: Text(
                           '${c['titulo']} - ' +
-                          (data != null ? DateFormat('dd/MM/yyyy HH:mm').format(data) : ''),
+                              (data != null
+                                  ? DateFormat('dd/MM/yyyy HH:mm').format(data)
+                                  : ''),
                         ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.download, color: AppTheme.primary),
+                          icon: const Icon(Icons.download,
+                              color: AppTheme.primary),
                           tooltip: 'Baixar Consulta',
-                          onPressed: () => _baixarEVisualizar(c as Map<String, dynamic>),
+                          onPressed: () =>
+                              _baixarEVisualizar(c as Map<String, dynamic>),
                         ),
-                        onTap: () => _baixarEVisualizar(c as Map<String, dynamic>),
+                        onTap: () =>
+                            _baixarEVisualizar(c as Map<String, dynamic>),
                       ),
                     );
                   },

@@ -5,16 +5,23 @@ import '../tables/app_tables.dart';
 part 'autocred_dao.g.dart';
 
 @DriftAccessor(tables: [ConsultasAutocred])
-class AutocredDao extends DatabaseAccessor<AppDatabase> with _$AutocredDaoMixin {
+class AutocredDao extends DatabaseAccessor<AppDatabase>
+    with _$AutocredDaoMixin {
   AutocredDao(super.db);
 
   Future<List<ConsultasAutocredData>> listarConsultas() =>
-      (select(consultasAutocred)..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
+      (select(consultasAutocred)
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
+          .get();
 
-  Future<ConsultasAutocredData?> buscarConsultaPorIdPesquisa(String idPesquisa) =>
-      (select(consultasAutocred)..where((t) => t.idPesquisaAutocred.equals(idPesquisa))).getSingleOrNull();
+  Future<ConsultasAutocredData?> buscarConsultaPorIdPesquisa(
+          String idPesquisa) =>
+      (select(consultasAutocred)
+            ..where((t) => t.idPesquisaAutocred.equals(idPesquisa)))
+          .getSingleOrNull();
 
-  Future<ConsultasAutocredData?> buscarConsultaPorVistoria(String vistoriaId) async {
+  Future<ConsultasAutocredData?> buscarConsultaPorVistoria(
+      String vistoriaId) async {
     final query = select(consultasAutocred)
       ..where((t) => t.vistoriaId.equals(vistoriaId))
       ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])

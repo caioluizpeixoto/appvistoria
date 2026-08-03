@@ -17,11 +17,11 @@ void main() {
 </soap:Envelope>''';
 
   XmlDocument document = XmlDocument.parse(xmlString);
-      
-  final resultNodes = document.descendantElements.where((e) => 
-      e.name.local.toLowerCase() == 'getconsultaresult' || 
+
+  final resultNodes = document.descendantElements.where((e) =>
+      e.name.local.toLowerCase() == 'getconsultaresult' ||
       e.name.local.toLowerCase() == 'consultaresult');
-      
+
   if (resultNodes.isNotEmpty) {
     final innerText = resultNodes.first.innerText.trim();
     print("Inner text starts with < ? \${innerText.startsWith('<')}");
@@ -33,8 +33,8 @@ void main() {
   }
 
   String? findTag(String tagName) {
-    final matches = document.descendantElements.where((element) => 
-        element.name.local.toLowerCase() == tagName.toLowerCase());
+    final matches = document.descendantElements.where(
+        (element) => element.name.local.toLowerCase() == tagName.toLowerCase());
     if (matches.isNotEmpty) {
       final text = matches.first.innerText.trim();
       return text.isEmpty ? null : text;

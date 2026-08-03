@@ -13,8 +13,7 @@ class NumeroLaudoGenerator {
     final parte2 = DateFormat('yyyyMMdd').format(now);
     final parte3 = DateFormat('HHmmss').format(now);
     final parte4 = Random().nextInt(9999).toString().padLeft(4, '0');
-    final parte5 =
-        Random().nextInt(999999).toString().padLeft(6, '0');
+    final parte5 = Random().nextInt(999999).toString().padLeft(6, '0');
     return '$parte1-$parte2-$parte3-$parte4-$parte5';
   }
 }

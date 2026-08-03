@@ -9,10 +9,11 @@ void main() {
     print('DB does not exist.');
     return;
   }
-  
+
   final db = sqlite3.open(dbPath);
   try {
-    final ResultSet resultSet = db.select('SELECT retorno_bruto FROM consultas_autocred ORDER BY created_at DESC LIMIT 1');
+    final ResultSet resultSet = db.select(
+        'SELECT retorno_bruto FROM consultas_autocred ORDER BY created_at DESC LIMIT 1');
     if (resultSet.isEmpty) {
       print('No results found.');
     } else {

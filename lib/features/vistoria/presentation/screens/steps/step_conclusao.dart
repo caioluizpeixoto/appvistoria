@@ -66,8 +66,10 @@ class _StepConclusaoState extends State<StepConclusao> {
     super.dispose();
   }
 
-  Future<void> _salvarAssinatura(VistoriaWizardState state, {required bool isCliente}) async {
-    final controller = isCliente ? _signatureControllerCliente : _signatureController;
+  Future<void> _salvarAssinatura(VistoriaWizardState state,
+      {required bool isCliente}) async {
+    final controller =
+        isCliente ? _signatureControllerCliente : _signatureController;
     if (controller.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -83,7 +85,8 @@ class _StepConclusaoState extends State<StepConclusao> {
 
     final dir = await getApplicationDocumentsDirectory();
     final tipo = isCliente ? 'cliente' : 'vistoriador';
-    final file = File('${dir.path}/assinatura_${tipo}_${state.vistoriaId}_${DateTime.now().millisecondsSinceEpoch}.png');
+    final file = File(
+        '${dir.path}/assinatura_${tipo}_${state.vistoriaId}_${DateTime.now().millisecondsSinceEpoch}.png');
     await file.writeAsBytes(imageBytes);
 
     if (isCliente) {
@@ -97,7 +100,8 @@ class _StepConclusaoState extends State<StepConclusao> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ Assinatura do ${isCliente ? 'Cliente' : 'Responsável Técnico'} salva com sucesso!'),
+          content: Text(
+              '✅ Assinatura do ${isCliente ? 'Cliente' : 'Responsável Técnico'} salva com sucesso!'),
           backgroundColor: AppTheme.conforme,
         ),
       );
@@ -160,7 +164,8 @@ class _StepConclusaoState extends State<StepConclusao> {
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: _resultadoColor(state.statusSugerido).withValues(alpha: 0.3),
+                  color: _resultadoColor(state.statusSugerido)
+                      .withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 )
@@ -213,7 +218,7 @@ class _StepConclusaoState extends State<StepConclusao> {
                   fontWeight: FontWeight.w800,
                   color: AppTheme.textPrimary)),
           const SizedBox(height: 16),
-          
+
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -265,8 +270,10 @@ class _StepConclusaoState extends State<StepConclusao> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                          color: isSelected ? Colors.white : AppTheme.textPrimary,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color:
+                              isSelected ? Colors.white : AppTheme.textPrimary,
                         ),
                       ),
                     ],
@@ -277,7 +284,6 @@ class _StepConclusaoState extends State<StepConclusao> {
           ),
 
           const SizedBox(height: 20),
-
 
           // ── Parecer técnico ──────────────────────────────────────────────
           Container(
@@ -402,7 +408,8 @@ class _StepConclusaoState extends State<StepConclusao> {
                           height: 100,
                           width: double.infinity,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.grey),
                         ),
                       ),
                     ),
@@ -439,8 +446,10 @@ class _StepConclusaoState extends State<StepConclusao> {
                           Expanded(
                             child: OutlinedButton.icon(
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                side: const BorderSide(color: AppTheme.naoConforme),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                                side: const BorderSide(
+                                    color: AppTheme.naoConforme),
                               ),
                               onPressed: () {
                                 _signatureController.clear();
@@ -451,17 +460,20 @@ class _StepConclusaoState extends State<StepConclusao> {
                               icon: const Icon(Icons.clear_rounded,
                                   color: AppTheme.naoConforme, size: 18),
                               label: const Text('Limpar',
-                                  style: TextStyle(color: AppTheme.naoConforme)),
+                                  style:
+                                      TextStyle(color: AppTheme.naoConforme)),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
                                 backgroundColor: AppTheme.conforme,
                               ),
-                              onPressed: () => _salvarAssinatura(state, isCliente: false),
+                              onPressed: () =>
+                                  _salvarAssinatura(state, isCliente: false),
                               icon: const Icon(Icons.check_rounded, size: 18),
                               label: const Text('Confirmar'),
                             ),
@@ -475,141 +487,147 @@ class _StepConclusaoState extends State<StepConclusao> {
               ],
             ),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // ── Assinatura digital do Cliente ──────────────────────────────────
-          if (!state.isChecklist && state.tipoEnum != TipoVistoria.vistoriaEntrada)
+          if (!state.isChecklist &&
+              state.tipoEnum != TipoVistoria.vistoriaEntrada)
             Container(
-            decoration: BoxDecoration(
-              color: AppTheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: state.assinaturaClientePath != null
-                    ? AppTheme.conforme
-                    : AppTheme.border,
-                width: state.assinaturaClientePath != null ? 2 : 1,
+              decoration: BoxDecoration(
+                color: AppTheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: state.assinaturaClientePath != null
+                      ? AppTheme.conforme
+                      : AppTheme.border,
+                  width: state.assinaturaClientePath != null ? 2 : 1,
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      Icon(
-                        state.assinaturaClientePath != null
-                            ? Icons.verified_rounded
-                            : Icons.draw_rounded,
-                        color: state.assinaturaClientePath != null
-                            ? AppTheme.conforme
-                            : AppTheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        state.assinaturaClientePath != null
-                            ? 'Assinatura Cliente ✅'
-                            : 'Assinatura Cliente',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Icon(
+                          state.assinaturaClientePath != null
+                              ? Icons.verified_rounded
+                              : Icons.draw_rounded,
                           color: state.assinaturaClientePath != null
                               ? AppTheme.conforme
-                              : AppTheme.textPrimary,
+                              : AppTheme.primary,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Text(
+                          state.assinaturaClientePath != null
+                              ? 'Assinatura Cliente ✅'
+                              : 'Assinatura Cliente',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: state.assinaturaClientePath != null
+                                ? AppTheme.conforme
+                                : AppTheme.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-
-                if (state.assinaturaClientePath != null)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.file(
-                        File(state.assinaturaClientePath!),
-                        height: 100,
-                        width: double.infinity,
-                        fit: BoxFit.contain,
-                        errorBuilder: (context, error, stackTrace) => Container(
+                  if (state.assinaturaClientePath != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(
+                          File(state.assinaturaClientePath!),
                           height: 100,
                           width: double.infinity,
-                          color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
+                            height: 100,
+                            width: double.infinity,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image,
+                                color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Assine abaixo (Cliente):',
-                          style: TextStyle(
-                              fontSize: 12, color: AppTheme.textSecondary)),
-                      const SizedBox(height: 8),
-                      Container(
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.border),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Signature(
-                            controller: _signatureControllerCliente,
-                            backgroundColor: Colors.white,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Assine abaixo (Cliente):',
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.textSecondary)),
+                        const SizedBox(height: 8),
+                        Container(
+                          height: 160,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.border),
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                side: const BorderSide(color: AppTheme.naoConforme),
-                              ),
-                              onPressed: () {
-                                _signatureControllerCliente.clear();
-                                state.assinaturaClientePath = null;
-                                // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
-                                state.notifyListeners();
-                              },
-                              icon: const Icon(Icons.clear_rounded,
-                                  color: AppTheme.naoConforme, size: 18),
-                              label: const Text('Limpar',
-                                  style: TextStyle(color: AppTheme.naoConforme)),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Signature(
+                              controller: _signatureControllerCliente,
+                              backgroundColor: Colors.white,
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                backgroundColor: AppTheme.conforme,
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  side: const BorderSide(
+                                      color: AppTheme.naoConforme),
+                                ),
+                                onPressed: () {
+                                  _signatureControllerCliente.clear();
+                                  state.assinaturaClientePath = null;
+                                  // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+                                  state.notifyListeners();
+                                },
+                                icon: const Icon(Icons.clear_rounded,
+                                    color: AppTheme.naoConforme, size: 18),
+                                label: const Text('Limpar',
+                                    style:
+                                        TextStyle(color: AppTheme.naoConforme)),
                               ),
-                              onPressed: () => _salvarAssinatura(state, isCliente: true),
-                              icon: const Icon(Icons.check_rounded, size: 18),
-                              label: const Text('Confirmar'),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  backgroundColor: AppTheme.conforme,
+                                ),
+                                onPressed: () =>
+                                    _salvarAssinatura(state, isCliente: true),
+                                icon: const Icon(Icons.check_rounded, size: 18),
+                                label: const Text('Confirmar'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 14),
-              ],
+                  const SizedBox(height: 14),
+                ],
+              ),
             ),
-          ),
 
           // Dados do vistoriador (somente leitura)
           const SizedBox(height: 16),
@@ -652,5 +670,3 @@ class _StepConclusaoState extends State<StepConclusao> {
     );
   }
 }
-
-

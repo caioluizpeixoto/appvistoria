@@ -152,18 +152,20 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       _placaEditCtrl.text = veiculo.placa;
       _chassiEditCtrl.text = veiculo.chassi;
       _motorEditCtrl.text = veiculo.motor;
-      
+
       final mm = veiculo.marcaModelo.split('/');
       _marcaEditCtrl.text = mm.isNotEmpty ? mm[0].trim() : '';
       _modeloEditCtrl.text = mm.length > 1 ? mm[1].trim() : '';
-      
+
       _anoFabEditCtrl.text = veiculo.anoFabricacao;
       _anoModEditCtrl.text = veiculo.anoModelo;
       _corEditCtrl.text = veiculo.cor;
       _renavamEditCtrl.text = veiculo.renavam;
       _municipioEditCtrl.text = veiculo.municipio;
       _ufEditCtrl.text = veiculo.estado;
-      _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty ? veiculo.restricoes1 : veiculo.informacoesRelevantes;
+      _restricoesEditCtrl.text = veiculo.restricoes1.isNotEmpty
+          ? veiculo.restricoes1
+          : veiculo.informacoesRelevantes;
       _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
       _situacaoVeiculo = veiculo.situacao;
     });
@@ -172,7 +174,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   Future<Map<String, dynamic>?> _verificarNuvem(String valor) async {
     final repo = sl<RadarRepository>();
     final service = sl<RadarService>();
-    
+
     // Mostra loading rápido de busca
     setState(() {
       _buscandoVeiculo = true;
@@ -189,7 +191,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     }
 
     // Marca como local
-    final combinadas = consultasNuvem.map((c) => {...c, 'fonte': 'local'}).toList();
+    final combinadas =
+        consultasNuvem.map((c) => {...c, 'fonte': 'local'}).toList();
 
     // Busca na API da Radar
     try {
@@ -213,8 +216,59 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       _buscandoVeiculo = false;
     });
 
-    if (combinadas.isEmpty || !mounted) return {'forcarNova': true};
-
+    if (combinadas.isEmpty) {
+      if (!mounted) return {'forcarNova': true};
+      final querNova = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.info_outline_rounded,
+                    color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Nenhuma Pesquisa',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: const Text(
+            'Não encontramos nenhuma pesquisa anterior para este veículo.\n\nDeseja realizar uma NOVA consulta na base de dados agora? (Sujeito a cobrança de saldo).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Continuar Sem Pesquisa',
+                  style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Realizar Consulta'),
+            ),
+          ],
+        ),
+      );
+      if (querNova == null) return null; // Cancelou
+      return {'forcarNova': querNova};
+    }
     // Ordenar por data mais recente
     combinadas.sort((a, b) {
       try {
@@ -240,13 +294,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 color: AppTheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.history_rounded, color: AppTheme.primary, size: 24),
+              child: const Icon(Icons.history_rounded,
+                  color: AppTheme.primary, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Pesquisas Encontradas ($total)',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
             ),
           ],
@@ -259,7 +315,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             children: [
               Text(
                 'Identificamos $total pesquisa(s) realizada(s) anteriormente para este veículo. Deseja utilizar uma pesquisa anterior ou realizar uma nova consulta?',
-                style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.4),
+                style: const TextStyle(
+                    fontSize: 14, color: AppTheme.textPrimary, height: 1.4),
               ),
               const SizedBox(height: 16),
               Flexible(
@@ -272,17 +329,19 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                     final dataString = item['created_at'].toString();
                     DateTime? createdAt;
                     try {
-                       createdAt = DateTime.parse(dataString);
+                      createdAt = DateTime.parse(dataString);
                     } catch (_) {}
-                    
-                    final dateFormatted = createdAt != null 
-                        ? '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year} às ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}' 
+
+                    final dateFormatted = createdAt != null
+                        ? '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year} às ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
                         : dataString;
-                    
+
                     final prefix = isRadar ? '[Nuvem]' : '[Local]';
-                    final title = item['titulo'] != null ? '$prefix ${item['titulo']}' : '$prefix Pesquisa';
+                    final title = item['titulo'] != null
+                        ? '$prefix ${item['titulo']}'
+                        : '$prefix Pesquisa';
                     final subtitle = 'Realizada em: $dateFormatted';
-                    
+
                     return Card(
                       elevation: 0,
                       color: AppTheme.surfaceVariant.withValues(alpha: 0.5),
@@ -293,16 +352,24 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       margin: const EdgeInsets.only(bottom: 8),
                       child: ListTile(
                         leading: Icon(
-                          isRadar ? Icons.cloud_sync_rounded : Icons.history_rounded, 
+                          isRadar
+                              ? Icons.cloud_sync_rounded
+                              : Icons.history_rounded,
                           color: AppTheme.primary,
                         ),
-                        title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                        title: Text(title,
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold)),
+                        subtitle: Text(subtitle,
+                            style: const TextStyle(
+                                fontSize: 11, color: AppTheme.textSecondary)),
                         trailing: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                            textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 0),
+                            textStyle: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           onPressed: () => Navigator.of(ctx).pop(item),
                           icon: const Icon(Icons.check_rounded, size: 14),
@@ -325,7 +392,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.comObs),
             onPressed: () => Navigator.of(ctx).pop({'forcarNova': true}),
             icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
-            label: const Text('Realizar Nova Consulta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            label: const Text('Realizar Nova Consulta',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -334,15 +403,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
   Future<bool> _buscarVeiculo() async {
     if (_buscandoVeiculo) return false;
-    
+
     final valor = _buscaCtrl.text.trim();
     if (valor.isEmpty) return false;
 
     final escolhida = await _verificarNuvem(valor);
     if (escolhida == null) return false; // Cancelou
-    
+
     String? tokenConsulta;
-    
+
     if (escolhida['forcarNova'] != true) {
       if (escolhida['fonte'] == 'local') {
         // Reaproveitar dados antigos locais/nuvem supabase
@@ -351,7 +420,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           _preencherDados(veiculo);
           return true;
         } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao carregar dados antigos: $e')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Erro ao carregar dados antigos: $e')));
           return false;
         }
       } else if (escolhida['fonte'] == 'radar') {
@@ -363,8 +433,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     setState(() {
       _buscandoVeiculo = true;
       _veiculoEncontrado = false;
-      _mensagemCarregamento = tokenConsulta != null 
-          ? 'Puxando detalhes da base...' 
+      _mensagemCarregamento = tokenConsulta != null
+          ? 'Puxando detalhes da base...'
           : 'Consultando veículo...';
     });
 
@@ -375,7 +445,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         param: _modoEntrada,
         value: valor,
         vistoriaId: '',
-        forcarNova: true,
+        forcarNova: escolhida['forcarNova'] == true,
         tokenConsulta: tokenConsulta,
       );
 
@@ -417,7 +487,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     try {
       final dao = sl<VistoriaDao>();
       final vistoria = await dao.buscarPorNumeroLaudoOuId(codigo);
-      
+
       if (vistoria != null) {
         if (mounted) {
           if (vistoria.status == 'concluido') {
@@ -425,7 +495,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             if (diff.inHours > 72) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Laudo concluído há mais de 72h. Prazo de retificação expirado.'),
+                  content: Text(
+                      'Laudo concluído há mais de 72h. Prazo de retificação expirado.'),
                   backgroundColor: AppTheme.naoConforme,
                 ),
               );
@@ -434,7 +505,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             // Retificar (dentro das 72h)
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Modo Retificação ativado. (${72 - diff.inHours}h restantes)'),
+                content: Text(
+                    'Modo Retificação ativado. (${72 - diff.inHours}h restantes)'),
                 backgroundColor: AppTheme.comObs,
               ),
             );
@@ -602,37 +674,25 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
       if (_modoEntrada == 'placa' && valor.isNotEmpty) {
         veiculoExistente = await dao.buscarVeiculoPorPlaca(valor);
-        if (veiculoExistente != null) {
-          final vistoriaAnterior =
-              await dao.buscarPorId(veiculoExistente.vistoriaId);
-          if (vistoriaAnterior != null) {
-            final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
-            if (diff.inHours <= 72 && vistoriaAnterior.tipoVistoria == widget.tipo.titulo) {
-              reuse = true;
-            }
-          }
-        }
       }
 
       bool forcarNova = false;
       String? tokenConsulta;
       Map<String, dynamic>? dadosReaproveitados;
 
-      if (!reuse) {
-        final escolhida = await _verificarNuvem(valor);
-        if (escolhida == null) return; // Cancela se o usuário fechar o Dialog
-        
-        if (escolhida['forcarNova'] == true) {
+      final escolhida = await _verificarNuvem(valor);
+      if (escolhida == null) return; // Cancela se o usuário fechar o Dialog
+
+      if (escolhida['forcarNova'] == true) {
+        forcarNova = true;
+      } else {
+        if (escolhida['fonte'] == 'local') {
+          dadosReaproveitados = escolhida;
+          reuse = true; // trata como reuso para pular a chamada à Radar API
+        } else if (escolhida['fonte'] == 'radar') {
+          // Se for via buscar histórico radar, a gente força nova local para bater na API com token
           forcarNova = true;
-        } else {
-          if (escolhida['fonte'] == 'local') {
-            dadosReaproveitados = escolhida;
-            reuse = true; // trata como reuso para pular a chamada à Radar API
-          } else if (escolhida['fonte'] == 'radar') {
-            // Se for via buscar histórico radar, a gente força nova local para bater na API com token
-            forcarNova = true;
-            tokenConsulta = escolhida['tokenConsulta'];
-          }
+          tokenConsulta = escolhida['tokenConsulta'];
         }
       }
 
@@ -652,13 +712,20 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         ));
 
         // Prepara objeto com dados que o usuário digitou ou que vieram da nuvem
-        String chassi = _modoEntrada == 'chassi' ? valor : (veiculoExistente?.chassiVeiculo ?? '');
-        String motor = _modoEntrada == 'motor' ? valor : (veiculoExistente?.motorVeiculo ?? '');
-        String placa = _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
-        
-        if (dadosReaproveitados != null && dadosReaproveitados['dados_tratados'] != null) {
+        String chassi = _modoEntrada == 'chassi'
+            ? valor
+            : (veiculoExistente?.chassiVeiculo ?? '');
+        String motor = _modoEntrada == 'motor'
+            ? valor
+            : (veiculoExistente?.motorVeiculo ?? '');
+        String placa =
+            _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
+
+        if (dadosReaproveitados != null &&
+            dadosReaproveitados['dados_tratados'] != null) {
           try {
-            final veiculoNuvem = RadarVeiculo.fromJson(dadosReaproveitados['dados_tratados']);
+            final veiculoNuvem =
+                RadarVeiculo.fromJson(dadosReaproveitados['dados_tratados']);
             if (veiculoNuvem.placa.isNotEmpty) placa = veiculoNuvem.placa;
             if (veiculoNuvem.chassi.isNotEmpty) chassi = veiculoNuvem.chassi;
             if (veiculoNuvem.motor.isNotEmpty) motor = veiculoNuvem.motor;
@@ -683,7 +750,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           param: _modoEntrada,
           value: valor,
           vistoriaId: vistoriaId,
-          forcarNova: false, 
+          forcarNova: false,
           tokenConsulta: tokenConsulta,
         )
             .then((veiculoApi) async {
@@ -692,28 +759,44 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             final mm = veiculoApi.marcaModelo.split('/');
             final marca = mm.isNotEmpty ? mm[0].trim() : '';
             final modelo = mm.length > 1 ? mm[1].trim() : '';
-            
+
             await dao.atualizarVeiculo(VeiculosCompanion(
               id: drift.Value(veiculoDb.id),
               vistoriaId: drift.Value(veiculoDb.vistoriaId),
               placa: drift.Value(veiculoApi.placa.isNotEmpty
                   ? veiculoApi.placa
                   : veiculoDb.placa),
-              chassiVeiculo:
-                  drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
-              motorVeiculo:
-                  drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+              chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty
+                  ? veiculoApi.chassi
+                  : veiculoDb.chassiVeiculo),
+              motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
+                  ? veiculoApi.motor
+                  : veiculoDb.motorVeiculo),
               marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
-              modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
+              modelo:
+                  drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
               anoFabricacao: drift.Value(
-                  int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
-              anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
-              cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
-              renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
-              chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
-              motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
-              municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
-              uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+                  int.tryParse(veiculoApi.anoFabricacao) ??
+                      veiculoDb.anoFabricacao),
+              anoModelo: drift.Value(
+                  int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+              cor: drift.Value(
+                  veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+              renavam: drift.Value(veiculoApi.renavam.isNotEmpty
+                  ? veiculoApi.renavam
+                  : veiculoDb.renavam),
+              chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty
+                  ? veiculoApi.chassi
+                  : veiculoDb.chassiBin),
+              motorBin: drift.Value(veiculoApi.motor.isNotEmpty
+                  ? veiculoApi.motor
+                  : veiculoDb.motorBin),
+              municipio: drift.Value(veiculoApi.municipio.isNotEmpty
+                  ? veiculoApi.municipio
+                  : veiculoDb.municipio),
+              uf: drift.Value(veiculoApi.estado.isNotEmpty
+                  ? veiculoApi.estado
+                  : veiculoDb.uf),
             ));
           }
         }).catchError((_) {
@@ -753,7 +836,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: Text(_somentePesquisa ? 'Pesquisa Veicular' : widget.tipo.titulo),
+        title:
+            Text(_somentePesquisa ? 'Pesquisa Veicular' : widget.tipo.titulo),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
@@ -848,15 +932,18 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _buscandoVeiculo ? null : () async {
-                    if (_somentePesquisa) {
-                      await _buscarVeiculo();
-                    } else {
-                      setState(() => _buscandoVeiculo = true);
-                      await _iniciarVistoriaEmBackground();
-                      if (mounted) setState(() => _buscandoVeiculo = false);
-                    }
-                  },
+                  onPressed: _buscandoVeiculo
+                      ? null
+                      : () async {
+                          if (_somentePesquisa) {
+                            await _buscarVeiculo();
+                          } else {
+                            setState(() => _buscandoVeiculo = true);
+                            await _iniciarVistoriaEmBackground();
+                            if (mounted)
+                              setState(() => _buscandoVeiculo = false);
+                          }
+                        },
                   icon: _buscandoVeiculo
                       ? const SizedBox(
                           width: 18,
@@ -864,10 +951,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           child: CircularProgressIndicator(
                               color: Colors.white, strokeWidth: 2),
                         )
-                      : Icon(_somentePesquisa ? Icons.search_rounded : Icons.play_arrow_rounded),
+                      : Icon(_somentePesquisa
+                          ? Icons.search_rounded
+                          : Icons.play_arrow_rounded),
                   label: Text(_buscandoVeiculo
-                      ? (_somentePesquisa ? 'Consultando...' : 'Iniciando Vistoria...')
-                      : (_somentePesquisa ? 'Realizar Pesquisa' : 'Consultar Veículo e Iniciar')),
+                      ? (_somentePesquisa
+                          ? 'Consultando...'
+                          : 'Iniciando Vistoria...')
+                      : (_somentePesquisa
+                          ? 'Realizar Pesquisa'
+                          : 'Consultar Veículo e Iniciar')),
                 ),
               ),
               const SizedBox(height: 12),
@@ -881,7 +974,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                   decoration: BoxDecoration(
                     color: AppTheme.primary.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1)),
+                    border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.1)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -943,7 +1037,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           ),
                           onPressed: () {
                             setState(() {
-                              _mostrarDetalhesPesquisa = !_mostrarDetalhesPesquisa;
+                              _mostrarDetalhesPesquisa =
+                                  !_mostrarDetalhesPesquisa;
                             });
                           },
                           icon: Icon(
@@ -986,7 +1081,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Não foi possível abrir o PDF.'),
+                                      content:
+                                          Text('Não foi possível abrir o PDF.'),
                                     ),
                                   );
                                 }
@@ -994,7 +1090,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('O relatório PDF da pesquisa está sendo processado.'),
+                                  content: Text(
+                                      'O relatório PDF da pesquisa está sendo processado.'),
                                   backgroundColor: AppTheme.comObs,
                                 ),
                               );
@@ -1046,8 +1143,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       icon: const Icon(Icons.play_arrow_rounded, size: 22),
                       label: const Text(
                         'Iniciar Vistoria',
-                        style:
-                            TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -1139,21 +1236,25 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       ],
                     ),
                   ),
-                  if (_arquivoPesquisaUrl != null && _arquivoPesquisaUrl!.isNotEmpty)
+                  if (_arquivoPesquisaUrl != null &&
+                      _arquivoPesquisaUrl!.isNotEmpty)
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                       ),
                       onPressed: () async {
                         final uri = Uri.parse(_arquivoPesquisaUrl!);
                         if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(uri,
+                              mode: LaunchMode.externalApplication);
                         }
                       },
                       icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                      label: const Text('Baixar Laudo', style: TextStyle(fontSize: 12)),
+                      label: const Text('Baixar Laudo',
+                          style: TextStyle(fontSize: 12)),
                     ),
                 ],
               ),

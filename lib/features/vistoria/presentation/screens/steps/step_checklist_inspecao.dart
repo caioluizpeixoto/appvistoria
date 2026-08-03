@@ -5,6 +5,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import '../../../domain/vistoria_type.dart';
+import '../../../domain/checklist_definitions.dart';
 
 class ChecklistOption {
   final String title;
@@ -38,26 +40,70 @@ class StepChecklistInspecao extends StatelessWidget {
   const StepChecklistInspecao({super.key});
 
   static const List<ChecklistOption> optionsFDI = [
-    ChecklistOption(title: 'F', fullTitle: 'Funcionando', value: 'Funcionando', selectedColor: AppTheme.conforme),
-    ChecklistOption(title: 'D', fullTitle: 'Danificado', value: 'Danificado', selectedColor: AppTheme.naoConforme),
-    ChecklistOption(title: 'I', fullTitle: 'Inexistente', value: 'Inexistente', selectedColor: Colors.grey),
+    ChecklistOption(
+        title: 'F',
+        fullTitle: 'Funcionando',
+        value: 'Funcionando',
+        selectedColor: AppTheme.conforme),
+    ChecklistOption(
+        title: 'D',
+        fullTitle: 'Danificado',
+        value: 'Danificado',
+        selectedColor: AppTheme.naoConforme),
+    ChecklistOption(
+        title: 'I',
+        fullTitle: 'Inexistente',
+        value: 'Inexistente',
+        selectedColor: Colors.grey),
   ];
 
   static const List<ChecklistOption> optionsSimNao = [
-    ChecklistOption(title: 'SIM', fullTitle: 'Sim', value: 'Sim', selectedColor: AppTheme.conforme),
-    ChecklistOption(title: 'NÃO', fullTitle: 'Não', value: 'Não', selectedColor: Colors.grey),
+    ChecklistOption(
+        title: 'SIM',
+        fullTitle: 'Sim',
+        value: 'Sim',
+        selectedColor: AppTheme.conforme),
+    ChecklistOption(
+        title: 'NÃO',
+        fullTitle: 'Não',
+        value: 'Não',
+        selectedColor: Colors.grey),
   ];
 
   static const List<ChecklistOption> optionsEscritorio = [
-    ChecklistOption(title: 'P/E', fullTitle: 'Possui / Escritório', value: 'Possui / Escritório', selectedColor: AppTheme.conforme),
-    ChecklistOption(title: 'E/C', fullTitle: 'Está com Cliente', value: 'Está com Cliente', selectedColor: Colors.orange),
-    ChecklistOption(title: 'N', fullTitle: 'Não Tem', value: 'Não Tem', selectedColor: Colors.grey),
+    ChecklistOption(
+        title: 'P/E',
+        fullTitle: 'Possui / Escritório',
+        value: 'Possui / Escritório',
+        selectedColor: AppTheme.conforme),
+    ChecklistOption(
+        title: 'E/C',
+        fullTitle: 'Está com Cliente',
+        value: 'Está com Cliente',
+        selectedColor: Colors.orange),
+    ChecklistOption(
+        title: 'N',
+        fullTitle: 'Não Tem',
+        value: 'Não Tem',
+        selectedColor: Colors.grey),
   ];
 
   static const List<ChecklistOption> optionsCNC = [
-    ChecklistOption(title: 'C', fullTitle: 'Conforme', value: 'Conforme', selectedColor: AppTheme.conforme),
-    ChecklistOption(title: 'NC', fullTitle: 'Não Conforme', value: 'Não Conforme', selectedColor: AppTheme.naoConforme),
-    ChecklistOption(title: 'NP', fullTitle: 'Não Possui', value: 'Não Possui', selectedColor: Colors.grey),
+    ChecklistOption(
+        title: 'C',
+        fullTitle: 'Conforme',
+        value: 'Conforme',
+        selectedColor: AppTheme.conforme),
+    ChecklistOption(
+        title: 'NC',
+        fullTitle: 'Não Conforme',
+        value: 'Não Conforme',
+        selectedColor: AppTheme.naoConforme),
+    ChecklistOption(
+        title: 'NP',
+        fullTitle: 'Não Possui',
+        value: 'Não Possui',
+        selectedColor: Colors.grey),
   ];
 
   @override
@@ -90,11 +136,40 @@ class StepChecklistInspecao extends StatelessWidget {
               const SizedBox(height: 24),
               _buildLegend(),
               const SizedBox(height: 24),
-              _buildCategoryGroup('Itens Externos', _getItensVeiculo(isPesado), state, context),
-              _buildCategoryGroup(isPesado ? 'Descrição Cabine' : 'Interior do Veículo', _getItensCabine(isPesado), state, context),
-              if (isPesado) _buildCategoryGroup('Itens Carreta', _getItensCarreta(), state, context),
-              if (isPesado) _buildCategoryGroup('Baterias', _getBaterias(), state, context),
-              _buildCategoryGroup('Itens de Escritório', _getItensEscritorio(isPesado), state, context),
+              if (state.tipoEnum == TipoVistoria.checklistPesado ||
+                  state.tipoEnum == TipoVistoria.checklistOnibus ||
+                  state.tipoEnum == TipoVistoria.checklistMicroOnibus)
+                ...getChecklistCategories(state.tipoEnum).entries.map((cat) {
+                  return _buildCategoryGroup(
+                    cat.key,
+                    cat.value.entries
+                        .map((e) => ChecklistItemDef(
+                              id: e.key,
+                              label: e.value,
+                              options: optionsCNC,
+                            ))
+                        .toList(),
+                    state,
+                    context,
+                  );
+                }).toList()
+              else ...[
+                _buildCategoryGroup('Itens Externos',
+                    _getItensVeiculo(isPesado), state, context),
+                _buildCategoryGroup(
+                    isPesado ? 'Descrição Cabine' : 'Interior do Veículo',
+                    _getItensCabine(isPesado),
+                    state,
+                    context),
+                if (isPesado)
+                  _buildCategoryGroup(
+                      'Itens Carreta', _getItensCarreta(), state, context),
+                if (isPesado)
+                  _buildCategoryGroup(
+                      'Baterias', _getBaterias(), state, context),
+                _buildCategoryGroup('Itens de Escritório',
+                    _getItensEscritorio(isPesado), state, context),
+              ],
               const SizedBox(height: 100),
             ],
           ),
@@ -114,15 +189,18 @@ class StepChecklistInspecao extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Legendas do Veículo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const Text('Legendas do Veículo:',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           const SizedBox(height: 4),
-          const Text('F = Funcionando | D = Danificado | I = Inexistente', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+          const Text('F = Funcionando | D = Danificado | I = Inexistente',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
         ],
       ),
     );
   }
 
-  Widget _buildCategoryGroup(String title, List<ChecklistItemDef> items, VistoriaWizardState state, BuildContext context) {
+  Widget _buildCategoryGroup(String title, List<ChecklistItemDef> items,
+      VistoriaWizardState state, BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -156,7 +234,8 @@ class StepChecklistInspecao extends StatelessWidget {
     );
   }
 
-  Widget _buildChecklistItem(ChecklistItemDef item, VistoriaWizardState state, BuildContext context) {
+  Widget _buildChecklistItem(
+      ChecklistItemDef item, VistoriaWizardState state, BuildContext context) {
     final status = state.getStatus(item.id);
     final obs = state.getObs(item.id);
     final temFoto = state.hasFoto(item.id);
@@ -186,7 +265,9 @@ class StepChecklistInspecao extends StatelessWidget {
               ),
               IconButton(
                 icon: Icon(
-                  temFoto ? Icons.camera_alt_rounded : Icons.camera_alt_outlined,
+                  temFoto
+                      ? Icons.camera_alt_rounded
+                      : Icons.camera_alt_outlined,
                   color: temFoto ? AppTheme.primary : AppTheme.textSecondary,
                 ),
                 onPressed: () => _tirarFoto(item.id, state, context),
@@ -200,7 +281,8 @@ class StepChecklistInspecao extends StatelessWidget {
               height: 60,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                children: state.getFotosLocais(item.id).asMap().entries.map((entry) {
+                children:
+                    state.getFotosLocais(item.id).asMap().entries.map((entry) {
                   return Container(
                     margin: const EdgeInsets.only(right: 8),
                     width: 60,
@@ -221,7 +303,8 @@ class StepChecklistInspecao extends StatelessWidget {
                             color: Colors.black54,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.close, size: 14, color: Colors.white),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Colors.white),
                         ),
                       ),
                     ),
@@ -268,7 +351,8 @@ class StepChecklistInspecao extends StatelessWidget {
     );
   }
 
-  Future<void> _tirarFoto(String itemId, VistoriaWizardState state, BuildContext context) async {
+  Future<void> _tirarFoto(
+      String itemId, VistoriaWizardState state, BuildContext context) async {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
       source: ImageSource.camera,
@@ -282,56 +366,131 @@ class StepChecklistInspecao extends StatelessWidget {
   }
 
   // --- Listas de itens ---
-  
+
   List<ChecklistItemDef> _getItensVeiculo(bool isPesado) {
     if (isPesado) {
       return [
-        const ChecklistItemDef(id: 'alternador', label: '3.1 Alternador', options: optionsFDI),
-        const ChecklistItemDef(id: 'macanetas_externas', label: '3.2 Maçanetas Externas', options: optionsFDI),
-        const ChecklistItemDef(id: 'espelho_retrovisor_d', label: '3.3 Espelho Retrovisor (D)', options: optionsFDI),
-        const ChecklistItemDef(id: 'espelho_retrovisor_e', label: '3.4 Espelho Retrovisor (E)', options: optionsFDI),
-        const ChecklistItemDef(id: 'lanternas', label: '3.5 Lanternas', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_baixo', label: '3.6 Farol Baixo', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_alto', label: '3.7 Farol Alto', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_milha', label: '3.8 Farol de Milha', options: optionsFDI),
-        const ChecklistItemDef(id: 'seta_direita', label: '3.9 Seta Direita', options: optionsFDI),
-        const ChecklistItemDef(id: 'seta_esquerda', label: '3.10 Seta Esquerda', options: optionsFDI),
-        const ChecklistItemDef(id: 'pisca_alerta', label: '3.11 Pisca Alerta', options: optionsFDI),
-        const ChecklistItemDef(id: 'arla', label: '3.12 Arla', options: optionsFDI),
-        const ChecklistItemDef(id: 'chave_tanque', label: '3.13 Chave do Tanque', options: optionsFDI),
-        const ChecklistItemDef(id: 'tampa_tanque', label: '3.14 Tampa do Tanque', options: optionsFDI),
-        const ChecklistItemDef(id: 'tanque_suplementar', label: '3.15 Tanque Suplementar', options: optionsFDI),
-        const ChecklistItemDef(id: 'rodo_ar', label: '3.16 Rodo Ar', options: optionsFDI),
-        const ChecklistItemDef(id: 'step', label: '3.17 Step', options: optionsFDI),
-        const ChecklistItemDef(id: 'placa_mercosul', label: '3.18 Placa Mercosul?', options: optionsSimNao),
-        const ChecklistItemDef(id: 'luz_re', label: '3.19 Luz de Ré', options: optionsFDI),
-        const ChecklistItemDef(id: 'luz_freio', label: '3.20 Luz de Freio', options: optionsFDI),
-        const ChecklistItemDef(id: 'macaco', label: '3.21 Macaco', options: optionsFDI),
-        const ChecklistItemDef(id: 'triangulo', label: '3.22 Triângulo', options: optionsFDI),
-        const ChecklistItemDef(id: 'chave_roda', label: '3.23 Chave de Roda', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'alternador', label: '3.1 Alternador', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macanetas_externas',
+            label: '3.2 Maçanetas Externas',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'espelho_retrovisor_d',
+            label: '3.3 Espelho Retrovisor (D)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'espelho_retrovisor_e',
+            label: '3.4 Espelho Retrovisor (E)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'lanternas', label: '3.5 Lanternas', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_baixo', label: '3.6 Farol Baixo', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_alto', label: '3.7 Farol Alto', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_milha',
+            label: '3.8 Farol de Milha',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'seta_direita', label: '3.9 Seta Direita', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'seta_esquerda',
+            label: '3.10 Seta Esquerda',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'pisca_alerta',
+            label: '3.11 Pisca Alerta',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'arla', label: '3.12 Arla', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'chave_tanque',
+            label: '3.13 Chave do Tanque',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tampa_tanque',
+            label: '3.14 Tampa do Tanque',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tanque_suplementar',
+            label: '3.15 Tanque Suplementar',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'rodo_ar', label: '3.16 Rodo Ar', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'step', label: '3.17 Step', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'placa_mercosul',
+            label: '3.18 Placa Mercosul?',
+            options: optionsSimNao),
+        const ChecklistItemDef(
+            id: 'luz_re', label: '3.19 Luz de Ré', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luz_freio', label: '3.20 Luz de Freio', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macaco', label: '3.21 Macaco', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'triangulo', label: '3.22 Triângulo', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'chave_roda', label: '3.23 Chave de Roda', options: optionsFDI),
       ];
     } else {
       return [
-        const ChecklistItemDef(id: 'macanetas_externas', label: 'Maçanetas Externas', options: optionsFDI),
-        const ChecklistItemDef(id: 'espelho_retrovisor_d', label: 'Espelho Retrovisor (D)', options: optionsFDI),
-        const ChecklistItemDef(id: 'espelho_retrovisor_e', label: 'Espelho Retrovisor (E)', options: optionsFDI),
-        const ChecklistItemDef(id: 'lanternas_dianteiras', label: 'Lanternas Dianteiras', options: optionsFDI),
-        const ChecklistItemDef(id: 'lanternas_traseiras', label: 'Lanternas Traseiras', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_baixo', label: 'Farol Baixo', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_alto', label: 'Farol Alto', options: optionsFDI),
-        const ChecklistItemDef(id: 'farol_milha', label: 'Farol de Milha', options: optionsFDI),
-        const ChecklistItemDef(id: 'seta_direita', label: 'Seta Direita', options: optionsFDI),
-        const ChecklistItemDef(id: 'seta_esquerda', label: 'Seta Esquerda', options: optionsFDI),
-        const ChecklistItemDef(id: 'pisca_alerta', label: 'Pisca Alerta', options: optionsFDI),
-        const ChecklistItemDef(id: 'tampa_tanque', label: 'Tampa do Tanque', options: optionsFDI),
-        const ChecklistItemDef(id: 'step', label: 'Estepe', options: optionsFDI),
-        const ChecklistItemDef(id: 'placa_mercosul', label: 'Placa Mercosul?', options: optionsSimNao),
-        const ChecklistItemDef(id: 'luz_re', label: 'Luz de Ré', options: optionsFDI),
-        const ChecklistItemDef(id: 'luz_freio', label: 'Luz de Freio', options: optionsFDI),
-        const ChecklistItemDef(id: 'macaco', label: 'Macaco', options: optionsFDI),
-        const ChecklistItemDef(id: 'triangulo', label: 'Triângulo', options: optionsFDI),
-        const ChecklistItemDef(id: 'chave_roda', label: 'Chave de Roda', options: optionsFDI),
-        const ChecklistItemDef(id: 'antena', label: 'Antena', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macanetas_externas',
+            label: 'Maçanetas Externas',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'espelho_retrovisor_d',
+            label: 'Espelho Retrovisor (D)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'espelho_retrovisor_e',
+            label: 'Espelho Retrovisor (E)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'lanternas_dianteiras',
+            label: 'Lanternas Dianteiras',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'lanternas_traseiras',
+            label: 'Lanternas Traseiras',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_baixo', label: 'Farol Baixo', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_alto', label: 'Farol Alto', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'farol_milha', label: 'Farol de Milha', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'seta_direita', label: 'Seta Direita', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'seta_esquerda', label: 'Seta Esquerda', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'pisca_alerta', label: 'Pisca Alerta', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tampa_tanque', label: 'Tampa do Tanque', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'step', label: 'Estepe', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'placa_mercosul',
+            label: 'Placa Mercosul?',
+            options: optionsSimNao),
+        const ChecklistItemDef(
+            id: 'luz_re', label: 'Luz de Ré', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luz_freio', label: 'Luz de Freio', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macaco', label: 'Macaco', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'triangulo', label: 'Triângulo', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'chave_roda', label: 'Chave de Roda', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'antena', label: 'Antena', options: optionsFDI),
       ];
     }
   }
@@ -339,95 +498,261 @@ class StepChecklistInspecao extends StatelessWidget {
   List<ChecklistItemDef> _getItensCabine(bool isPesado) {
     if (isPesado) {
       return [
-        const ChecklistItemDef(id: 'alarme_outros', label: '3.33 Alarme / Outros', options: optionsFDI),
-        const ChecklistItemDef(id: 'rastreador', label: '3.34 Rastreador', options: optionsSimNao),
-        const ChecklistItemDef(id: 'travas_portas', label: '3.35 Travas Portas', options: optionsFDI),
-        const ChecklistItemDef(id: 'caixa_fusiveis', label: '3.36 Caixa Fusível', options: optionsFDI),
-        const ChecklistItemDef(id: 'comutador_chave', label: '3.37 Comutador Chave (Ignição)', options: optionsFDI),
-        const ChecklistItemDef(id: 'motor_arranque', label: '3.38 Motor de Arranque', options: optionsFDI),
-        const ChecklistItemDef(id: 'freio_motor', label: '3.39 Freio Motor', options: optionsFDI),
-        const ChecklistItemDef(id: 'luzes_painel', label: '3.40 Luzes do Painel', options: optionsFDI),
-        const ChecklistItemDef(id: 'luz_diagnostico', label: '3.41 Luz Diagnóstico', options: optionsFDI),
-        const ChecklistItemDef(id: 'conta_giros', label: '3.42 Conta Giros', options: optionsFDI),
-        const ChecklistItemDef(id: 'buzina_eletrica', label: '3.43 Buzina Elétrica', options: optionsFDI),
-        const ChecklistItemDef(id: 'buzina_pneumatica', label: '3.44 Buzina Pneumática', options: optionsFDI),
-        const ChecklistItemDef(id: 'para_brisas', label: '3.45 Para-brisas', options: optionsFDI),
-        const ChecklistItemDef(id: 'esguicho_agua', label: '3.46 Esguicho de Água do Para-brisa', options: optionsFDI),
-        const ChecklistItemDef(id: 'limpador_para_brisas', label: '3.47 Limpador do Para-brisa', options: optionsFDI),
-        const ChecklistItemDef(id: 'acendedor_eletrico', label: '3.48 Acendedor Elétrico', options: optionsFDI),
-        const ChecklistItemDef(id: 'piloto_automatico', label: '3.49 Piloto Automático', options: optionsFDI),
-        const ChecklistItemDef(id: 'som', label: '3.50 Som FM / MP3 / USB', options: optionsFDI),
-        const ChecklistItemDef(id: 'ar_condicionado', label: '3.51 Ar Condicionado', options: optionsFDI),
-        const ChecklistItemDef(id: 'ventilador', label: '3.52 Ventilador', options: optionsFDI),
-        const ChecklistItemDef(id: 'interclima', label: '3.53 Interclima', options: optionsFDI),
-        const ChecklistItemDef(id: 'vidro_eletrico', label: '3.54 Vidro Elétrico', options: optionsFDI),
-        const ChecklistItemDef(id: 'manivela_vidros', label: '3.55 Manivela Vidros', options: optionsFDI),
-        const ChecklistItemDef(id: 'macanetas_internas', label: '3.56 Maçanetas Internas', options: optionsFDI),
-        const ChecklistItemDef(id: 'tapecaria_bancos', label: '3.57 Tapeçaria Bancos', options: optionsFDI),
-        const ChecklistItemDef(id: 'tapecaria_cama', label: '3.58 Tapeçaria Cama', options: optionsFDI),
-        const ChecklistItemDef(id: 'cinto_motorista', label: '3.59 Cinto de Segurança Motorista', options: optionsFDI),
-        const ChecklistItemDef(id: 'cinto_passageiro', label: '3.60 Cinto de Segurança Passageiro', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'alarme_outros',
+            label: '3.33 Alarme / Outros',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'rastreador', label: '3.34 Rastreador', options: optionsSimNao),
+        const ChecklistItemDef(
+            id: 'travas_portas',
+            label: '3.35 Travas Portas',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'caixa_fusiveis',
+            label: '3.36 Caixa Fusível',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'comutador_chave',
+            label: '3.37 Comutador Chave (Ignição)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'motor_arranque',
+            label: '3.38 Motor de Arranque',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'freio_motor', label: '3.39 Freio Motor', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luzes_painel',
+            label: '3.40 Luzes do Painel',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luz_diagnostico',
+            label: '3.41 Luz Diagnóstico',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'conta_giros', label: '3.42 Conta Giros', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'buzina_eletrica',
+            label: '3.43 Buzina Elétrica',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'buzina_pneumatica',
+            label: '3.44 Buzina Pneumática',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_brisas', label: '3.45 Para-brisas', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'esguicho_agua',
+            label: '3.46 Esguicho de Água do Para-brisa',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'limpador_para_brisas',
+            label: '3.47 Limpador do Para-brisa',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'acendedor_eletrico',
+            label: '3.48 Acendedor Elétrico',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'piloto_automatico',
+            label: '3.49 Piloto Automático',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'som', label: '3.50 Som FM / MP3 / USB', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'ar_condicionado',
+            label: '3.51 Ar Condicionado',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'ventilador', label: '3.52 Ventilador', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'interclima', label: '3.53 Interclima', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'vidro_eletrico',
+            label: '3.54 Vidro Elétrico',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'manivela_vidros',
+            label: '3.55 Manivela Vidros',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macanetas_internas',
+            label: '3.56 Maçanetas Internas',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tapecaria_bancos',
+            label: '3.57 Tapeçaria Bancos',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tapecaria_cama',
+            label: '3.58 Tapeçaria Cama',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'cinto_motorista',
+            label: '3.59 Cinto de Segurança Motorista',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'cinto_passageiro',
+            label: '3.60 Cinto de Segurança Passageiro',
+            options: optionsFDI),
       ];
     } else {
       return [
-        const ChecklistItemDef(id: 'alarme_outros', label: 'Alarme / Outros', options: optionsFDI),
-        const ChecklistItemDef(id: 'travas_portas', label: 'Travas Portas', options: optionsFDI),
-        const ChecklistItemDef(id: 'comutador_chave', label: 'Comutador Chave (Ignição)', options: optionsFDI),
-        const ChecklistItemDef(id: 'motor_arranque', label: 'Motor de Arranque', options: optionsFDI),
-        const ChecklistItemDef(id: 'luzes_painel', label: 'Luzes do Painel', options: optionsFDI),
-        const ChecklistItemDef(id: 'luz_diagnostico', label: 'Luz Diagnóstico', options: optionsFDI),
-        const ChecklistItemDef(id: 'conta_giros', label: 'Conta Giros', options: optionsFDI),
-        const ChecklistItemDef(id: 'buzina', label: 'Buzina', options: optionsFDI),
-        const ChecklistItemDef(id: 'para_brisas', label: 'Para-Brisas', options: optionsFDI),
-        const ChecklistItemDef(id: 'esguicho_agua', label: 'Esguicho de Água', options: optionsFDI),
-        const ChecklistItemDef(id: 'limpador_dianteiro', label: 'Limpador Dianteiro', options: optionsFDI),
-        const ChecklistItemDef(id: 'limpador_traseiro', label: 'Limpador Traseiro', options: optionsFDI),
-        const ChecklistItemDef(id: 'acendedor_eletrico', label: 'Acendedor Elétrico / 12V', options: optionsFDI),
-        const ChecklistItemDef(id: 'som', label: 'Som / Multimídia', options: optionsFDI),
-        const ChecklistItemDef(id: 'ar_condicionado', label: 'Ar Condicionado', options: optionsFDI),
-        const ChecklistItemDef(id: 'ventilador', label: 'Ventilador', options: optionsFDI),
-        const ChecklistItemDef(id: 'vidro_eletrico', label: 'Vidro Elétrico', options: optionsFDI),
-        const ChecklistItemDef(id: 'manivela_vidros', label: 'Manivela Vidros', options: optionsFDI),
-        const ChecklistItemDef(id: 'macanetas_internas', label: 'Maçanetas Internas', options: optionsFDI),
-        const ChecklistItemDef(id: 'tapecaria_bancos', label: 'Tapeçaria Bancos', options: optionsFDI),
-        const ChecklistItemDef(id: 'tapecaria_teto', label: 'Tapeçaria Teto', options: optionsFDI),
-        const ChecklistItemDef(id: 'cinto_dianteiro', label: 'Cinto Segurança Dianteiros', options: optionsFDI),
-        const ChecklistItemDef(id: 'cinto_traseiro', label: 'Cinto Segurança Traseiros', options: optionsFDI),
-        const ChecklistItemDef(id: 'luz_interna', label: 'Luz Interna', options: optionsFDI),
-        const ChecklistItemDef(id: 'retrovisor_interno', label: 'Retrovisor Interno', options: optionsFDI),
-        const ChecklistItemDef(id: 'quebra_sol_d', label: 'Quebra Sol (D)', options: optionsFDI),
-        const ChecklistItemDef(id: 'quebra_sol_e', label: 'Quebra Sol (E)', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'alarme_outros', label: 'Alarme / Outros', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'travas_portas', label: 'Travas Portas', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'comutador_chave',
+            label: 'Comutador Chave (Ignição)',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'motor_arranque',
+            label: 'Motor de Arranque',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luzes_painel', label: 'Luzes do Painel', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luz_diagnostico',
+            label: 'Luz Diagnóstico',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'conta_giros', label: 'Conta Giros', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'buzina', label: 'Buzina', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_brisas', label: 'Para-Brisas', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'esguicho_agua',
+            label: 'Esguicho de Água',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'limpador_dianteiro',
+            label: 'Limpador Dianteiro',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'limpador_traseiro',
+            label: 'Limpador Traseiro',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'acendedor_eletrico',
+            label: 'Acendedor Elétrico / 12V',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'som', label: 'Som / Multimídia', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'ar_condicionado',
+            label: 'Ar Condicionado',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'ventilador', label: 'Ventilador', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'vidro_eletrico', label: 'Vidro Elétrico', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'manivela_vidros',
+            label: 'Manivela Vidros',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'macanetas_internas',
+            label: 'Maçanetas Internas',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tapecaria_bancos',
+            label: 'Tapeçaria Bancos',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'tapecaria_teto', label: 'Tapeçaria Teto', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'cinto_dianteiro',
+            label: 'Cinto Segurança Dianteiros',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'cinto_traseiro',
+            label: 'Cinto Segurança Traseiros',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'luz_interna', label: 'Luz Interna', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'retrovisor_interno',
+            label: 'Retrovisor Interno',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'quebra_sol_d', label: 'Quebra Sol (D)', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'quebra_sol_e', label: 'Quebra Sol (E)', options: optionsFDI),
       ];
     }
   }
 
   List<ChecklistItemDef> _getItensCarreta() {
     return [
-      const ChecklistItemDef(id: 'tomada_forca', label: '3.24 Tomada de Força', options: optionsFDI),
-      const ChecklistItemDef(id: 'lanternas_carreta', label: '3.25 Lanternas', options: optionsFDI),
-      const ChecklistItemDef(id: 'seta_direita_carreta', label: '3.26 Seta Direita', options: optionsFDI),
-      const ChecklistItemDef(id: 'seta_esquerda_carreta', label: '3.27 Seta Esquerda', options: optionsFDI),
-      const ChecklistItemDef(id: 'pisca_alerta_carreta', label: '3.28 Pisca Alerta', options: optionsFDI),
-      const ChecklistItemDef(id: 'luz_re_carreta', label: '3.29 Luz de Ré', options: optionsFDI),
-      const ChecklistItemDef(id: 'luz_freio_carreta', label: '3.30 Luz de Freio', options: optionsFDI),
-      const ChecklistItemDef(id: 'pistao_1', label: '3.31 Pistão Hidráulico 1', options: optionsFDI),
-      const ChecklistItemDef(id: 'pistao_2', label: '3.32 Pistão Hidráulico 2', options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'tomada_forca',
+          label: '3.24 Tomada de Força',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'lanternas_carreta',
+          label: '3.25 Lanternas',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'seta_direita_carreta',
+          label: '3.26 Seta Direita',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'seta_esquerda_carreta',
+          label: '3.27 Seta Esquerda',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'pisca_alerta_carreta',
+          label: '3.28 Pisca Alerta',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'luz_re_carreta', label: '3.29 Luz de Ré', options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'luz_freio_carreta',
+          label: '3.30 Luz de Freio',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'pistao_1',
+          label: '3.31 Pistão Hidráulico 1',
+          options: optionsFDI),
+      const ChecklistItemDef(
+          id: 'pistao_2',
+          label: '3.32 Pistão Hidráulico 2',
+          options: optionsFDI),
     ];
   }
 
   List<ChecklistItemDef> _getBaterias() {
     return [
-      const ChecklistItemDef(id: 'bateria_a', label: '(A) Bateria', options: [], hasTextField: true),
-      const ChecklistItemDef(id: 'bateria_b', label: '(B) Bateria', options: [], hasTextField: true),
+      const ChecklistItemDef(
+          id: 'bateria_a',
+          label: '(A) Bateria',
+          options: [],
+          hasTextField: true),
+      const ChecklistItemDef(
+          id: 'bateria_b',
+          label: '(B) Bateria',
+          options: [],
+          hasTextField: true),
     ];
   }
 
   List<ChecklistItemDef> _getItensEscritorio(bool isPesado) {
     return [
-      const ChecklistItemDef(id: 'doc_rodar', label: 'Documento CRLV', options: optionsEscritorio),
-      const ChecklistItemDef(id: 'doc_recibo', label: 'Documento Recibo', options: optionsEscritorio),
-      const ChecklistItemDef(id: 'manual', label: 'Manual', options: optionsEscritorio),
-      const ChecklistItemDef(id: 'chave_reserva', label: 'Chave Reserva', options: optionsEscritorio),
+      const ChecklistItemDef(
+          id: 'doc_rodar', label: 'Documento CRLV', options: optionsEscritorio),
+      const ChecklistItemDef(
+          id: 'doc_recibo',
+          label: 'Documento Recibo',
+          options: optionsEscritorio),
+      const ChecklistItemDef(
+          id: 'manual', label: 'Manual', options: optionsEscritorio),
+      const ChecklistItemDef(
+          id: 'chave_reserva',
+          label: 'Chave Reserva',
+          options: optionsEscritorio),
     ];
   }
 }
@@ -477,4 +802,3 @@ class _OptionButton extends StatelessWidget {
     );
   }
 }
-

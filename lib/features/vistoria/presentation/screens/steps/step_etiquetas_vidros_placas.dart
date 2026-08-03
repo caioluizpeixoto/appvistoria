@@ -36,7 +36,8 @@ class StepVidros extends StatelessWidget {
 
     final itensFiltrados = _itensPrincipais.where((item) {
       if (isCaminhao) {
-        if (item['id'] == 'vidro_traseiro_direito' || item['id'] == 'vidro_traseiro_esquerdo') {
+        if (item['id'] == 'vidro_traseiro_direito' ||
+            item['id'] == 'vidro_traseiro_esquerdo') {
           return false;
         }
       }
@@ -58,7 +59,6 @@ class StepVidros extends StatelessWidget {
               statusOptions: _statusOpcoes,
               obrigatoria: false,
             )),
-        
         if (vidrosExtrasIds.isNotEmpty) ...[
           const SizedBox(height: 16),
           const Divider(),
@@ -83,7 +83,8 @@ class StepVidros extends StatelessWidget {
                   top: 10,
                   right: 10,
                   child: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: AppTheme.naoConforme),
+                    icon: const Icon(Icons.delete_outline,
+                        color: AppTheme.naoConforme),
                     onPressed: () => state.removeVidroExtra(id),
                   ),
                 ),
@@ -91,7 +92,6 @@ class StepVidros extends StatelessWidget {
             );
           }),
         ],
-
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity,
@@ -140,8 +140,8 @@ class _StepHeader extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF212121))),
               Text(subtitle,
-                  style: const TextStyle(
-                      fontSize: 12, color: Color(0xFF757575))),
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF757575))),
             ],
           ),
         ),

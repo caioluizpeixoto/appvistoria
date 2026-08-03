@@ -7,7 +7,8 @@ void main() async {
   final anonKey = 'sb_publishable_C2JRdVkSfBaVeNE904dfTg_KTg6oksq';
 
   final response = await http.post(
-    Uri.parse('https://cmcpmppgpbrufrxznost.supabase.co/functions/v1/gerar-imagem-veiculo'),
+    Uri.parse(
+        'https://cmcpmppgpbrufrxznost.supabase.co/functions/v1/gerar-imagem-veiculo'),
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer sb_publishable_C2JRdVkSfBaVeNE904dfTg_KTg6oksq',
@@ -22,12 +23,13 @@ void main() async {
       'parts': [
         {'part': 'rear right (passenger side) door', 'color': 'red'}
       ],
-      'customInstruction': 'Ensure ONLY the rear right door on the passenger side is red. The left driver side doors MUST be neutral gray.'
+      'customInstruction':
+          'Ensure ONLY the rear right door on the passenger side is red. The left driver side doors MUST be neutral gray.'
     }),
   );
 
   print('Status: ${response.statusCode}');
-  
+
   try {
     final data = jsonDecode(response.body);
     if (data['base64'] != null) {

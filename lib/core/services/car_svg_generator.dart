@@ -7,7 +7,8 @@ class CarSvgGenerator {
     // Helper para extrair a cor hex
     String getHex(String key) {
       final color = colors[key] ?? PdfColor.fromHex('#e0e0e0');
-      return color.toHex().substring(0, 7); // Remove alpha se houver, garantindo formato #RRGGBB
+      return color.toHex().substring(
+          0, 7); // Remove alpha se houver, garantindo formato #RRGGBB
     }
 
     return '''

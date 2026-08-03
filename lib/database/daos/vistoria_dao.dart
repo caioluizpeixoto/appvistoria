@@ -31,17 +31,20 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<Vistoria?> buscarPorNumeroLaudoOuId(String termo) async {
     // 1. Busca exata por numeroLaudo
-    final porLaudo = await (select(vistorias)..where((t) => t.numeroLaudo.equals(termo))).getSingleOrNull();
+    final porLaudo = await (select(vistorias)
+          ..where((t) => t.numeroLaudo.equals(termo)))
+        .getSingleOrNull();
     if (porLaudo != null) return porLaudo;
 
-    // 2. Fallback: o app gerava códigos a partir do ID (ex: Timestamp). 
+    // 2. Fallback: o app gerava códigos a partir do ID (ex: Timestamp).
     // Se digitou VST-17818265, buscamos se o ID começa com 17818265
     String termoId = termo;
     if (termo.startsWith('VST-')) {
       termoId = termo.substring(4);
     }
-    
-    final porId = await (select(vistorias)..where((t) => t.id.like('$termoId%'))).get();
+
+    final porId =
+        await (select(vistorias)..where((t) => t.id.like('$termoId%'))).get();
     if (porId.isNotEmpty) return porId.first;
 
     return null;
@@ -60,12 +63,23 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<void> excluirVistoriaCompleta(String vistoriaId) async {
     return transaction(() async {
-      await (delete(fotosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
-      await (delete(itensVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
-      await (delete(itensPintura)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
-      await (delete(itensEstrutura)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
-      await (delete(vidrosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
-      await (delete(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      await (delete(fotosVistoria)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      await (delete(itensVistoria)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      await (delete(itensPintura)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      await (delete(itensEstrutura)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      await (delete(vidrosVistoria)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      await (delete(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
       await (delete(vistorias)..where((t) => t.id.equals(vistoriaId))).go();
     });
   }
@@ -119,7 +133,8 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
           .watchSingleOrNull();
 
   Future<Veiculo?> buscarVeiculoPorPlaca(String placa) async {
-    final results = await (select(veiculos)..where((t) => t.placa.equals(placa))).get();
+    final results =
+        await (select(veiculos)..where((t) => t.placa.equals(placa))).get();
     if (results.isEmpty) return null;
     return results.last; // Retorna o mais recente caso haja vários antigos
   }
@@ -133,8 +148,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   // ── Itens ─────────────────────────────────────────────────────────────────
 
-  Future<List<ItensVistoriaData>> listarItensPorVistoria(
-          String vistoriaId) =>
+  Future<List<ItensVistoriaData>> listarItensPorVistoria(String vistoriaId) =>
       (select(itensVistoria)
             ..where((t) => t.vistoriaId.equals(vistoriaId))
             ..orderBy([
@@ -146,8 +160,8 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
   Future<List<ItensVistoriaData>> listarItensPorEtapa(
           String vistoriaId, String etapa) =>
       (select(itensVistoria)
-            ..where((t) =>
-                t.vistoriaId.equals(vistoriaId) & t.etapa.equals(etapa)))
+            ..where(
+                (t) => t.vistoriaId.equals(vistoriaId) & t.etapa.equals(etapa)))
           .get();
 
   Future<int> inserirItem(ItensVistoriaCompanion item) =>
@@ -165,8 +179,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
 
-  Future<List<FotosVistoriaData>> listarFotosPorVistoria(
-          String vistoriaId) =>
+  Future<List<FotosVistoriaData>> listarFotosPorVistoria(String vistoriaId) =>
       (select(fotosVistoria)
             ..where((t) => t.vistoriaId.equals(vistoriaId))
             ..orderBy([(t) => OrderingTerm.asc(t.ordem)]))
@@ -183,8 +196,8 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
   Future<List<FotosVistoriaData>> listarFotosPorEtapa(
           String vistoriaId, String etapa) =>
       (select(fotosVistoria)
-            ..where((t) =>
-                t.vistoriaId.equals(vistoriaId) & t.etapa.equals(etapa))
+            ..where(
+                (t) => t.vistoriaId.equals(vistoriaId) & t.etapa.equals(etapa))
             ..orderBy([(t) => OrderingTerm.asc(t.ordem)]))
           .get();
 
@@ -198,24 +211,26 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
       (delete(fotosVistoria)..where((t) => t.id.equals(id))).go();
 
   Future<int> deletarFotosPorVistoria(String vistoriaId) =>
-      (delete(fotosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      (delete(fotosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
 
   Future<int> deletarItensPorVistoria(String vistoriaId) =>
-      (delete(itensVistoria)..where((t) => t.vistoriaId.equals(vistoriaId))).go();
+      (delete(itensVistoria)..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
 
   Future<int> contarFotosObrigatoriasFaltando(String vistoriaId) async {
     final fotos = await listarFotosPorVistoria(vistoriaId);
     final obrigatorias = fotos.where((f) => f.obrigatoria).toList();
-    final comFoto = obrigatorias.where((f) => f.urlSupabase != null || f.pathLocal != null).length;
+    final comFoto = obrigatorias
+        .where((f) => f.urlSupabase != null || f.pathLocal != null)
+        .length;
     return obrigatorias.length - comFoto;
   }
 
   // ── Pintura ───────────────────────────────────────────────────────────────
 
-  Future<List<ItensPinturaData>> listarPinturaPorVistoria(
-          String vistoriaId) =>
-      (select(itensPintura)
-            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+  Future<List<ItensPinturaData>> listarPinturaPorVistoria(String vistoriaId) =>
+      (select(itensPintura)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .get();
 
   Future<int> inserirOuAtualizarPintura(ItensPinturaCompanion item) =>
@@ -225,8 +240,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<ItensEstruturaData>> listarEstruturaPorVistoria(
           String vistoriaId) =>
-      (select(itensEstrutura)
-            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+      (select(itensEstrutura)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .get();
 
   Future<int> inserirOuAtualizarEstrutura(ItensEstruturaCompanion item) =>
@@ -234,10 +248,8 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   // ── Vidros ────────────────────────────────────────────────────────────────
 
-  Future<List<VidrosVistoriaData>> listarVidrosPorVistoria(
-          String vistoriaId) =>
-      (select(vidrosVistoria)
-            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+  Future<List<VidrosVistoriaData>> listarVidrosPorVistoria(String vistoriaId) =>
+      (select(vidrosVistoria)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .get();
 
   Future<int> inserirOuAtualizarVidro(VidrosVistoriaCompanion item) =>

@@ -76,7 +76,7 @@ class RadarVeiculo {
       restricoes4: json['restricoes4']?.toString() ?? '',
       informacoesRelevantes: json['informacoesRelevantes']?.toString() ?? '',
       arquivoPesquisaUrl: json['radar_pdf_url']?.toString(),
-      resultadoCompleto: json['resultadoCompleto'] != null 
+      resultadoCompleto: json['resultadoCompleto'] != null
           ? Map<String, dynamic>.from(json['resultadoCompleto'])
           : {},
     );

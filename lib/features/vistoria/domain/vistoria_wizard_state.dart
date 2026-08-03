@@ -78,11 +78,19 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Flags Auxiliares ───────────────────────────────────────────────────────
   TipoVistoria get tipoEnum => TipoVistoria.fromString(tipoVistoria);
   bool get isCaminhao => tipoEnum == TipoVistoria.cautelarCaminhao;
-  bool get temCroqui => tipoEnum != TipoVistoria.cautelarCaminhao && !isChecklistPesado && !isChecklistPasseio;
-  bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
   bool get isChecklistPesado => tipoEnum == TipoVistoria.checklistPesado;
+  bool get isChecklistOnibus => tipoEnum == TipoVistoria.checklistOnibus;
+  bool get isChecklistMicroOnibus =>
+      tipoEnum == TipoVistoria.checklistMicroOnibus;
   bool get isChecklistPasseio => tipoEnum == TipoVistoria.checklistPasseio;
-  bool get isChecklist => isChecklistPesado || isChecklistPasseio;
+  bool get isChecklist =>
+      isChecklistPesado ||
+      isChecklistPasseio ||
+      isChecklistOnibus ||
+      isChecklistMicroOnibus;
+  bool get temCroqui =>
+      tipoEnum != TipoVistoria.cautelarCaminhao && !isChecklist;
+  bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
 
   // ── Medidas e Complementos (apenas Caminhão) ──────────────────────────────
   final Map<String, String> medidasComplementos = {
@@ -123,12 +131,14 @@ class VistoriaWizardState extends ChangeNotifier {
 
   int get totalSteps {
     if (isChecklistPesado) return 5;
-    if (isChecklistPasseio) return 4;
+    if (isChecklistPasseio || isChecklistOnibus || isChecklistMicroOnibus)
+      return 4;
     int count = 10;
     if (temCroqui) count++;
     if (temAvarias) count++;
     return count;
   }
+
   bool get isFirstStep => currentStep == 0;
   bool get isLastStep => currentStep >= totalSteps - 1;
 
@@ -330,10 +340,11 @@ class VistoriaWizardState extends ChangeNotifier {
     if (divs.isEmpty && fotasObrigatoriasFaltando.isEmpty) {
       final temObs = checklistStatus.values.any((s) {
         final sl = s.toLowerCase();
-        if (sl.contains('sem reparo')) return false; // Ignorar pois é um status positivo
+        if (sl.contains('sem reparo'))
+          return false; // Ignorar pois é um status positivo
         return sl.contains('reparo') ||
-               sl.contains('observação') ||
-               sl.contains('repintura');
+            sl.contains('observação') ||
+            sl.contains('repintura');
       });
       return temObs ? 'Conforme com observações' : 'Conforme';
     }

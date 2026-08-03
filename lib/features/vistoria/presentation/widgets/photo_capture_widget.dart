@@ -73,7 +73,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         if (croppedFile != null) {
           final tempFile = File(croppedFile.path);
           final appDir = await getApplicationDocumentsDirectory();
-          final fileName = 'vistoria_img_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
+          final fileName =
+              'vistoria_img_${DateTime.now().millisecondsSinceEpoch}${p.extension(tempFile.path)}';
           final savedFile = await tempFile.copy('${appDir.path}/$fileName');
 
           setState(() => _currentPhoto = savedFile);
@@ -103,9 +104,11 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
     try {
       final byteData = await rootBundle.load('assets/images/app_icon.png');
       final appDir = await getApplicationDocumentsDirectory();
-      final tempFile = File('${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
-      await tempFile.writeAsBytes(byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
-      
+      final tempFile = File(
+          '${appDir.path}/dummy_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+
       setState(() => _currentPhoto = tempFile);
       if (widget.onPhotoCaptured != null) {
         widget.onPhotoCaptured!(tempFile);
@@ -152,27 +155,35 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
                 ),
                 if (widget.isMandatory)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.red.shade50,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       'Obrigatório',
-                      style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
                 if (widget.enableOcr)
                   Container(
                     margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: AppTheme.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
                       'OCR Ativo',
-                      style: TextStyle(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.primary,
+                          fontWeight: FontWeight.bold),
                     ),
                   ),
               ],
@@ -261,7 +272,8 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         TextButton.icon(
           onPressed: _fillDummyPhoto,
           icon: const Icon(Icons.bug_report, size: 16, color: Colors.grey),
-          label: const Text('Preencher com foto fictícia (Teste)', style: TextStyle(color: Colors.grey, fontSize: 12)),
+          label: const Text('Preencher com foto fictícia (Teste)',
+              style: TextStyle(color: Colors.grey, fontSize: 12)),
         ),
       ],
     );

@@ -18,8 +18,7 @@ class BinDao extends DatabaseAccessor<AppDatabase> with _$BinDaoMixin {
   // ── Vistoriador (perfil local) ─────────────────────────────────────────────
 
   Future<Vistoriadore?> buscarVistoriadorPorId(String id) =>
-      (select(vistoriadores)..where((t) => t.id.equals(id)))
-          .getSingleOrNull();
+      (select(vistoriadores)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Future<int> inserirOuAtualizarVistoriador(VistoriadoresCompanion v) =>
       into(vistoriadores).insertOnConflictUpdate(v);

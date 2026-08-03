@@ -32,7 +32,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (_senhaCtrl.text != _senhaConfCtrl.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -58,6 +58,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         title: const Text('Criar Conta'),
         backgroundColor: AppTheme.background,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/login'),
+        ),
       ),
       body: BlocConsumer<AuthBloc, AuthBlocState>(
         listener: (context, state) {
@@ -69,7 +73,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             );
           } else if (state is AuthAuthenticated) {
-             ScaffoldMessenger.of(context).showSnackBar(
+            ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('Conta criada com sucesso!'),
                 backgroundColor: AppTheme.conforme,
@@ -201,8 +205,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           : Icons.visibility_off_outlined,
                                       size: 20,
                                     ),
-                                    onPressed: () => setState(
-                                        () => _obscureSenhaConf = !_obscureSenhaConf),
+                                    onPressed: () => setState(() =>
+                                        _obscureSenhaConf = !_obscureSenhaConf),
                                   ),
                                 ),
                                 validator: (v) {

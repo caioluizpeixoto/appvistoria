@@ -27,14 +27,11 @@ class StepMotorCambio extends StatelessWidget {
             value: state.motorBin,
             color: AppTheme.primary,
           ),
-
         if (motorDivergente)
           _DivergenciaAlert(
             'O motor da BIN (${state.motorBin}) difere do informado no veículo (${state.motorVeiculo}).',
           ),
-
         const SizedBox(height: 12),
-
         if (!isCaminhao)
           const InspecaoItemWidget(
             itemId: 'compartimento_motor',
@@ -46,7 +43,6 @@ class StepMotorCambio extends StatelessWidget {
               'Com observação',
             ],
           ),
-
         InspecaoItemWidget(
           itemId: 'motor_gravacao',
           label: 'Gravação do Motor',
@@ -67,7 +63,6 @@ class StepMotorCambio extends StatelessWidget {
             'Com indício de adulteração',
           ],
         ),
-
         const InspecaoItemWidget(
           itemId: 'cambio_gravacao',
           label: 'Gravação do Câmbio',
@@ -81,21 +76,19 @@ class StepMotorCambio extends StatelessWidget {
             'Com indício de adulteração',
           ],
         ),
-
         const InspecaoItemWidget(
-            itemId: 'etiqueta_vis_motor',
-            label: 'Etiqueta VIS — Compartimento do Motor',
-            obrigatoria: true,
-            statusOptions: [
-              'Original',
-              'Ausente',
-              'Danificada',
-              'Divergente',
-              'Com indício de adulteração',
-              'Obstruído',
-            ],
-          ),
-
+          itemId: 'etiqueta_vis_motor',
+          label: 'Etiqueta VIS — Compartimento do Motor',
+          obrigatoria: true,
+          statusOptions: [
+            'Original',
+            'Ausente',
+            'Danificada',
+            'Divergente',
+            'Com indício de adulteração',
+            'Obstruído',
+          ],
+        ),
         const SizedBox(height: 32),
       ],
     );
@@ -118,18 +111,18 @@ class StepEtiquetasChassi extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       children: [
         const InspecaoItemWidget(
-            itemId: 'etiqueta_vis_porta',
-            label: 'Etiqueta VIS — Porta / Coluna',
-            obrigatoria: true,
-            statusOptions: [
-              'Original',
-              'Ausente',
-              'Danificada',
-              'Divergente',
-              'Com indício de adulteração',
-              'Obstruído',
-            ],
-          ),
+          itemId: 'etiqueta_vis_porta',
+          label: 'Etiqueta VIS — Porta / Coluna',
+          obrigatoria: true,
+          statusOptions: [
+            'Original',
+            'Ausente',
+            'Danificada',
+            'Divergente',
+            'Com indício de adulteração',
+            'Obstruído',
+          ],
+        ),
 
         if (isCaminhao)
           const InspecaoItemWidget(
@@ -197,7 +190,11 @@ class _InfoBadge extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  const _InfoBadge({required this.icon, required this.label, required this.value, required this.color});
+  const _InfoBadge(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +214,9 @@ class _InfoBadge extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary)),
                 const SizedBox(height: 2),
                 Text(value,
                     style: TextStyle(

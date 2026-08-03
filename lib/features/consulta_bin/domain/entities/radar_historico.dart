@@ -40,7 +40,7 @@ class RadarHistorico {
       retornoBruto: json['retorno_bruto'],
       dadosTratados: json['dados_tratados'] ?? {},
       arquivoPesquisaUrl: json['arquivo_pesquisa_url'],
-      createdAt: json['created_at'] != null 
+      createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : DateTime.now(),
     );

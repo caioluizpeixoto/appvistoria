@@ -10,20 +10,20 @@ class VistoriaCompleta extends Equatable {
   final String? anoFabricacao;
   final String? anoModelo;
   final String? cor;
-  
+
   // OCR Status
   final String? chassiOcr;
   final String? chassiStatus;
   final String? motorOcr;
   final String? motorStatus;
-  
+
   // Passos intermediários como JSON Flexível
   final Map<String, dynamic> dadosInspecao;
-  
+
   final String? observacoesGerais;
   final String? parecerTecnico;
   final String? statusFinal;
-  
+
   final bool isDraft;
 
   const VistoriaCompleta({
@@ -91,8 +91,23 @@ class VistoriaCompleta extends Equatable {
 
   @override
   List<Object?> get props => [
-        id, placa, chassi, motor, marca, modelo, anoFabricacao, anoModelo, cor,
-        chassiOcr, chassiStatus, motorOcr, motorStatus, dadosInspecao,
-        observacoesGerais, parecerTecnico, statusFinal, isDraft
+        id,
+        placa,
+        chassi,
+        motor,
+        marca,
+        modelo,
+        anoFabricacao,
+        anoModelo,
+        cor,
+        chassiOcr,
+        chassiStatus,
+        motorOcr,
+        motorStatus,
+        dadosInspecao,
+        observacoesGerais,
+        parecerTecnico,
+        statusFinal,
+        isDraft
       ];
 }
