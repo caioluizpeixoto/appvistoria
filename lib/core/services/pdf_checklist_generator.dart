@@ -23,7 +23,7 @@ Future<String?> generateChecklistPdf({
 
   pw.ImageProvider? logoImage;
   try {
-    final logoBytes = await rootBundle.load('assets/images/logo.pdf.png');
+    final logoBytes = await rootBundle.load('assets/images/topo.pdf.png');
     logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
   } catch (_) {}
 
@@ -133,23 +133,27 @@ Future<String?> generateChecklistPdf({
       header: (context) {
         return pw.Container(
           margin: const pw.EdgeInsets.only(bottom: 20),
-          child: pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          child: pw.Column(
             children: [
               if (logoImage != null)
-                pw.Image(logoImage, height: 40)
-              else
-                pw.Text('LOGO', style: pw.TextStyle(font: fontBold, fontSize: 24)),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                pw.Container(
+                  width: double.infinity,
+                  height: 120, // Limite de altura
+                  margin: const pw.EdgeInsets.only(bottom: 12),
+                  child: pw.Image(logoImage, fit: pw.BoxFit.contain),
+                ),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
-                  pw.Text(
-                    'CHECKLIST VEICULAR',
-                    style: pw.TextStyle(font: fontBold, fontSize: 18, color: primaryColor),
-                  ),
-                  pw.Text(
-                    'Registro N°: ${vistoria.numeroLaudo}',
-                    style: pw.TextStyle(font: fontRegular, fontSize: 10, color: secondaryColor),
+                  pw.Text(logoImage == null ? 'LOGO' : '', style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('CHECKLIST VEICULAR', style: pw.TextStyle(font: fontBold, fontSize: 18, color: primaryColor)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Data: ${vistoria.dataHora.day.toString().padLeft(2, '0')}/${vistoria.dataHora.month.toString().padLeft(2, '0')}/${vistoria.dataHora.year}', style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
+                      pw.Text('Laudo: ${vistoria.numeroLaudo}', style: pw.TextStyle(fontSize: 10, color: secondaryColor)),
+                    ],
                   ),
                 ],
               ),
