@@ -1871,38 +1871,7 @@ class PdfGeneratorService {
                     ),
                   ),
                 ),
-                pw.Container(
-                  width: double.infinity,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColor.fromHex('EAEAEA'),
-                    border: pw.Border(top: pw.BorderSide(color: PdfColor.fromHex('F39C12'), width: 3)),
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    children: [
-                      pw.Container(
-                        width: 80,
-                        alignment: pw.Alignment.centerLeft,
-                        child: pw.Text('PÁGINA 1', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey700)),
-                      ),
-                      pw.Expanded(
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.center,
-                          children: [
-                            pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey800)),
-                            pw.SizedBox(height: 2),
-                            pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
-                            pw.SizedBox(height: 2),
-                            pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
-                          ],
-                        ),
-                      ),
-                      pw.SizedBox(width: 80),
-                    ],
-                  ),
-                ),
+                _buildPdfFooter(context, styles),
               ],
             ),
           ],
@@ -3683,9 +3652,9 @@ class PdfGeneratorService {
     VistoriaWizardState? state,
   ) {
     final themeRed = PdfColor.fromHex(
-        '#0288d1'); // Azul claro principal (mantendo o nome da variavel para nao quebrar)
-    final lightRed = PdfColor.fromHex('#e1f5fe'); // Fundo azul clarinho
-    final borderRed = PdfColor.fromHex('#b3e5fc'); // Borda azul suave
+        '#8CC63F'); // Verde principal (mantendo o nome da variavel para nao quebrar)
+    final lightRed = PdfColor.fromHex('#F1F8E9'); // Fundo verde clarinho
+    final borderRed = PdfColor.fromHex('#C5E1A5'); // Borda verde suave
     final textDark = PdfColor.fromHex('#333333');
     final textMuted = PdfColor.fromHex('#666666');
 
@@ -4124,7 +4093,7 @@ class PdfGeneratorService {
                 desconto = guaranteeBrl(desconto);
                 valorSugerido = guaranteeBrl(valorSugerido);
 
-                final mainGreen = const PdfColor.fromInt(0xFF2E7D32);
+                final mainGreen = PdfColor.fromHex('8CC63F');
                 final blueColor = const PdfColor.fromInt(0xFF1976D2);
 
                 return pw.Column(
