@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:app_vistoria/core/utils/speech_recognizer.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -32,7 +33,7 @@ class ChecklistItemDef {
     required this.id,
     required this.label,
     required this.options,
-    this.hasTextField = false,
+    this.hasTextField = true,
   });
 }
 
@@ -236,119 +237,7 @@ class StepChecklistInspecao extends StatelessWidget {
 
   Widget _buildChecklistItem(
       ChecklistItemDef item, VistoriaWizardState state, BuildContext context) {
-    final status = state.getStatus(item.id);
-    final obs = state.getObs(item.id);
-    final temFoto = state.hasFoto(item.id);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  item.label,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: Icon(
-                  temFoto
-                      ? Icons.camera_alt_rounded
-                      : Icons.camera_alt_outlined,
-                  color: temFoto ? AppTheme.primary : AppTheme.textSecondary,
-                ),
-                onPressed: () => _tirarFoto(item.id, state, context),
-                tooltip: 'Adicionar Foto (Opcional)',
-              ),
-            ],
-          ),
-          if (temFoto) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              height: 60,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children:
-                    state.getFotosLocais(item.id).asMap().entries.map((entry) {
-                  return Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    width: 60,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
-                        image: FileImage(File(entry.value)),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: Align(
-                      alignment: Alignment.topRight,
-                      child: GestureDetector(
-                        onTap: () => state.removeFoto(item.id, entry.key),
-                        child: Container(
-                          margin: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.close,
-                              size: 14, color: Colors.white),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
-          if (item.options.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: item.options.map((opt) {
-                final isSelected = status == opt.value;
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: _OptionButton(
-                      title: opt.title,
-                      fullTitle: opt.fullTitle,
-                      isSelected: isSelected,
-                      selectedColor: opt.selectedColor,
-                      onTap: () => state.setStatus(item.id, opt.value),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-          if (item.hasTextField) ...[
-            const SizedBox(height: 12),
-            TextField(
-              decoration: const InputDecoration(
-                labelText: 'Marca / Observação',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              controller: TextEditingController(text: obs)
-                ..selection = TextSelection.collapsed(offset: obs.length),
-              onChanged: (val) => state.setObs(item.id, val),
-            )
-          ],
-        ],
-      ),
-    );
+    return _ChecklistItemWidget(key: Key(item.id), item: item, state: state, parentContext: context);
   }
 
   Future<void> _tirarFoto(
@@ -596,6 +485,18 @@ class StepChecklistInspecao extends StatelessWidget {
             id: 'cinto_passageiro',
             label: '3.60 Cinto de Segurança Passageiro',
             options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'portas_veiculo',
+            label: '3.61 Portas do Veículo',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_choque_dianteiro',
+            label: '3.62 Para-choque Dianteiro',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_choque_traseiro',
+            label: '3.63 Para-choque Traseiro',
+            options: optionsFDI),
       ];
     } else {
       return [
@@ -681,6 +582,18 @@ class StepChecklistInspecao extends StatelessWidget {
             id: 'quebra_sol_d', label: 'Quebra Sol (D)', options: optionsFDI),
         const ChecklistItemDef(
             id: 'quebra_sol_e', label: 'Quebra Sol (E)', options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'portas_veiculo',
+            label: 'Portas do Veículo',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_choque_dianteiro',
+            label: 'Para-choque Dianteiro',
+            options: optionsFDI),
+        const ChecklistItemDef(
+            id: 'para_choque_traseiro',
+            label: 'Para-choque Traseiro',
+            options: optionsFDI),
       ];
     }
   }
@@ -798,6 +711,262 @@ class _OptionButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ChecklistItemWidget extends StatefulWidget {
+  final ChecklistItemDef item;
+  final VistoriaWizardState state;
+  final BuildContext parentContext;
+
+  const _ChecklistItemWidget({
+    Key? key,
+    required this.item,
+    required this.state,
+    required this.parentContext,
+  }) : super(key: key);
+
+  @override
+  State<_ChecklistItemWidget> createState() => _ChecklistItemWidgetState();
+}
+
+class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
+  bool _isObsAberto = false;
+  bool _isListening = false;
+  late TextEditingController _obsController;
+  late FocusNode _obsFocus;
+
+  @override
+  void initState() {
+    super.initState();
+    final obs = widget.state.getObs(widget.item.id);
+    _obsController = TextEditingController(text: obs);
+    _obsFocus = FocusNode();
+  }
+
+  @override
+  void didUpdateWidget(_ChecklistItemWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Sync controller text if obs changed externally
+    final obs = widget.state.getObs(widget.item.id);
+    if (_obsController.text != obs) {
+      _obsController.text = obs;
+      _obsController.selection = TextSelection.collapsed(offset: obs.length);
+    }
+  }
+
+  @override
+  void dispose() {
+    _obsController.dispose();
+    _obsFocus.dispose();
+    super.dispose();
+  }
+
+
+  Future<void> _tirarFoto(String itemId) async {
+    final picker = ImagePicker();
+    final xfile = await picker.pickImage(
+      source: ImageSource.camera,
+      imageQuality: 80,
+      maxWidth: 800,
+      maxHeight: 800,
+    );
+    if (xfile != null) {
+      widget.state.addFotoLocal(itemId, xfile.path);
+    }
+  }
+
+  void _onMicLongPress() async {
+    setState(() => _isListening = true);
+    await SpeechRecognizer.startListening();
+  }
+
+  void _onMicLongPressEnd(LongPressEndDetails details) async {
+    setState(() => _isListening = false);
+    
+    List<String> searchableOptions = widget.item.options.map((e) => e.fullTitle).toList();
+    String? matched = await SpeechRecognizer.stopListening(searchableOptions);
+    
+    if (matched != null) {
+      final opt = widget.item.options.firstWhere((e) => e.fullTitle == matched);
+      widget.state.setStatus(widget.item.id, opt.value);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não entendi a condição falada. Tente novamente.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final status = widget.state.getStatus(widget.item.id);
+    final obs = widget.state.getObs(widget.item.id);
+    final temFoto = widget.state.hasFoto(widget.item.id);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isListening ? Colors.redAccent : AppTheme.border,
+          width: _isListening ? 2.0 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.item.label,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onLongPress: _onMicLongPress,
+                onLongPressEnd: _onMicLongPressEnd,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _isListening ? Colors.red.withOpacity(0.1) : Colors.transparent,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.mic,
+                    color: _isListening ? Colors.red : AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.note_add_outlined,
+                  color: (_isObsAberto || obs.isNotEmpty) ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+                onPressed: () {
+                  setState(() => _isObsAberto = !_isObsAberto);
+                  if (_isObsAberto) {
+                    // opening
+                    WidgetsBinding.instance.addPostFrameCallback((_) { if (_obsFocus.canRequestFocus) _obsFocus.requestFocus(); });
+                  }
+                },
+                tooltip: 'Adicionar Observação',
+              ),
+              IconButton(
+                icon: Icon(
+                  temFoto
+                      ? Icons.camera_alt_rounded
+                      : Icons.camera_alt_outlined,
+                  color: temFoto ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+                onPressed: () => _tirarFoto(widget.item.id),
+                tooltip: 'Adicionar Foto (Opcional)',
+              ),
+            ],
+          ),
+          if (_isListening)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                'Ouvindo...',
+                style: TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
+          if (temFoto) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 60,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children:
+                    widget.state.getFotosLocais(widget.item.id).asMap().entries.map((entry) {
+                  return Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    width: 60,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      image: DecorationImage(
+                        image: FileImage(File(entry.value)),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    child: Align(
+                      alignment: Alignment.topRight,
+                      child: GestureDetector(
+                        onTap: () => widget.state.removeFoto(widget.item.id, entry.key),
+                        child: Container(
+                          margin: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.close,
+                              size: 14, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+          if (widget.item.options.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: widget.item.options.map((opt) {
+                final isSelected = status == opt.value;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: _OptionButton(
+                      title: opt.title,
+                      fullTitle: opt.fullTitle,
+                      isSelected: isSelected,
+                      selectedColor: opt.selectedColor,
+                      onTap: () => widget.state.setStatus(widget.item.id, opt.value),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          if (_isObsAberto || obs.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: TextField(
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Adicionar observação (opcional)',
+                  hintStyle: TextStyle(fontSize: 12, color: AppTheme.textSecondary.withValues(alpha: 0.7)),
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  filled: true,
+                  fillColor: Colors.grey.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                controller: _obsController,
+                focusNode: _obsFocus,
+                autofocus: _isObsAberto && obs.isEmpty,
+                onChanged: (val) => widget.state.setObs(widget.item.id, val),
+              ),
+            )
+          ],
+        ],
       ),
     );
   }

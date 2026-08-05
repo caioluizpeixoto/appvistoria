@@ -15,6 +15,8 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional>
   @override
   bool get wantKeepAlive => true;
 
+  final Set<String> _obsAbertas = {};
+
   final Map<String, List<String>> _categoriasVistoria = {
     'PNEUS/RODAS': [
       'PNEU DIANTEIRO ESQUERDO',
@@ -285,9 +287,28 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional>
                                       ),
                                     ),
                                   ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.note_add_outlined,
+                                      color: _obsAbertas.contains(item) || (state.checklistOpcionalMotivos[item]?.isNotEmpty ?? false) ? AppTheme.primary : Colors.grey,
+                                      size: 20,
+                                    ),
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                                    splashRadius: 20,
+                                    onPressed: () {
+                                      setState(() {
+                                        if (_obsAbertas.contains(item)) {
+                                          _obsAbertas.remove(item);
+                                        } else {
+                                          _obsAbertas.add(item);
+                                        }
+                                      });
+                                    }
+                                  )
                                 ],
                               ),
-                              if (![
+                              if (_obsAbertas.contains(item) || ![
                                 'OK',
                                 'NÃO POSSUI',
                                 'POSSUI E FUNCIONA',
@@ -301,10 +322,18 @@ class _StepChecklistOpcionalState extends State<StepChecklistOpcional>
                                     initialValue:
                                         state.checklistOpcionalMotivos[item] ??
                                             '',
-                                    decoration: const InputDecoration(
-                                      labelText: 'Motivo',
-                                      border: OutlineInputBorder(),
+                                    decoration: InputDecoration(
+                                      labelText: 'Observação',
+                                      hintText: 'Adicionar observação (opcional)',
+                                      hintStyle: TextStyle(fontSize: 12, color: AppTheme.textSecondary.withOpacity(0.7)),
                                       isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      filled: true,
+                                      fillColor: Colors.grey.withOpacity(0.08),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                        borderSide: BorderSide.none,
+                                      ),
                                     ),
                                     onChanged: (text) {
                                       state.checklistOpcionalMotivos[item] =

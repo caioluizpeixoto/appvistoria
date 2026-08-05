@@ -181,6 +181,45 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       _mensagemCarregamento = 'Buscando histórico na nuvem...';
     });
 
+    final hasPending = await repo.existeConsultaPendente(_modoEntrada, valor);
+    if (hasPending) {
+      if (!mounted) return null;
+      setState(() { _buscandoVeiculo = false; });
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.hourglass_top_rounded, color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: Text('Pesquisa em Andamento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          content: const Text('Já existe uma pesquisa em andamento para este veículo.\n\nA vistoria será iniciada utilizando a pesquisa existente e o resultado ficará disponível para atualização na tela de resumo.'),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Entendi'),
+            )
+          ],
+        )
+      );
+      return {'forcarNova': false, 'fonte': 'local', 'dados_tratados': null};
+    }
+
     List<Map<String, dynamic>> consultasNuvem = [];
     if (_modoEntrada == 'placa') {
       consultasNuvem = await repo.buscarConsultasRecentesNuvem('placa', valor);
@@ -212,12 +251,11 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       print('Erro ao buscar histórico radar: $e');
     }
 
-    setState(() {
-      _buscandoVeiculo = false;
-    });
-
     if (combinadas.isEmpty) {
-      if (!mounted) return {'forcarNova': true};
+      if (!mounted) {
+        setState(() { _buscandoVeiculo = false; });
+        return {'forcarNova': true};
+      }
       final querNova = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
@@ -408,12 +446,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     if (valor.isEmpty) return false;
 
     final escolhida = await _verificarNuvem(valor);
-    if (escolhida == null) return false; // Cancelou
+    if (escolhida == null) {
+      setState(() { _buscandoVeiculo = false; });
+      return false; // Cancelou
+    }
 
     String? tokenConsulta;
 
     if (escolhida['forcarNova'] != true) {
       if (escolhida['fonte'] == 'local') {
+        if (escolhida['dados_tratados'] == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('A pesquisa ainda está em andamento. Aguarde a conclusão ou acesse pelo histórico.')));
+          setState(() { _buscandoVeiculo = false; });
+          return false;
+        }
         // Reaproveitar dados antigos locais/nuvem supabase
         try {
           final veiculo = RadarVeiculo.fromJson(escolhida['dados_tratados']);
@@ -681,7 +728,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       Map<String, dynamic>? dadosReaproveitados;
 
       final escolhida = await _verificarNuvem(valor);
-      if (escolhida == null) return; // Cancela se o usuário fechar o Dialog
+      if (escolhida == null) {
+        setState(() { _buscandoVeiculo = false; });
+        return; // Cancela se o usuário fechar o Dialog
+      }
 
       if (escolhida['forcarNova'] == true) {
         forcarNova = true;

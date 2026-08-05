@@ -23,6 +23,7 @@ import 'steps/step_pintura.dart';
 import 'steps/step_fotos_extras.dart';
 import 'steps/step_checklist_opcional.dart';
 import 'steps/step_checklist_medidas.dart';
+import 'steps/step_pintura_caminhao.dart';
 import 'steps/step_checklist_inspecao.dart';
 import 'steps/step_conclusao.dart';
 
@@ -48,8 +49,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   final _dao = sl<VistoriaDao>();
   final _autocredDao = sl<AutocredDao>();
   bool _isSaving = false;
-  String _statusConsulta =
-      'nenhuma'; // 'pendente', 'concluida', 'erro', ou 'nenhuma'
+  
   StreamSubscription? _veiculoSub;
   StreamSubscription? _consultaSub;
 
@@ -89,6 +89,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
       if (temAvarias)
         const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
+      if (_wizardState.isCaminhao)
+        const _StepInfo(titulo: 'Pintura (Caminhão)', icone: Icons.color_lens_rounded),
       const _StepInfo(
           titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
       const _StepInfo(
@@ -216,7 +218,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           novoStatus = 'andamento';
         }
 
-        if (_statusConsulta == 'pendente' && novoStatus == 'concluida') {
+        if (_wizardState.statusConsulta == 'pendente' && novoStatus == 'concluida') {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content:
@@ -225,7 +227,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               duration: Duration(seconds: 4),
             ),
           );
-        } else if (_statusConsulta == 'pendente' && novoStatus == 'erro') {
+        } else if (_wizardState.statusConsulta == 'pendente' && novoStatus == 'erro') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('❌ Erro na consulta: $retornoBruto'),
@@ -234,9 +236,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
             ),
           );
         }
-        if (_statusConsulta != novoStatus) {
+        if (_wizardState.statusConsulta != novoStatus) {
           setState(() {
-            _statusConsulta = novoStatus;
+            _wizardState.setStatusConsulta(novoStatus);
           });
         }
       }
@@ -244,6 +246,23 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   }
 
   Future<void> _retryRadarConsulta({bool blockUI = false}) async {
+    if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento') {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pesquisa em Andamento'),
+          content: const Text('Já existe uma pesquisa rodando para este veículo. Aguarde a conclusão da mesma.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Entendi'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
     final placa = _wizardState.placa;
     if (placa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -261,7 +280,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     final forcarNova = result['forcarNova'] as bool;
 
     setState(() {
-      _statusConsulta = 'pendente';
+      _wizardState.setStatusConsulta('pendente');
     });
 
     if (blockUI) {
@@ -340,7 +359,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       if (mounted) {
         if (blockUI) Navigator.pop(context); // fecha dialog
         setState(() {
-          _statusConsulta = 'concluida';
+          _wizardState.setStatusConsulta('concluida');
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -358,11 +377,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
         if (cleanError.contains('já está em andamento')) {
           setState(() {
-            _statusConsulta = 'andamento';
+            _wizardState.setStatusConsulta('andamento');
           });
         } else {
           setState(() {
-            _statusConsulta = 'erro';
+            _wizardState.setStatusConsulta('erro');
           });
         }
 
@@ -624,8 +643,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
 
       // Salvar Checklist Opcional se habilitado
-      if (s.realizarChecklistOpcional) {
+      if (s.realizarChecklistOpcional || s.realizarAvaliacaoPintura) {
         for (final entry in s.checklistOpcional.entries) {
+          final obs = s.checklistOpcionalMotivos[entry.key] ?? '';
           await _dao.inserirOuAtualizarItem(ItensVistoriaCompanion(
             id: drift.Value('${widget.vistoriaId}_checklist_${entry.key}'),
             vistoriaId: drift.Value(widget.vistoriaId),
@@ -633,7 +653,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
             categoria: const drift.Value('opcional'),
             nome: drift.Value(entry.key),
             status: drift.Value(entry.value),
-            observacao: const drift.Value(''),
+            observacao: drift.Value(obs),
           ));
         }
       }
@@ -704,7 +724,41 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
   }
 
+  bool _validarFotosComStatus() {
+    final fotosComStatusVazio = <String>[];
+    for (final entry in _wizardState.fotosLocais.entries) {
+      final id = entry.key;
+      final fileList = entry.value;
+      if (fileList.isNotEmpty) {
+        final status = _wizardState.checklistStatus[id];
+        if (status == null || status.trim().isEmpty) {
+          fotosComStatusVazio.add(id);
+        }
+      }
+    }
+
+    if (fotosComStatusVazio.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Status Obrigatório', style: TextStyle(color: Colors.red)),
+          content: const Text('Você adicionou fotos em alguns itens, mas esqueceu de preencher o status deles. Por favor, selecione um status antes de avançar.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _proximo() async {
+    if (!_validarFotosComStatus()) return;
+
     // Salvar automaticamente ao avançar
     await _salvar();
     if (!mounted) return;
@@ -762,6 +816,22 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   }
 
   void _confirmarFinalizar() async {
+    if (!_wizardState.isChecklist && (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento')) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pesquisa em Andamento', style: TextStyle(color: Colors.orange)),
+          content: const Text('PESQUISA AINDA EM ANDAMENTO aguarde até que seja concluída.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Entendi'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
     final faltando = _wizardState.fotasObrigatoriasFaltando;
     final semAssinatura = _wizardState.assinaturaPath == null;
     final semResultado = _wizardState.resultadoFinal.isEmpty;
@@ -817,7 +887,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     // Tudo ok, verifica se já fez pesquisa (exceto para Checklists, que são manuais)
     if (!_wizardState.isChecklist &&
-        (_statusConsulta == 'nenhuma' || _statusConsulta == 'erro')) {
+        (_wizardState.statusConsulta == 'nenhuma' || _wizardState.statusConsulta == 'erro')) {
       final querPesquisar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -890,7 +960,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               ),
               actions: [
                 if (!_wizardState.isChecklist) ...[
-                  if (_statusConsulta == 'pendente')
+                  if (_wizardState.statusConsulta == 'pendente')
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.only(right: 16),
@@ -905,7 +975,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         ),
                       ),
                     )
-                  else if (_statusConsulta == 'concluida')
+                  else if (_wizardState.statusConsulta == 'concluida')
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
@@ -924,26 +994,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         ),
                       ),
                     )
-                  else if (_statusConsulta == 'andamento')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message:
-                              'Consulta em andamento. Toque para verificar se terminou.',
-                          child: InkWell(
-                            onTap: _retryRadarConsulta,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.hourglass_bottom_rounded,
-                                  color: Colors.orangeAccent, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_statusConsulta == 'erro')
+
+                  else if (_wizardState.statusConsulta == 'erro')
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
@@ -1019,6 +1071,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         return const StepEtiquetasChassi();
                       if (titulo == 'Estrutura') return const StepEstrutura();
                       if (titulo == 'Pintura') return const StepPintura();
+                      if (titulo == 'Pintura (Caminhão)') return const StepPinturaCaminhao();
                       if (titulo == 'Fotos Extras')
                         return const StepFotosExtras();
                       if (titulo == 'Dados do Veículo')

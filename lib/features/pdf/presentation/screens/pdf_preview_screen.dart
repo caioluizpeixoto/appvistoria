@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -25,6 +26,11 @@ class PdfPreviewScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Documento PDF'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.home_rounded),
+            tooltip: 'Voltar ao Início',
+            onPressed: () => context.go('/home'),
+          ),
           IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Compartilhar',

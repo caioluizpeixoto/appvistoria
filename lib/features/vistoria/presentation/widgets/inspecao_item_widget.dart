@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:app_vistoria/core/utils/speech_recognizer.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -47,6 +48,31 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   final _codigoController = TextEditingController();
   bool _uploading = false;
   bool _isEditingCodigo = false;
+  bool _isListening = false;
+
+  void _onMicLongPress() async {
+    setState(() => _isListening = true);
+    await SpeechRecognizer.startListening();
+  }
+
+  void _onMicLongPressEnd(LongPressEndDetails details) async {
+    setState(() => _isListening = false);
+    
+    String? matched = await SpeechRecognizer.stopListening(widget.statusOptions);
+    
+    if (matched != null) {
+      if (mounted) {
+        context.read<VistoriaWizardState>().setStatus(widget.itemId, matched);
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Não entendi a condição falada. Tente novamente.')),
+        );
+      }
+    }
+  }
+
 
   @override
   void initState() {
@@ -513,6 +539,22 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                   _statusIcon(statusAtual),
                   size: 18,
                   color: _statusColor(statusAtual),
+                ),
+                suffixIcon: GestureDetector(
+                  onLongPress: _onMicLongPress,
+                  onLongPressEnd: _onMicLongPressEnd,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: _isListening ? Colors.red.withOpacity(0.1) : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.mic,
+                      color: _isListening ? Colors.red : AppTheme.textSecondary,
+                    ),
+                  ),
                 ),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

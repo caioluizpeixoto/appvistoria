@@ -40,6 +40,8 @@ class VistoriaWizardState extends ChangeNotifier {
   String km = '';
   String numeroGrv = '';
   String arquivoPesquisaUrl = '';
+  String statusConsulta = 'nenhuma';
+
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
 
@@ -65,7 +67,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String recomendacoes = '';
 
   // ── Checklist Opcional ────────────────────────────────────────────────────
-  bool realizarChecklistOpcional = false;
+  bool realizarChecklistOpcional = false; bool realizarAvaliacaoPintura = true;
   final Map<String, String> checklistOpcional = {};
   final Map<String, String> checklistOpcionalMotivos = {};
 
@@ -169,6 +171,11 @@ class VistoriaWizardState extends ChangeNotifier {
   String getStatus(String itemId) => checklistStatus[itemId] ?? '';
   String getObs(String itemId) => checklistObs[itemId] ?? '';
   String getCodigo(String itemId) => checklistCodigo[itemId] ?? '';
+
+  void setStatusConsulta(String status) {
+    statusConsulta = status;
+    notifyListeners();
+  }
 
   void setStatus(String itemId, String status) {
     checklistStatus[itemId] = status;

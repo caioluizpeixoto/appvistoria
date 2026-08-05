@@ -26,6 +26,8 @@ import 'package:geocoding/geocoding.dart';
 import 'pdf_checklist_generator.dart';
 import '../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 
+pw.ImageProvider? _globalRodapeImage;
+
 Uint8List _processGrayscaleImage(Uint8List uint8list) {
   final decodedImage = img.decodeImage(uint8list);
   if (decodedImage != null) {
@@ -236,6 +238,13 @@ class PdfGeneratorService {
       carroPinturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (_) {}
 
+    try {
+      if (_globalRodapeImage == null) {
+        final bytes = await rootBundle.load('assets/images/rodape.pdf.png');
+        _globalRodapeImage = pw.MemoryImage(bytes.buffer.asUint8List());
+      }
+    } catch (_) {}
+
     pw.ImageProvider? assinaturaImage;
     if (wizardState?.assinaturaPath != null) {
       try {
@@ -417,6 +426,7 @@ class PdfGeneratorService {
         pdf.addPage(pw.MultiPage(
             pageFormat: PdfPageFormat.a4,
             margin: const pw.EdgeInsets.all(16),
+            footer: (ctx) => _buildPdfFooter(ctx, styles),
             header: (ctx) => pw.Column(children: [
                   _buildHeader(vistoria, styles, logoImage, state: wizardState),
                   pw.SizedBox(height: 8),
@@ -620,8 +630,8 @@ class PdfGeneratorService {
                 }
 
                 return pw.Container(
-                  width: isLarge ? 270.0 : 170.0,
-                  height: isLarge ? 180.0 : 113.0,
+                  width: isLarge ? 240.0 : 170.0,
+                  height: isLarge ? 160.0 : 113.0,
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
                     color: PdfColors.white,
@@ -1077,6 +1087,48 @@ class PdfGeneratorService {
   }
 
   // ── Seções Compartilhadas ────────────────────────────────────────────────
+
+
+  pw.Widget _buildPdfFooter(pw.Context context, _PdfStyles styles) {
+    return pw.Container(
+      width: double.infinity,
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('EAEAEA'),
+        border: pw.Border(top: pw.BorderSide(color: PdfColor.fromHex('F39C12'), width: 3)),
+      ),
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Container(
+            width: 80,
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey700)),
+          ),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey800)),
+                pw.SizedBox(height: 2),
+                pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+                pw.SizedBox(height: 2),
+                pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+              ],
+            ),
+          ),
+          _globalRodapeImage != null
+              ? pw.Container(
+                  width: 80,
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Image(_globalRodapeImage!, width: 60),
+                )
+              : pw.SizedBox(width: 80),
+        ],
+      ),
+    );
+  }
 
   pw.Widget _buildHeader(
       Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo,
@@ -2633,6 +2685,7 @@ class PdfGeneratorService {
 
                 _buildFooter(vistoria, styles, ctx, assinatura,
                     assinaturaCliente: assinaturaCliente, showSignatures: true),
+                _buildPdfFooter(ctx, styles),
               ],
             ),
           ],
@@ -2968,7 +3021,7 @@ class PdfGeneratorService {
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _buildHeader(vistoria, styles, logo, state: state, showQr: true),
+            _buildHeader(vistoria, styles, logo, state: state, showQr: false),
             _buildBlackBar(
                 'VISTORIA CAUTELAR: ${vistoria.numeroLaudo}', styles),
             _buildBlackBar('CHECKLIST', styles),
@@ -3240,6 +3293,7 @@ class PdfGeneratorService {
             _buildFooter(vistoria, styles, ctx, assinatura,
                 assinaturaCliente: assinaturaCliente,
                 showSignatures: showSignatures),
+            _buildPdfFooter(ctx, styles),
           ],
         );
       },
@@ -3755,6 +3809,7 @@ class PdfGeneratorService {
             pw.Spacer(),
             _buildFooter(vistoria, styles, ctx, assinatura,
                 showSignatures: false),
+            _buildPdfFooter(ctx, styles),
           ],
         );
       },
@@ -3946,6 +4001,7 @@ class PdfGeneratorService {
             pw.Spacer(),
             _buildFooter(vistoria, styles, ctx, assinatura,
                 showSignatures: false),
+            _buildPdfFooter(ctx, styles),
           ],
         );
       },

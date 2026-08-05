@@ -194,4 +194,29 @@ class RadarRepository {
       return [];
     }
   }
+
+  Future<bool> existeConsultaPendente(String coluna, String valor) async {
+    try {
+      final response = await supabase
+          .from('autocred_consultas')
+          .select()
+          .eq(coluna, valor)
+          .eq('status', 'pendente')
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      if (response != null && response is List && response.isNotEmpty) {
+        final createdAt = DateTime.parse(response.first['created_at'].toString());
+        final now = DateTime.now();
+        if (now.difference(createdAt).inMinutes < 15) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      print('Erro ao verificar consultas pendentes: $e');
+      return false;
+    }
+  }
 }
+

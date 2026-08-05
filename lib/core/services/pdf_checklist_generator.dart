@@ -100,6 +100,12 @@ Future<String?> generateChecklistPdf({
     logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
   } catch (_) {}
 
+  pw.ImageProvider? rodapeImage;
+  try {
+    final rodapeBytes = await rootBundle.load('assets/images/rodape.pdf.png');
+    rodapeImage = pw.MemoryImage(rodapeBytes.buffer.asUint8List());
+  } catch (_) {}
+
   pw.ImageProvider? assinaturaImage;
   if (wizardState?.assinaturaPath != null) {
     try {
@@ -133,6 +139,48 @@ Future<String?> generateChecklistPdf({
   final fontBold = pw.Font.helveticaBold();
 
   // Helper para construir grupos de itens
+
+  pw.Widget _buildPdfFooter(pw.Context context) {
+    return pw.Container(
+      width: double.infinity,
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('EAEAEA'),
+        border: pw.Border(top: pw.BorderSide(color: PdfColor.fromHex('F39C12'), width: 3)),
+      ),
+      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.Container(
+            width: 80,
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey700)),
+          ),
+          pw.Expanded(
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
+                pw.SizedBox(height: 2),
+                pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800)),
+                pw.SizedBox(height: 2),
+                pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800)),
+              ],
+            ),
+          ),
+          rodapeImage != null
+              ? pw.Container(
+                  width: 80,
+                  alignment: pw.Alignment.centerRight,
+                  child: pw.Image(rodapeImage, width: 60),
+                )
+              : pw.SizedBox(width: 80),
+        ],
+      ),
+    );
+  }
+
   List<pw.Widget> buildItemCategory(String title, Map<String, String> items) {
     if (wizardState == null) return [];
     final wState = wizardState!;
@@ -216,6 +264,7 @@ Future<String?> generateChecklistPdf({
   pdf.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.all(32),
+    footer: (context) => pw.Builder(builder: (c) => _buildPdfFooter(c)),
     header: (context) {
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 20),
@@ -252,17 +301,6 @@ Future<String?> generateChecklistPdf({
               ],
             ),
           ],
-        ),
-      );
-    },
-    footer: (context) {
-      return pw.Container(
-        alignment: pw.Alignment.centerRight,
-        margin: const pw.EdgeInsets.only(top: 10),
-        child: pw.Text(
-          'Página ${context.pageNumber} de ${context.pagesCount}',
-          style: pw.TextStyle(
-              font: fontRegular, fontSize: 10, color: PdfColors.grey),
         ),
       );
     },
@@ -425,7 +463,8 @@ Future<String?> generateChecklistPdf({
       pdf.addPage(pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        header: (context) {
+        footer: (context) => pw.Builder(builder: (c) => _buildPdfFooter(c)),
+    header: (context) {
           return pw.Container(
             margin: const pw.EdgeInsets.only(bottom: 20),
             alignment: pw.Alignment.centerLeft,

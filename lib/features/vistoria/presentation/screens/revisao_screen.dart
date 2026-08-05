@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../features/consulta_bin/data/repositories/radar_repository.dart';
+import '../../../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 import '../../../../core/services/pdf_generator_service.dart';
 import '../../../../injection_container.dart';
+import 'package:drift/drift.dart' as drift;
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
 import '../../domain/vistoria_wizard_state.dart';
@@ -19,6 +22,8 @@ class RevisaoScreen extends StatefulWidget {
 class _RevisaoScreenState extends State<RevisaoScreen> {
   final _dao = sl<VistoriaDao>();
   bool _gerandoPdf = false;
+  bool _verificandoRadar = false;
+  bool _pesquisaPendente = false;
   VistoriaWizardState? _state;
   Vistoria? _vistoria;
   Veiculo? _veiculo;
@@ -37,6 +42,90 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
         _vistoria = v;
         _veiculo = veiculo;
       });
+      if (v?.tipoVistoria == 'Cautelar' && veiculo != null) {
+        _verificarStatusRadar(veiculo.placa);
+      }
+    }
+  }
+
+  Future<void> _verificarStatusRadar(String placa) async {
+    setState(() => _verificandoRadar = true);
+    try {
+      final repo = sl<RadarRepository>();
+      final pendente = await repo.existeConsultaPendente('placa', placa);
+      if (mounted) {
+        setState(() {
+          _pesquisaPendente = pendente;
+          _verificandoRadar = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _verificandoRadar = false);
+    }
+  }
+
+  Future<void> _atualizarRadar() async {
+    if (_veiculo == null) return;
+    setState(() => _verificandoRadar = true);
+    
+    try {
+      final repo = sl<RadarRepository>();
+      final pendente = await repo.existeConsultaPendente('placa', _veiculo!.placa);
+      
+      if (!pendente) {
+        // Tenta puxar da nuvem e atualizar o local
+        final nuvem = await repo.buscarConsultasRecentesNuvem('placa', _veiculo!.placa);
+        if (nuvem.isNotEmpty) {
+          try {
+            final radarData = RadarVeiculo.fromJson(nuvem.first['dados_tratados']);
+            final mm = radarData.marcaModelo.split('/');
+            final marca = mm.isNotEmpty ? mm[0].trim() : '';
+            final modelo = mm.length > 1 ? mm[1].trim() : '';
+            
+            await _dao.atualizarVeiculo(VeiculosCompanion(
+              id: drift.Value(_veiculo!.id),
+              vistoriaId: drift.Value(_veiculo!.vistoriaId),
+              placa: drift.Value(radarData.placa.isNotEmpty ? radarData.placa : _veiculo!.placa),
+              chassiVeiculo: drift.Value(radarData.chassi.isNotEmpty ? radarData.chassi : _veiculo!.chassiVeiculo),
+              motorVeiculo: drift.Value(radarData.motor.isNotEmpty ? radarData.motor : _veiculo!.motorVeiculo),
+              marca: drift.Value(marca.isNotEmpty ? marca : _veiculo!.marca),
+              modelo: drift.Value(modelo.isNotEmpty ? modelo : _veiculo!.modelo),
+              anoFabricacao: drift.Value(int.tryParse(radarData.anoFabricacao) ?? _veiculo!.anoFabricacao),
+              anoModelo: drift.Value(int.tryParse(radarData.anoModelo) ?? _veiculo!.anoModelo),
+              cor: drift.Value(radarData.cor.isNotEmpty ? radarData.cor : _veiculo!.cor),
+              renavam: drift.Value(radarData.renavam.isNotEmpty ? radarData.renavam : _veiculo!.renavam),
+              chassiBin: drift.Value(radarData.chassi.isNotEmpty ? radarData.chassi : _veiculo!.chassiBin),
+              motorBin: drift.Value(radarData.motor.isNotEmpty ? radarData.motor : _veiculo!.motorBin),
+              municipio: drift.Value(radarData.municipio.isNotEmpty ? radarData.municipio : _veiculo!.municipio),
+              uf: drift.Value(radarData.estado.isNotEmpty ? radarData.estado : _veiculo!.uf),
+            ));
+            
+            // Recarrega os dados
+            final v = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
+            if (mounted) {
+              setState(() {
+                _veiculo = v;
+                _pesquisaPendente = false;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Pesquisa concluída e dados atualizados!'), backgroundColor: AppTheme.conforme)
+              );
+            }
+          } catch (_) {}
+        } else {
+          if (mounted) setState(() => _pesquisaPendente = false);
+        }
+      } else {
+        if (mounted) {
+          setState(() => _pesquisaPendente = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('A pesquisa ainda está em andamento. Aguarde mais um pouco.'), backgroundColor: AppTheme.comObs)
+          );
+        }
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) setState(() => _verificandoRadar = false);
     }
   }
 
@@ -186,8 +275,49 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
           color: AppTheme.surface,
           border: Border(top: BorderSide(color: AppTheme.border)),
         ),
-        child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
+        child: (_vistoria?.tipoVistoria == 'Cautelar' && _pesquisaPendente)
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppTheme.comObs.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.comObs.withValues(alpha: 0.5)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.hourglass_top_rounded, color: AppTheme.comObs),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Pesquisa ainda em andamento. Aguarde a conclusão para gerar o Laudo.',
+                          style: TextStyle(color: AppTheme.textPrimary, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    onPressed: _verificandoRadar ? null : _atualizarRadar,
+                    icon: _verificandoRadar
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.refresh_rounded, color: Colors.white),
+                    label: Text(_verificandoRadar ? 'Atualizando...' : 'Atualizar Resultado', style: const TextStyle(color: Colors.white)),
+                  ),
+                ),
+              ],
+            )
+          : ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
             backgroundColor: AppTheme.conforme,
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
