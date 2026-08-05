@@ -12,6 +12,9 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Dados Gerais (Step 1) ──────────────────────────────────────────────────
   String tipoVistoria = 'Vistoria Cautelar Automotiva';
   String clienteNome = '';
+  String clienteEmail = '';
+  String clienteCpf = '';
+  String clienteTelefone = '';
   String unidade = '';
   String vistoriadorNome = '';
   String vistoriadorCpf = '';

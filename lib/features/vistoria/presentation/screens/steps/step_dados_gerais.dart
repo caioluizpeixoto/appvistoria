@@ -15,6 +15,9 @@ class StepDadosGerais extends StatefulWidget {
 
 class _StepDadosGeraisState extends State<StepDadosGerais> {
   final _clienteCtrl = TextEditingController();
+  final _clienteEmailCtrl = TextEditingController();
+  final _clienteCpfCtrl = TextEditingController();
+  final _clienteTelefoneCtrl = TextEditingController();
   final _unidadeCtrl = TextEditingController();
   final _vistoriadorNomeCtrl = TextEditingController();
   final _vistoriadorCpfCtrl = TextEditingController();
@@ -25,6 +28,9 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final state = context.read<VistoriaWizardState>();
       _clienteCtrl.text = state.clienteNome;
+      _clienteEmailCtrl.text = state.clienteEmail;
+      _clienteCpfCtrl.text = state.clienteCpf;
+      _clienteTelefoneCtrl.text = state.clienteTelefone;
       _unidadeCtrl.text = state.unidade;
       _vistoriadorNomeCtrl.text = state.vistoriadorNome;
       _vistoriadorCpfCtrl.text = state.vistoriadorCpf;
@@ -34,6 +40,9 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
   @override
   void dispose() {
     _clienteCtrl.dispose();
+    _clienteEmailCtrl.dispose();
+    _clienteCpfCtrl.dispose();
+    _clienteTelefoneCtrl.dispose();
     _unidadeCtrl.dispose();
     _vistoriadorNomeCtrl.dispose();
     _vistoriadorCpfCtrl.dispose();
@@ -100,11 +109,50 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               controller: _clienteCtrl,
               textCapitalization: TextCapitalization.words,
               decoration: const InputDecoration(
-                labelText: 'Cliente / Proprietário',
+                labelText: 'Cliente / Proprietário (opcional)',
                 prefixIcon: Icon(Icons.person_rounded, color: AppTheme.primary),
               ),
               onChanged: (v) {
                 state.clienteNome = v;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _clienteCpfCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'CPF / CNPJ do Cliente (opcional)',
+                hintText: '000.000.000-00',
+                prefixIcon: Icon(Icons.credit_card_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.clienteCpf = v;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _clienteEmailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'E-mail do Cliente (opcional)',
+                hintText: 'cliente@email.com',
+                prefixIcon: Icon(Icons.email_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.clienteEmail = v;
+              },
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _clienteTelefoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Telefone / WhatsApp do Cliente (opcional)',
+                hintText: '(00) 90000-0000',
+                prefixIcon: Icon(Icons.phone_rounded, color: AppTheme.primary),
+              ),
+              onChanged: (v) {
+                state.clienteTelefone = v;
               },
             ),
             const SizedBox(height: 14),

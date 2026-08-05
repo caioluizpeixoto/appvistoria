@@ -92,12 +92,28 @@ Deno.serve(async (req) => {
     const estadoLocal = uf ? `Considere o mercado do estado de(a) ${uf}, NO BRASIL, para estimativa de preços.` : 'Considere o mercado médio brasileiro para estimativa de preços.';
     
     if (hasApontamentos) {
-      extraPrompt = `\nIMPORTANTE: O vistoriador apontou as seguintes DIVERGÊNCIAS/DEFEITOS reais neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}\n\nSua tarefa é ESTIMAR o valor da peça de reposição (nova ou paralela), o custo de mão de obra para reparar ou substituir as peças citadas acima e também indicar exatamente o local no veículo onde esse apontamento costuma ser encontrado (ex: 'Cofre do motor, lado direito' ou 'Estrutura Dianteira'). ${estadoLocal} REGRA CRÍTICA: Assuma sempre que o reparo é uma troca simples de componente mecânico/estético. Nunca orce reparos estruturais complexos (como alinhamento de chassi, solda ou repuxamento de torre), mesmo que o termo utilizado sugira parte estrutural, limite-se ao custo de substituição da peça mecânica correspondente. Inclua essas estimativas no JSON de retorno sob a chave "apontamentos_veiculo". TODOS OS VALORES DEVERÃO SER EM REAIS (R$).`;
+      extraPrompt = `\nIMPORTANTE: O vistoriador registrou os seguintes apontamentos neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}
+
+REGRAS CRÍTICAS DE TRATAMENTO DOS APONTAMENTOS:
+1. ITENS MARCADOS COMO "SEM ACESSO", "SEMA ACESSO", "NÃO LOCALIZADO" OU "NÃO FOI POSSÍVEL VERIFICAR":
+   - Estes itens NÃO SÃO AVARIAS OU DEFEITOS DO VEÍCULO. Indicam apenas impossibilidade física de visualização/acesso no momento da vistoria (ex: gravação de câmbio oculta, longarina coberta/sem visibilidade).
+   - Para estes itens de "SEM ACESSO", você DEVE OBRIGATORIAMENTE preencher:
+     * "valor_peca_estimado": "R$ 0,00"
+     * "valor_mao_de_obra_estimado": "R$ 0,00"
+     * "observacao_indicada": "Item sem acesso físico para verificação na vistoria (não representa avaria nem gera custo de reparo)".
+   - NUNCA atribua valor de mão de obra ou valor de peça a um item que está apenas "SEM ACESSO".
+   - NUNCA inclua o custo de itens "SEM ACESSO" no cálculo do "desconto_total_avarias".
+
+2. ITENS COM AVARIAS REAIS OU DEFEITOS (ex: amassado, trincado, corroído, adulterado, repintura):
+   - Estime o valor da peça de reposição (nova ou paralela) e o custo de mão de obra para reparar ou substituir.
+   - REGRA PARA AVARIAS ESTRUTURAIS: Assuma sempre que o reparo é uma troca simples de componente ou serviço pontual. Nunca orce reconstruções ou reparos estruturais complexos de alto custo se for item simples.
+
+Inclua as estimativas no JSON de retorno sob a chave "apontamentos_veiculo". ${estadoLocal} TODOS OS VALORES DEVERÃO SER EM REAIS (R$).`;
       extraJsonSchema = `,\n"apontamentos_veiculo": [\n{\n"peca_ou_problema": "",\n"local_no_veiculo": "",\n"observacao_indicada": "",\n"valor_peca_estimado": "",\n"valor_mao_de_obra_estimado": ""\n}\n]`;
     }
     
     // Sempre adicionar a análise final
-    extraPrompt += `\nAlém disso, faça uma análise final da vistoria: se está tudo certo ou se há avarias, apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado nas avarias informadas (se houver) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
+    extraPrompt += `\nAlém disso, faça uma análise final da vistoria: se está tudo certo ou se há avarias reais, apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado APENAS nas avarias reais informadas (desconsiderando itens sem acesso) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
     extraJsonSchema += `,\n"analise_final": {\n"resumo_estado_veiculo": "",\n"valor_venda_mercado_local": "",\n"desconto_total_avarias": "",\n"valor_venda_sugerido_final": "",\n"justificativa": ""\n}`;
 
     const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados. OBRIGATÓRIO: TODOS OS PREÇOS E AVALIAÇÕES DEVEM SER EM MOEDA BRASILEIRA (BRL) FORMATADOS COMO "R$ X.XXX,XX". NUNCA USE USD NEM REALIZE AVALIAÇÕES DO MERCADO AMERICANO.${extraPrompt}

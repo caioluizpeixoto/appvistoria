@@ -466,6 +466,24 @@ class $VistoriasTable extends Vistorias
   late final GeneratedColumn<String> clienteNome = GeneratedColumn<String>(
       'cliente_nome', aliasedName, true,
       type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _clienteEmailMeta =
+      const VerificationMeta('clienteEmail');
+  @override
+  late final GeneratedColumn<String> clienteEmail = GeneratedColumn<String>(
+      'cliente_email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _clienteCpfMeta =
+      const VerificationMeta('clienteCpf');
+  @override
+  late final GeneratedColumn<String> clienteCpf = GeneratedColumn<String>(
+      'cliente_cpf', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _clienteTelefoneMeta =
+      const VerificationMeta('clienteTelefone');
+  @override
+  late final GeneratedColumn<String> clienteTelefone = GeneratedColumn<String>(
+      'cliente_telefone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _unidadeMeta =
       const VerificationMeta('unidade');
   @override
@@ -574,6 +592,9 @@ class $VistoriasTable extends Vistorias
         status,
         tipoVistoria,
         clienteNome,
+        clienteEmail,
+        clienteCpf,
+        clienteTelefone,
         unidade,
         parecerTecnico,
         statusFinal,
@@ -628,6 +649,24 @@ class $VistoriasTable extends Vistorias
           _clienteNomeMeta,
           clienteNome.isAcceptableOrUnknown(
               data['cliente_nome']!, _clienteNomeMeta));
+    }
+    if (data.containsKey('cliente_email')) {
+      context.handle(
+          _clienteEmailMeta,
+          clienteEmail.isAcceptableOrUnknown(
+              data['cliente_email']!, _clienteEmailMeta));
+    }
+    if (data.containsKey('cliente_cpf')) {
+      context.handle(
+          _clienteCpfMeta,
+          clienteCpf.isAcceptableOrUnknown(
+              data['cliente_cpf']!, _clienteCpfMeta));
+    }
+    if (data.containsKey('cliente_telefone')) {
+      context.handle(
+          _clienteTelefoneMeta,
+          clienteTelefone.isAcceptableOrUnknown(
+              data['cliente_telefone']!, _clienteTelefoneMeta));
     }
     if (data.containsKey('unidade')) {
       context.handle(_unidadeMeta,
@@ -730,6 +769,12 @@ class $VistoriasTable extends Vistorias
           .read(DriftSqlType.string, data['${effectivePrefix}tipo_vistoria'])!,
       clienteNome: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}cliente_nome']),
+      clienteEmail: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cliente_email']),
+      clienteCpf: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cliente_cpf']),
+      clienteTelefone: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}cliente_telefone']),
       unidade: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}unidade']),
       parecerTecnico: attachedDatabase.typeMapping
@@ -776,6 +821,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   final String status;
   final String tipoVistoria;
   final String? clienteNome;
+  final String? clienteEmail;
+  final String? clienteCpf;
+  final String? clienteTelefone;
   final String? unidade;
   final String? parecerTecnico;
   final String? statusFinal;
@@ -797,6 +845,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       required this.status,
       required this.tipoVistoria,
       this.clienteNome,
+      this.clienteEmail,
+      this.clienteCpf,
+      this.clienteTelefone,
       this.unidade,
       this.parecerTecnico,
       this.statusFinal,
@@ -821,6 +872,15 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
     map['tipo_vistoria'] = Variable<String>(tipoVistoria);
     if (!nullToAbsent || clienteNome != null) {
       map['cliente_nome'] = Variable<String>(clienteNome);
+    }
+    if (!nullToAbsent || clienteEmail != null) {
+      map['cliente_email'] = Variable<String>(clienteEmail);
+    }
+    if (!nullToAbsent || clienteCpf != null) {
+      map['cliente_cpf'] = Variable<String>(clienteCpf);
+    }
+    if (!nullToAbsent || clienteTelefone != null) {
+      map['cliente_telefone'] = Variable<String>(clienteTelefone);
     }
     if (!nullToAbsent || unidade != null) {
       map['unidade'] = Variable<String>(unidade);
@@ -867,6 +927,15 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       clienteNome: clienteNome == null && nullToAbsent
           ? const Value.absent()
           : Value(clienteNome),
+      clienteEmail: clienteEmail == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clienteEmail),
+      clienteCpf: clienteCpf == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clienteCpf),
+      clienteTelefone: clienteTelefone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clienteTelefone),
       unidade: unidade == null && nullToAbsent
           ? const Value.absent()
           : Value(unidade),
@@ -911,6 +980,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       status: serializer.fromJson<String>(json['status']),
       tipoVistoria: serializer.fromJson<String>(json['tipoVistoria']),
       clienteNome: serializer.fromJson<String?>(json['clienteNome']),
+      clienteEmail: serializer.fromJson<String?>(json['clienteEmail']),
+      clienteCpf: serializer.fromJson<String?>(json['clienteCpf']),
+      clienteTelefone: serializer.fromJson<String?>(json['clienteTelefone']),
       unidade: serializer.fromJson<String?>(json['unidade']),
       parecerTecnico: serializer.fromJson<String?>(json['parecerTecnico']),
       statusFinal: serializer.fromJson<String?>(json['statusFinal']),
@@ -939,6 +1011,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       'status': serializer.toJson<String>(status),
       'tipoVistoria': serializer.toJson<String>(tipoVistoria),
       'clienteNome': serializer.toJson<String?>(clienteNome),
+      'clienteEmail': serializer.toJson<String?>(clienteEmail),
+      'clienteCpf': serializer.toJson<String?>(clienteCpf),
+      'clienteTelefone': serializer.toJson<String?>(clienteTelefone),
       'unidade': serializer.toJson<String?>(unidade),
       'parecerTecnico': serializer.toJson<String?>(parecerTecnico),
       'statusFinal': serializer.toJson<String?>(statusFinal),
@@ -964,6 +1039,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           String? status,
           String? tipoVistoria,
           Value<String?> clienteNome = const Value.absent(),
+          Value<String?> clienteEmail = const Value.absent(),
+          Value<String?> clienteCpf = const Value.absent(),
+          Value<String?> clienteTelefone = const Value.absent(),
           Value<String?> unidade = const Value.absent(),
           Value<String?> parecerTecnico = const Value.absent(),
           Value<String?> statusFinal = const Value.absent(),
@@ -985,6 +1063,12 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
         status: status ?? this.status,
         tipoVistoria: tipoVistoria ?? this.tipoVistoria,
         clienteNome: clienteNome.present ? clienteNome.value : this.clienteNome,
+        clienteEmail:
+            clienteEmail.present ? clienteEmail.value : this.clienteEmail,
+        clienteCpf: clienteCpf.present ? clienteCpf.value : this.clienteCpf,
+        clienteTelefone: clienteTelefone.present
+            ? clienteTelefone.value
+            : this.clienteTelefone,
         unidade: unidade.present ? unidade.value : this.unidade,
         parecerTecnico:
             parecerTecnico.present ? parecerTecnico.value : this.parecerTecnico,
@@ -1021,6 +1105,14 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           : this.tipoVistoria,
       clienteNome:
           data.clienteNome.present ? data.clienteNome.value : this.clienteNome,
+      clienteEmail: data.clienteEmail.present
+          ? data.clienteEmail.value
+          : this.clienteEmail,
+      clienteCpf:
+          data.clienteCpf.present ? data.clienteCpf.value : this.clienteCpf,
+      clienteTelefone: data.clienteTelefone.present
+          ? data.clienteTelefone.value
+          : this.clienteTelefone,
       unidade: data.unidade.present ? data.unidade.value : this.unidade,
       parecerTecnico: data.parecerTecnico.present
           ? data.parecerTecnico.value
@@ -1065,6 +1157,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           ..write('status: $status, ')
           ..write('tipoVistoria: $tipoVistoria, ')
           ..write('clienteNome: $clienteNome, ')
+          ..write('clienteEmail: $clienteEmail, ')
+          ..write('clienteCpf: $clienteCpf, ')
+          ..write('clienteTelefone: $clienteTelefone, ')
           ..write('unidade: $unidade, ')
           ..write('parecerTecnico: $parecerTecnico, ')
           ..write('statusFinal: $statusFinal, ')
@@ -1085,27 +1180,31 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      numeroLaudo,
-      status,
-      tipoVistoria,
-      clienteNome,
-      unidade,
-      parecerTecnico,
-      statusFinal,
-      assinaturaPath,
-      assinaturaClientePath,
-      dataHora,
-      vistoriadorId,
-      vistoriadorNome,
-      vistoriadorCpf,
-      observacoesGerais,
-      pdfUrl,
-      etapaAtual,
-      sincronizado,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        id,
+        numeroLaudo,
+        status,
+        tipoVistoria,
+        clienteNome,
+        clienteEmail,
+        clienteCpf,
+        clienteTelefone,
+        unidade,
+        parecerTecnico,
+        statusFinal,
+        assinaturaPath,
+        assinaturaClientePath,
+        dataHora,
+        vistoriadorId,
+        vistoriadorNome,
+        vistoriadorCpf,
+        observacoesGerais,
+        pdfUrl,
+        etapaAtual,
+        sincronizado,
+        createdAt,
+        updatedAt
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1115,6 +1214,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           other.status == this.status &&
           other.tipoVistoria == this.tipoVistoria &&
           other.clienteNome == this.clienteNome &&
+          other.clienteEmail == this.clienteEmail &&
+          other.clienteCpf == this.clienteCpf &&
+          other.clienteTelefone == this.clienteTelefone &&
           other.unidade == this.unidade &&
           other.parecerTecnico == this.parecerTecnico &&
           other.statusFinal == this.statusFinal &&
@@ -1138,6 +1240,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   final Value<String> status;
   final Value<String> tipoVistoria;
   final Value<String?> clienteNome;
+  final Value<String?> clienteEmail;
+  final Value<String?> clienteCpf;
+  final Value<String?> clienteTelefone;
   final Value<String?> unidade;
   final Value<String?> parecerTecnico;
   final Value<String?> statusFinal;
@@ -1160,6 +1265,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     this.status = const Value.absent(),
     this.tipoVistoria = const Value.absent(),
     this.clienteNome = const Value.absent(),
+    this.clienteEmail = const Value.absent(),
+    this.clienteCpf = const Value.absent(),
+    this.clienteTelefone = const Value.absent(),
     this.unidade = const Value.absent(),
     this.parecerTecnico = const Value.absent(),
     this.statusFinal = const Value.absent(),
@@ -1183,6 +1291,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     this.status = const Value.absent(),
     this.tipoVistoria = const Value.absent(),
     this.clienteNome = const Value.absent(),
+    this.clienteEmail = const Value.absent(),
+    this.clienteCpf = const Value.absent(),
+    this.clienteTelefone = const Value.absent(),
     this.unidade = const Value.absent(),
     this.parecerTecnico = const Value.absent(),
     this.statusFinal = const Value.absent(),
@@ -1208,6 +1319,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     Expression<String>? status,
     Expression<String>? tipoVistoria,
     Expression<String>? clienteNome,
+    Expression<String>? clienteEmail,
+    Expression<String>? clienteCpf,
+    Expression<String>? clienteTelefone,
     Expression<String>? unidade,
     Expression<String>? parecerTecnico,
     Expression<String>? statusFinal,
@@ -1231,6 +1345,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       if (status != null) 'status': status,
       if (tipoVistoria != null) 'tipo_vistoria': tipoVistoria,
       if (clienteNome != null) 'cliente_nome': clienteNome,
+      if (clienteEmail != null) 'cliente_email': clienteEmail,
+      if (clienteCpf != null) 'cliente_cpf': clienteCpf,
+      if (clienteTelefone != null) 'cliente_telefone': clienteTelefone,
       if (unidade != null) 'unidade': unidade,
       if (parecerTecnico != null) 'parecer_tecnico': parecerTecnico,
       if (statusFinal != null) 'status_final': statusFinal,
@@ -1257,6 +1374,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       Value<String>? status,
       Value<String>? tipoVistoria,
       Value<String?>? clienteNome,
+      Value<String?>? clienteEmail,
+      Value<String?>? clienteCpf,
+      Value<String?>? clienteTelefone,
       Value<String?>? unidade,
       Value<String?>? parecerTecnico,
       Value<String?>? statusFinal,
@@ -1279,6 +1399,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       status: status ?? this.status,
       tipoVistoria: tipoVistoria ?? this.tipoVistoria,
       clienteNome: clienteNome ?? this.clienteNome,
+      clienteEmail: clienteEmail ?? this.clienteEmail,
+      clienteCpf: clienteCpf ?? this.clienteCpf,
+      clienteTelefone: clienteTelefone ?? this.clienteTelefone,
       unidade: unidade ?? this.unidade,
       parecerTecnico: parecerTecnico ?? this.parecerTecnico,
       statusFinal: statusFinal ?? this.statusFinal,
@@ -1316,6 +1439,15 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     }
     if (clienteNome.present) {
       map['cliente_nome'] = Variable<String>(clienteNome.value);
+    }
+    if (clienteEmail.present) {
+      map['cliente_email'] = Variable<String>(clienteEmail.value);
+    }
+    if (clienteCpf.present) {
+      map['cliente_cpf'] = Variable<String>(clienteCpf.value);
+    }
+    if (clienteTelefone.present) {
+      map['cliente_telefone'] = Variable<String>(clienteTelefone.value);
     }
     if (unidade.present) {
       map['unidade'] = Variable<String>(unidade.value);
@@ -1377,6 +1509,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
           ..write('status: $status, ')
           ..write('tipoVistoria: $tipoVistoria, ')
           ..write('clienteNome: $clienteNome, ')
+          ..write('clienteEmail: $clienteEmail, ')
+          ..write('clienteCpf: $clienteCpf, ')
+          ..write('clienteTelefone: $clienteTelefone, ')
           ..write('unidade: $unidade, ')
           ..write('parecerTecnico: $parecerTecnico, ')
           ..write('statusFinal: $statusFinal, ')
@@ -6633,6 +6768,9 @@ typedef $$VistoriasTableCreateCompanionBuilder = VistoriasCompanion Function({
   Value<String> status,
   Value<String> tipoVistoria,
   Value<String?> clienteNome,
+  Value<String?> clienteEmail,
+  Value<String?> clienteCpf,
+  Value<String?> clienteTelefone,
   Value<String?> unidade,
   Value<String?> parecerTecnico,
   Value<String?> statusFinal,
@@ -6656,6 +6794,9 @@ typedef $$VistoriasTableUpdateCompanionBuilder = VistoriasCompanion Function({
   Value<String> status,
   Value<String> tipoVistoria,
   Value<String?> clienteNome,
+  Value<String?> clienteEmail,
+  Value<String?> clienteCpf,
+  Value<String?> clienteTelefone,
   Value<String?> unidade,
   Value<String?> parecerTecnico,
   Value<String?> statusFinal,
@@ -6803,6 +6944,16 @@ class $$VistoriasTableFilterComposer
 
   ColumnFilters<String> get clienteNome => $composableBuilder(
       column: $table.clienteNome, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get clienteEmail => $composableBuilder(
+      column: $table.clienteEmail, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get clienteCpf => $composableBuilder(
+      column: $table.clienteCpf, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get clienteTelefone => $composableBuilder(
+      column: $table.clienteTelefone,
+      builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get unidade => $composableBuilder(
       column: $table.unidade, builder: (column) => ColumnFilters(column));
@@ -7028,6 +7179,17 @@ class $$VistoriasTableOrderingComposer
   ColumnOrderings<String> get clienteNome => $composableBuilder(
       column: $table.clienteNome, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get clienteEmail => $composableBuilder(
+      column: $table.clienteEmail,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get clienteCpf => $composableBuilder(
+      column: $table.clienteCpf, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get clienteTelefone => $composableBuilder(
+      column: $table.clienteTelefone,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get unidade => $composableBuilder(
       column: $table.unidade, builder: (column) => ColumnOrderings(column));
 
@@ -7105,6 +7267,15 @@ class $$VistoriasTableAnnotationComposer
 
   GeneratedColumn<String> get clienteNome => $composableBuilder(
       column: $table.clienteNome, builder: (column) => column);
+
+  GeneratedColumn<String> get clienteEmail => $composableBuilder(
+      column: $table.clienteEmail, builder: (column) => column);
+
+  GeneratedColumn<String> get clienteCpf => $composableBuilder(
+      column: $table.clienteCpf, builder: (column) => column);
+
+  GeneratedColumn<String> get clienteTelefone => $composableBuilder(
+      column: $table.clienteTelefone, builder: (column) => column);
 
   GeneratedColumn<String> get unidade =>
       $composableBuilder(column: $table.unidade, builder: (column) => column);
@@ -7335,6 +7506,9 @@ class $$VistoriasTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<String> tipoVistoria = const Value.absent(),
             Value<String?> clienteNome = const Value.absent(),
+            Value<String?> clienteEmail = const Value.absent(),
+            Value<String?> clienteCpf = const Value.absent(),
+            Value<String?> clienteTelefone = const Value.absent(),
             Value<String?> unidade = const Value.absent(),
             Value<String?> parecerTecnico = const Value.absent(),
             Value<String?> statusFinal = const Value.absent(),
@@ -7358,6 +7532,9 @@ class $$VistoriasTableTableManager extends RootTableManager<
             status: status,
             tipoVistoria: tipoVistoria,
             clienteNome: clienteNome,
+            clienteEmail: clienteEmail,
+            clienteCpf: clienteCpf,
+            clienteTelefone: clienteTelefone,
             unidade: unidade,
             parecerTecnico: parecerTecnico,
             statusFinal: statusFinal,
@@ -7381,6 +7558,9 @@ class $$VistoriasTableTableManager extends RootTableManager<
             Value<String> status = const Value.absent(),
             Value<String> tipoVistoria = const Value.absent(),
             Value<String?> clienteNome = const Value.absent(),
+            Value<String?> clienteEmail = const Value.absent(),
+            Value<String?> clienteCpf = const Value.absent(),
+            Value<String?> clienteTelefone = const Value.absent(),
             Value<String?> unidade = const Value.absent(),
             Value<String?> parecerTecnico = const Value.absent(),
             Value<String?> statusFinal = const Value.absent(),
@@ -7404,6 +7584,9 @@ class $$VistoriasTableTableManager extends RootTableManager<
             status: status,
             tipoVistoria: tipoVistoria,
             clienteNome: clienteNome,
+            clienteEmail: clienteEmail,
+            clienteCpf: clienteCpf,
+            clienteTelefone: clienteTelefone,
             unidade: unidade,
             parecerTecnico: parecerTecnico,
             statusFinal: statusFinal,

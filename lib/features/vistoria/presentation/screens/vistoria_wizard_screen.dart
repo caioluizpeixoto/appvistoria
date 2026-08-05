@@ -451,6 +451,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     if (vistoria != null) {
       _wizardState.numeroLaudo = vistoria.numeroLaudo;
       _wizardState.clienteNome = vistoria.clienteNome ?? '';
+      _wizardState.clienteEmail = vistoria.clienteEmail ?? '';
+      _wizardState.clienteCpf = vistoria.clienteCpf ?? '';
+      _wizardState.clienteTelefone = vistoria.clienteTelefone ?? '';
       _wizardState.vistoriadorNome = vistoria.vistoriadorNome ?? '';
       _wizardState.vistoriadorCpf = vistoria.vistoriadorCpf ?? '';
       _wizardState.unidade = vistoria.unidade ?? '';
@@ -562,6 +565,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       await _dao.atualizarVistoria(VistoriasCompanion(
         id: drift.Value(widget.vistoriaId),
         clienteNome: drift.Value(s.clienteNome),
+        clienteEmail: drift.Value(s.clienteEmail),
+        clienteCpf: drift.Value(s.clienteCpf),
+        clienteTelefone: drift.Value(s.clienteTelefone),
         unidade: drift.Value(s.unidade),
         tipoVistoria: drift.Value(s.tipoVistoria),
         vistoriadorNome: drift.Value(s.vistoriadorNome),

@@ -8,12 +8,75 @@ import '../../database/app_database.dart';
 import '../../features/vistoria/domain/vistoria_type.dart';
 import '../../features/vistoria/domain/vistoria_wizard_state.dart';
 import '../../features/vistoria/domain/checklist_definitions.dart';
+import '../../injection_container.dart';
+import '../../database/daos/vistoria_dao.dart';
 
 Future<String?> generateChecklistPdf({
   required Vistoria vistoria,
   required Veiculo veiculo,
   VistoriaWizardState? wizardState,
 }) async {
+  // Se wizardState for nulo ou estiver sem checklistStatus, recarrega do banco de dados local (Drift)
+  if (wizardState == null || wizardState.checklistStatus.isEmpty) {
+    try {
+      final vistoriaDao = sl<VistoriaDao>();
+      wizardState ??= VistoriaWizardState(vistoriaId: vistoria.id);
+
+      wizardState.numeroLaudo = vistoria.numeroLaudo;
+      wizardState.clienteNome = vistoria.clienteNome ?? '';
+      wizardState.clienteEmail = vistoria.clienteEmail ?? '';
+      wizardState.clienteCpf = vistoria.clienteCpf ?? '';
+      wizardState.clienteTelefone = vistoria.clienteTelefone ?? '';
+      wizardState.vistoriadorNome = vistoria.vistoriadorNome ?? '';
+      wizardState.vistoriadorCpf = vistoria.vistoriadorCpf ?? '';
+      wizardState.unidade = vistoria.unidade ?? '';
+      wizardState.assinaturaPath = vistoria.assinaturaPath;
+      wizardState.assinaturaClientePath = vistoria.assinaturaClientePath;
+      wizardState.observacoesVistoriador = vistoria.observacoesGerais ?? '';
+      wizardState.parecerTecnico = vistoria.parecerTecnico ?? '';
+      wizardState.resultadoFinal = vistoria.statusFinal ?? '';
+      wizardState.status = vistoria.status;
+      if (vistoria.tipoVistoria != null) {
+        wizardState.tipoVistoria = vistoria.tipoVistoria!;
+      }
+
+      final itens = await vistoriaDao.listarItensPorVistoria(vistoria.id);
+      for (final item in itens) {
+        if (item.etapa == 'checklist_opcional') {
+          wizardState.realizarChecklistOpcional = true;
+          wizardState.checklistOpcional[item.nome] = item.status;
+        } else {
+          wizardState.checklistStatus[item.nome] = item.status;
+          wizardState.checklistObs[item.nome] = item.observacao ?? '';
+        }
+      }
+
+      final fotos = await vistoriaDao.listarFotosPorVistoria(vistoria.id);
+      for (final foto in fotos) {
+        if (foto.etapa == 'extra') {
+          if (foto.pathLocal != null && foto.pathLocal!.isNotEmpty) {
+            wizardState.fotosExtras.add({
+              'pathLocal': foto.pathLocal ?? '',
+              'url': foto.urlSupabase,
+              'obs': foto.observacao ?? '',
+              'titulo': 'Foto Extra',
+              'categoria': 'Outro',
+            });
+          }
+        } else {
+          if (foto.pathLocal != null) {
+            final itemId = foto.itemId ?? 'desconhecido';
+            wizardState.fotosLocais
+                .putIfAbsent(itemId, () => [])
+                .add(foto.pathLocal!);
+          }
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar dados do checklist do banco para o PDF: $e');
+    }
+  }
+
   final pdf = pw.Document(
     title: 'Checklist Veicular - ${veiculo.placa}',
     author: vistoria.vistoriadorNome ?? 'Sistema',
@@ -72,10 +135,11 @@ Future<String?> generateChecklistPdf({
   // Helper para construir grupos de itens
   List<pw.Widget> buildItemCategory(String title, Map<String, String> items) {
     if (wizardState == null) return [];
+    final wState = wizardState!;
 
     // Filtra os itens que têm algum status
     final validItems = items.entries
-        .where((e) => wizardState.getStatus(e.key).isNotEmpty)
+        .where((e) => wState.getStatus(e.key).isNotEmpty)
         .toList();
     if (validItems.isEmpty) return [];
 
@@ -101,7 +165,7 @@ Future<String?> generateChecklistPdf({
           final mapEntry = entry.value;
           final itemId = mapEntry.key;
           final itemLabel = mapEntry.value;
-          final status = wizardState.getStatus(itemId);
+          final status = wState.getStatus(itemId);
 
           PdfColor statusColor = PdfColors.black;
           if (status == 'Conforme' ||

@@ -34,7 +34,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -75,6 +75,11 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 4) {
             await m.addColumn(veiculos, veiculos.aiImage3dBase64);
+          }
+          if (from < 5) {
+            await m.addColumn(vistorias, vistorias.clienteEmail);
+            await m.addColumn(vistorias, vistorias.clienteCpf);
+            await m.addColumn(vistorias, vistorias.clienteTelefone);
           }
         },
       );

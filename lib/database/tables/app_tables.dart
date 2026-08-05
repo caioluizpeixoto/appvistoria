@@ -24,6 +24,9 @@ class Vistorias extends Table {
   TextColumn get tipoVistoria =>
       text().withDefault(const Constant('cautelar_carro'))();
   TextColumn get clienteNome => text().nullable()();
+  TextColumn get clienteEmail => text().nullable()();
+  TextColumn get clienteCpf => text().nullable()();
+  TextColumn get clienteTelefone => text().nullable()();
   TextColumn get unidade => text().nullable()();
   // Novo: parecer técnico e status final (quando concluído)
   TextColumn get parecerTecnico => text().nullable()();
