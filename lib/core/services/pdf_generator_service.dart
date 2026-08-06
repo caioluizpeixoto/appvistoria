@@ -383,6 +383,7 @@ class PdfGeneratorService {
               label = label.replaceAll('_', ' ');
 
               fotosSecao.add({
+                'id': id,
                 'path': localPath,
                 'label': label,
               });
@@ -629,6 +630,42 @@ class PdfGeneratorService {
                   );
                 }
 
+                final id = f['id'] as String?;
+                final statusAtual = (id != null && wizardState != null) ? wizardState.checklistStatus[id] ?? '' : '';
+                final s = statusAtual.toLowerCase();
+                PdfColor labelColor = PdfColors.grey700;
+                String statusIcon = '';
+                
+                if (s.isNotEmpty) {
+                  if (s.contains('divergente') ||
+                      s.contains('adulteração') ||
+                      s.contains('reprovado') ||
+                      s.contains('não original') ||
+                      s.contains('substituído') ||
+                      s.contains('ausente') ||
+                      s.contains('danificad') ||
+                      s.contains('colisão') ||
+                      s.contains('ilegível') ||
+                      s.contains('não localizad')) {
+                    labelColor = PdfColor.fromHex('EE4036');
+                    statusIcon = '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+                  } else if (s.contains('reparo') ||
+                      s.contains('amassad') ||
+                      s.contains('risco') ||
+                      s.contains('trincad') ||
+                      s.contains('quebrad') ||
+                      s.contains('apontamento') ||
+                      s.contains('observaçã') ||
+                      s.contains('atenção') ||
+                      s.contains('desgaste')) {
+                    labelColor = PdfColor.fromHex('FBB03B');
+                    statusIcon = '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+                  } else {
+                    labelColor = PdfColor.fromHex('8CC63F'); // Conforme
+                    statusIcon = '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                  }
+                }
+
                 return pw.Container(
                   width: isLarge ? 240.0 : 170.0,
                   height: isLarge ? 160.0 : 113.0,
@@ -648,13 +685,39 @@ class PdfGeneratorService {
                       pw.Container(
                         padding: const pw.EdgeInsets.symmetric(vertical: 3),
                         alignment: pw.Alignment.center,
-                        child: pw.Text(
-                          label,
-                          style: pw.TextStyle(
-                              font: styles.bold,
-                              fontSize: 6,
-                              color: PdfColors.grey700),
-                          textAlign: pw.TextAlign.center,
+                        child: pw.Column(
+                          mainAxisSize: pw.MainAxisSize.min,
+                          children: [
+                            pw.Text(
+                              label,
+                              style: pw.TextStyle(
+                                  font: styles.bold,
+                                  fontSize: 6,
+                                  color: PdfColors.grey700),
+                              textAlign: pw.TextAlign.center,
+                            ),
+                            if (s.isNotEmpty) ...[
+                              pw.SizedBox(height: 1.5),
+                              pw.Row(
+                                mainAxisAlignment: pw.MainAxisAlignment.center,
+                                children: [
+                                  pw.SvgImage(
+                                    svg: statusIcon,
+                                    width: 6,
+                                    height: 6,
+                                  ),
+                                  pw.SizedBox(width: 2.5),
+                                  pw.Text(
+                                    s.toUpperCase(),
+                                    style: pw.TextStyle(
+                                        font: styles.bold,
+                                        fontSize: 5,
+                                        color: labelColor),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ],
@@ -692,25 +755,31 @@ class PdfGeneratorService {
                                       color: PdfColors.white)),
                             ),
                             pw.SizedBox(height: 8),
-                            pw.Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: firstRow
-                                  .map((f) => buildPhotoItem(f,
-                                      isLarge: isIdentificacao))
-                                  .toList(),
+                            pw.Center(
+                              child: pw.Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                alignment: pw.WrapAlignment.center,
+                                children: firstRow
+                                    .map((f) => buildPhotoItem(f,
+                                        isLarge: isIdentificacao))
+                                    .toList(),
+                              ),
                             ),
                           ]))
                     ]));
 
                 if (rest.isNotEmpty) {
                   widgets.add(pw.SizedBox(height: 8));
-                  widgets.add(pw.Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: rest
-                        .map((f) => buildPhotoItem(f, isLarge: isIdentificacao))
-                        .toList(),
+                  widgets.add(pw.Center(
+                    child: pw.Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: pw.WrapAlignment.center,
+                      children: rest
+                          .map((f) => buildPhotoItem(f, isLarge: isIdentificacao))
+                          .toList(),
+                    ),
                   ));
                 }
 

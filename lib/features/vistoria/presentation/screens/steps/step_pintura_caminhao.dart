@@ -17,7 +17,7 @@ class _StepPinturaCaminhaoState extends State<StepPinturaCaminhao>
   bool get wantKeepAlive => true;
 
   static const List<String> _statusOpcoes = [
-    'Pintura original',
+    'Padrão do fabricante',
     'Repintura',
     'Repintura e/ou massa',
     'Substitu\u00eddo',

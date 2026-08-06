@@ -40,7 +40,7 @@ class StepPintura extends StatelessWidget {
   };
 
   static const List<String> _statusOpcoes = [
-    'Pintura original',
+    'Padrão do fabricante',
     'Repintura',
     'Repintura e/ou massa',
     'Substituído',
@@ -53,7 +53,7 @@ class StepPintura extends StatelessWidget {
   Color _statusColor(String status) {
     if (status.isEmpty) return AppTheme.naoAplicavel;
     final s = status.toLowerCase();
-    if (s.contains('original')) return AppTheme.conforme;
+    if (s.contains('original') || s.contains('padrão') || s.contains('fabricante')) return AppTheme.conforme;
     if (s.contains('substituído') ||
         s.contains('danificado') ||
         s.contains('massa')) return AppTheme.naoConforme;
@@ -73,7 +73,7 @@ class StepPintura extends StatelessWidget {
         .where((id) => state.getStatus(id).toLowerCase().contains('repintura'))
         .length;
     final originais =
-        _pecas.where((id) => state.getStatus(id) == 'Pintura original').length;
+        _pecas.where((id) => state.getStatus(id) == 'Padrão do fabricante' || state.getStatus(id) == 'Pintura original').length;
 
     return ListView(
       padding: const EdgeInsets.all(16),

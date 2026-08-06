@@ -540,22 +540,7 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                   size: 18,
                   color: _statusColor(statusAtual),
                 ),
-                suffixIcon: GestureDetector(
-                  onLongPress: _onMicLongPress,
-                  onLongPressEnd: _onMicLongPressEnd,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: _isListening ? Colors.red.withOpacity(0.1) : Colors.transparent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.mic,
-                      color: _isListening ? Colors.red : AppTheme.textSecondary,
-                    ),
-                  ),
-                ),
+                // Microfone movido para a Observação
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
@@ -623,12 +608,28 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
               controller: _obsController,
               maxLines: 3,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Observação (opcional)',
                 hintText: 'Descreva detalhes relevantes...',
-                prefixIcon: Icon(Icons.notes_rounded, size: 18),
+                prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                suffixIcon: GestureDetector(
+                  onLongPress: _onMicLongPress,
+                  onLongPressEnd: _onMicLongPressEnd,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: _isListening ? Colors.red.withOpacity(0.1) : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.mic,
+                      color: _isListening ? Colors.red : AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
                 contentPadding:
-                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               ),
               onChanged: (v) => state.setObs(widget.itemId, v),
             ),
