@@ -81,7 +81,7 @@ class RadarService {
           'forcarNova': forcarNova,
           'tokenConsulta': tokenConsulta,
         },
-      ).timeout(const Duration(minutes: 15));
+      ).timeout(const Duration(minutes: 35));
 
       if (response.data is Map<String, dynamic> &&
           response.data['sucesso'] == false) {

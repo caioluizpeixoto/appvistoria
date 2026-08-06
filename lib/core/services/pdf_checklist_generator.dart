@@ -476,42 +476,41 @@ Future<String?> generateChecklistPdf({
         build: (context) {
           List<pw.Widget> photoWidgets = [];
 
-          /* TEMPORARIAMENTE REMOVIDO PARA ACELERAR O PDF
-            for (final entry in fotosComImagens) {
-              final item = entry.key;
-              for (final path in entry.value) {
-                try {
-                  final file = File(path);
-                  if (file.existsSync()) {
-                    final image = pw.MemoryImage(file.readAsBytesSync());
-                    photoWidgets.add(
-                      pw.Container(
-                        width: 200,
-                        margin: const pw.EdgeInsets.only(bottom: 15),
-                        child: pw.Column(
-                          children: [
-                            pw.Container(
-                              height: 150,
-                              width: 200,
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border.all(color: PdfColors.grey300),
-                              ),
-                              child: pw.Image(image, fit: pw.BoxFit.cover),
+          for (final entry in fotosComImagens) {
+            final item = entry.key;
+            for (final path in entry.value) {
+              try {
+                final file = File(path);
+                if (file.existsSync()) {
+                  final image = pw.MemoryImage(file.readAsBytesSync());
+                  photoWidgets.add(
+                    pw.Container(
+                      width: 200,
+                      margin: const pw.EdgeInsets.only(bottom: 15),
+                      child: pw.Column(
+                        children: [
+                          pw.Container(
+                            height: 150,
+                            width: 200,
+                            decoration: pw.BoxDecoration(
+                              border: pw.Border.all(color: PdfColors.grey300),
                             ),
-                            pw.SizedBox(height: 4),
-                            pw.Text(item.toUpperCase(), style: pw.TextStyle(font: fontBold, fontSize: 10)),
-                          ],
-                        ),
+                            child: pw.Image(image, fit: pw.BoxFit.cover),
+                          ),
+                          pw.SizedBox(height: 4),
+                          pw.Text(item.toUpperCase(), style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                        ],
                       ),
-                    );
-                  }
-                } catch (_) {}
-              }
+                    ),
+                  );
+                }
+              } catch (_) {}
             }
-            */
+          }
+
           if (photoWidgets.isEmpty) {
             photoWidgets.add(pw.Text(
-                'Fotos foram temporariamente ocultadas para acelerar a geração do laudo.',
+                'Nenhuma foto encontrada para esta vistoria.',
                 style: pw.TextStyle(color: PdfColors.grey)));
           }
 

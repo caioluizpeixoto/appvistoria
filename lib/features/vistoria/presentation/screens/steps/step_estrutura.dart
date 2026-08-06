@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:open_file/open_file.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
@@ -110,8 +112,90 @@ class StepEstrutura extends StatelessWidget {
               statusOptions: _statusOpcoes,
               obrigatoria: false,
             )),
+        const SizedBox(height: 24),
+        const Divider(),
+        const SizedBox(height: 16),
+        _buildVideoSection(context, state),
         const SizedBox(height: 32),
       ],
+    );
+  }
+
+  Widget _buildVideoSection(BuildContext context, VistoriaWizardState state) {
+    if (state.videoEstruturalPath != null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.blue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Vídeo de Avaria Gravado',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'O vídeo será enviado para a base, mas não aparecerá no PDF gerado.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      OpenFile.open(state.videoEstruturalPath);
+                    },
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Reproduzir'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    state.clearVideoEstrutural();
+                  },
+                  icon: const Icon(Icons.delete),
+                  label: const Text('Excluir'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.withValues(alpha: 0.1),
+                    foregroundColor: Colors.red,
+                    elevation: 0,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return OutlinedButton.icon(
+      onPressed: () async {
+        final picker = ImagePicker();
+        final xFile = await picker.pickVideo(
+          source: ImageSource.camera,
+          maxDuration: const Duration(seconds: 30),
+        );
+        if (xFile != null) {
+          state.setVideoEstrutural(xFile.path);
+        }
+      },
+      icon: const Icon(Icons.videocam),
+      label: const Text('Gravar Vídeo de Avaria (Máx 30s)'),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        side: const BorderSide(color: AppTheme.primary, width: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 }

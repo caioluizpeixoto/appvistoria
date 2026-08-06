@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/services/image_service.dart';
 import '../../../../injection_container.dart';
 import '../../domain/vistoria_wizard_state.dart';
+import '../screens/image_viewer_screen.dart';
 
 /// Widget padrão de inspeção de um item.
 /// Cada item tem: foto(s), status, observação, e upload automático.
@@ -145,6 +146,20 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
 
     final state = context.read<VistoriaWizardState>();
     final file = File(croppedFile.path);
+
+    // Salvar automaticamente na galeria (pasta Pictures/AppVistoria)
+    try {
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = 'VISTORIA_${widget.itemId}_$timestamp.jpg';
+      final defaultPath = '/storage/emulated/0/Pictures/AppVistoria';
+      final dir = Directory(defaultPath);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      await file.copy('${dir.path}/$fileName');
+    } catch (_) {
+      // Ignora erro silenciosamente se não conseguir salvar (ex: permissões negadas em certas versões do Android)
+    }
 
     // Adiciona localmente de imediato para feedback rápido
     state.addFotoLocal(widget.itemId, croppedFile.path);
@@ -380,20 +395,30 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                     }
                     return Stack(
                       children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: Image.file(
-                            File(fotos[i]),
-                            width: 100,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                Container(
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ImageViewerScreen(imagePath: fotos[i]),
+                              ),
+                            );
+                          },
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              File(fotos[i]),
                               width: 100,
                               height: 120,
-                              color: Colors.grey[200],
-                              child: const Icon(Icons.broken_image,
-                                  color: Colors.grey),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Container(
+                                width: 100,
+                                height: 120,
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.broken_image,
+                                    color: Colors.grey),
+                              ),
                             ),
                           ),
                         ),

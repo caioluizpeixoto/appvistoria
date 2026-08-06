@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 import 'dart:convert';
 
 class PdfRadarGenerator {
-  static const _kBlueHeader = PdfColor.fromInt(0xFF1F4E79);
+  static const _kPrimaryHeader = PdfColor.fromInt(0xFF1F5E3D);
   static const _kYellowHeader = PdfColor.fromInt(0xFFFDF7CC);
   static const _kYellowHeaderDarkText = PdfColor.fromInt(0xFF8B7500);
   static const _kBlueLight = PdfColor.fromInt(0xFFF2F2F2);
@@ -200,7 +200,7 @@ class PdfRadarGenerator {
 
     final List<pw.Widget> contentWidgets = [
       _buildSectionHeader('Bin **',
-          svgIcon: null, bgColor: _kBlueHeader, textColor: PdfColors.white),
+          svgIcon: null, bgColor: _kPrimaryHeader, textColor: PdfColors.white),
       pw.SizedBox(height: 10),
       _buildTopHeader(marca, marcaLogo, placa, chassi, renavam, anomodelo),
       pw.SizedBox(height: 10),
@@ -320,7 +320,7 @@ class PdfRadarGenerator {
 
   static pw.Widget _buildSectionHeader(String title,
       {String? svgIcon,
-      PdfColor bgColor = _kBlueHeader,
+      PdfColor bgColor = _kPrimaryHeader,
       PdfColor textColor = PdfColors.white}) {
     return pw.Container(
         width: double.infinity,

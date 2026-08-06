@@ -60,6 +60,10 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Fotos Extras (Step 12) ────────────────────────────────────────────────
   final List<Map<String, dynamic>> fotosExtras = [];
 
+  // ── Vídeo Estrutural ──────────────────────────────────────────────────────
+  String? videoEstruturalPath;
+  String? videoEstruturalUrl;
+
   // ── Observações Gerais (Step 13) ──────────────────────────────────────────
   String observacoesVeiculo = '';
   String observacoesVistoriador = '';
@@ -230,6 +234,19 @@ class VistoriaWizardState extends ChangeNotifier {
 
   void setGeneratingAiImage(bool value) {
     isGeneratingAiImage = value;
+    notifyListeners();
+  }
+
+  // ── Vídeo Estrutural ──────────────────────────────────────────────────────
+
+  void setVideoEstrutural(String path) {
+    videoEstruturalPath = path;
+    notifyListeners();
+  }
+
+  void clearVideoEstrutural() {
+    videoEstruturalPath = null;
+    videoEstruturalUrl = null;
     notifyListeners();
   }
 

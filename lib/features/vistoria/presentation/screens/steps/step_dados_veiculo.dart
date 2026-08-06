@@ -39,12 +39,17 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   final _cambioVeiculoCtrl = TextEditingController();
 
   bool _isLoadingOcr = false;
+  bool _foiPreenchidoPelaConsulta = false;
+  late VistoriaWizardState _wizardStateRef;
 
   @override
   void initState() {
     super.initState();
+    _wizardStateRef = context.read<VistoriaWizardState>();
+    _wizardStateRef.addListener(_onStateChanged);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final s = context.read<VistoriaWizardState>();
+      final s = _wizardStateRef;
       _placaCtrl.text = s.placa;
       _marcaCtrl.text = s.marca;
       _modeloCtrl.text = s.modelo;
@@ -66,8 +71,35 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
     });
   }
 
+  void _onStateChanged() {
+    if (_wizardStateRef.statusConsulta == 'concluida' && !_foiPreenchidoPelaConsulta) {
+      _foiPreenchidoPelaConsulta = true;
+      if (mounted) {
+        setState(() {
+          if (_wizardStateRef.placa.isNotEmpty) _placaCtrl.text = _wizardStateRef.placa;
+          if (_wizardStateRef.marca.isNotEmpty) _marcaCtrl.text = _wizardStateRef.marca;
+          if (_wizardStateRef.modelo.isNotEmpty) _modeloCtrl.text = _wizardStateRef.modelo;
+          if (_wizardStateRef.anoFabricacao.isNotEmpty) _anoFabCtrl.text = _wizardStateRef.anoFabricacao;
+          if (_wizardStateRef.anoModelo.isNotEmpty) _anoModCtrl.text = _wizardStateRef.anoModelo;
+          if (_wizardStateRef.cor.isNotEmpty) _corCtrl.text = _wizardStateRef.cor;
+          if (_wizardStateRef.combustivel.isNotEmpty) _combustivelCtrl.text = _wizardStateRef.combustivel;
+          if (_wizardStateRef.municipio.isNotEmpty) _municipioCtrl.text = _wizardStateRef.municipio;
+          if (_wizardStateRef.uf.isNotEmpty) _ufCtrl.text = _wizardStateRef.uf;
+          if (_wizardStateRef.renavam.isNotEmpty) _renavamCtrl.text = _wizardStateRef.renavam;
+          if (_wizardStateRef.chassiBin.isNotEmpty) _chassiBinCtrl.text = _wizardStateRef.chassiBin;
+          if (_wizardStateRef.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = _wizardStateRef.chassiVeiculo;
+          if (_wizardStateRef.motorBin.isNotEmpty) _motorBinCtrl.text = _wizardStateRef.motorBin;
+          if (_wizardStateRef.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = _wizardStateRef.motorVeiculo;
+        });
+      }
+    } else if (_wizardStateRef.statusConsulta == 'pendente' || _wizardStateRef.statusConsulta == 'andamento') {
+      _foiPreenchidoPelaConsulta = false;
+    }
+  }
+
   @override
   void dispose() {
+    _wizardStateRef.removeListener(_onStateChanged);
     for (final c in [
       _placaCtrl, _marcaCtrl, _modeloCtrl, _anoFabCtrl, _anoModCtrl,
       _corCtrl, _combustivelCtrl, _municipioCtrl, _ufCtrl, _renavamCtrl,

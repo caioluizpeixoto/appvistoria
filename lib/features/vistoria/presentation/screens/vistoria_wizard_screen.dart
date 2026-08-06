@@ -251,7 +251,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Pesquisa em Andamento'),
-          content: const Text('Já existe uma pesquisa rodando para este veículo. Aguarde a conclusão da mesma.'),
+          content: const Text('Já existe uma pesquisa rodando para este veículo no momento. O aplicativo aguardará a conclusão. Por favor, aguarde a nuvem ficar verde.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -261,6 +261,28 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         ),
       );
       return;
+    }
+
+    if (_wizardState.statusConsulta == 'concluida') {
+      final querNova = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Pesquisa Concluída'),
+          content: const Text('Você já possui uma pesquisa concluída com sucesso para este veículo nesta vistoria.\n\nDeseja realizar uma NOVA consulta? (Isso consumirá mais saldo).'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Forçar Nova Consulta'),
+            ),
+          ],
+        ),
+      );
+      if (querNova != true) return;
     }
 
     final placa = _wizardState.placa;
@@ -309,7 +331,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         vistoriaId: widget.vistoriaId,
         forcarNova: forcarNova,
       )
-          .timeout(const Duration(seconds: 90), onTimeout: () {
+          .timeout(const Duration(minutes: 35), onTimeout: () {
         throw Exception("Tempo limite de pesquisa excedido.");
       });
 
@@ -358,9 +380,26 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
       if (mounted) {
         if (blockUI) Navigator.pop(context); // fecha dialog
+        
+        // Atualiza o estado em memória para a tela reagir imediatamente
+        _wizardState.placa = veiculoApi.placa.isNotEmpty ? veiculoApi.placa : _wizardState.placa;
+        _wizardState.chassiVeiculo = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiVeiculo;
+        _wizardState.motorVeiculo = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorVeiculo;
+        _wizardState.marca = veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo.split(' ')[0] : _wizardState.marca;
+        _wizardState.modelo = veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo : _wizardState.modelo;
+        _wizardState.anoFabricacao = veiculoApi.anoFabricacao.isNotEmpty ? veiculoApi.anoFabricacao : _wizardState.anoFabricacao;
+        _wizardState.anoModelo = veiculoApi.anoModelo.isNotEmpty ? veiculoApi.anoModelo : _wizardState.anoModelo;
+        _wizardState.cor = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.cor;
+        _wizardState.renavam = veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : _wizardState.renavam;
+        _wizardState.chassiBin = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiBin;
+        _wizardState.motorBin = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorBin;
+        _wizardState.municipio = veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : _wizardState.municipio;
+        _wizardState.uf = veiculoApi.estado.isNotEmpty ? veiculoApi.estado : _wizardState.uf;
+        
         setState(() {
           _wizardState.setStatusConsulta('concluida');
         });
+        _wizardState.forceUpdate();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('✅ Pesquisa atualizada!'),
@@ -539,6 +578,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           'titulo': 'Foto Extra',
           'categoria': 'Outro',
         });
+      } else if (foto.etapa == 'video_estrutural') {
+        _wizardState.videoEstruturalPath = foto.pathLocal;
+        _wizardState.videoEstruturalUrl = foto.urlSupabase;
       } else {
         if (foto.pathLocal != null) {
           final itemId = foto.itemId ?? 'desconhecido';
@@ -690,6 +732,21 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           urlSupabase: drift.Value(extra['url'] as String?),
           observacao: drift.Value(extra['obs'] as String?),
           ordem: drift.Value(i),
+          obrigatoria: const drift.Value(false),
+        ));
+      }
+
+      // Vídeo Estrutural
+      if (s.videoEstruturalPath != null) {
+        await _dao.inserirFoto(FotosVistoriaCompanion.insert(
+          id: '${widget.vistoriaId}_video_estrutural',
+          vistoriaId: widget.vistoriaId,
+          legenda: 'Vídeo Estrutural',
+          etapa: const drift.Value('video_estrutural'),
+          itemId: const drift.Value('video_estrutural'),
+          pathLocal: drift.Value(s.videoEstruturalPath),
+          urlSupabase: drift.Value(s.videoEstruturalUrl),
+          ordem: const drift.Value(0),
           obrigatoria: const drift.Value(false),
         ));
       }

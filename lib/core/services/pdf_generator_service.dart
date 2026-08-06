@@ -359,6 +359,29 @@ class PdfGeneratorService {
           'peca_porta_dianteira_direita',
           'peca_paralama_dianteiro_direito',
         ],
+      if (isCaminhao)
+        'FOTOS - PINTURA E LATARIA (CAMINHÃO)': [
+          'peca_cam_capo',
+          'peca_cam_teto',
+          'peca_cam_painel_tras',
+          'peca_cam_parachoque_dian',
+          'peca_cam_grade',
+          'peca_cam_porta_esq',
+          'peca_cam_paralama_esq',
+          'peca_cam_coluna_a_esq',
+          'peca_cam_coluna_b_esq',
+          'peca_cam_lat_esq',
+          'peca_cam_saia_esq',
+          'peca_cam_paralama_tras_esq',
+          'peca_cam_porta_dir',
+          'peca_cam_paralama_dir',
+          'peca_cam_coluna_a_dir',
+          'peca_cam_coluna_b_dir',
+          'peca_cam_lat_dir',
+          'peca_cam_saia_dir',
+          'peca_cam_paralama_tras_dir',
+          'peca_cam_parachoque_tras',
+        ],
     };
 
     bool hasAnyPhoto = false;
@@ -3728,7 +3751,7 @@ class PdfGeneratorService {
     VistoriaWizardState? state,
   ) {
     final themeRed = PdfColor.fromHex(
-        '#8CC63F'); // Verde principal (mantendo o nome da variavel para nao quebrar)
+        '#1F5E3D'); // Verde principal (mantendo o nome da variavel para nao quebrar)
     final lightRed = PdfColor.fromHex('#F1F8E9'); // Fundo verde clarinho
     final borderRed = PdfColor.fromHex('#C5E1A5'); // Borda verde suave
     final textDark = PdfColor.fromHex('#333333');
@@ -3865,6 +3888,21 @@ class PdfGeneratorService {
       pageFormat: PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(16),
       build: (ctx) {
+        final apontamentosOriginais = data['apontamentos_veiculo'] is List ? (data['apontamentos_veiculo'] as List) : [];
+        final validApontamentos = apontamentosOriginais.where((item) {
+          final pecaUpper = (item['peca_ou_problema']?.toString() ?? '').toUpperCase();
+          final obsUpper = (item['observacao_indicada']?.toString() ?? '').toUpperCase();
+          return !(pecaUpper.contains('SEM ACESSO') ||
+              pecaUpper.contains('SEMA ACESSO') ||
+              obsUpper.contains('SEM ACESSO') ||
+              obsUpper.contains('SEMA ACESSO') ||
+              obsUpper.contains('NÃO É AVARIA') ||
+              obsUpper.contains('NAO E AVARIA') ||
+              obsUpper.contains('NÃO REPRESENTA AVARIA') ||
+              obsUpper.contains('OBSTRUÍDO') ||
+              obsUpper.contains('OBSTRUIDO'));
+        }).toList();
+
         return pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -3949,8 +3987,7 @@ class PdfGeneratorService {
                   ],
                 ),
               ),
-            if (data['apontamentos_veiculo'] != null &&
-                data['apontamentos_veiculo'] is List) ...[
+            if (validApontamentos.isNotEmpty) ...[
               pw.SizedBox(height: 8),
               pw.Container(
                 width: double.infinity,
@@ -4016,21 +4053,11 @@ class PdfGeneratorService {
                                       color:
                                           const PdfColor.fromInt(0xFFF57F17)))),
                         ]),
-                    ...((data['apontamentos_veiculo'] as List).map((item) {
+                    ...(validApontamentos.map((item) {
                       final peca = item['peca_ou_problema']?.toString() ?? '';
                       final obs = item['observacao_indicada']?.toString() ?? '';
-                      final pecaUpper = peca.toUpperCase();
-                      final obsUpper = obs.toUpperCase();
-                      final isSemAcesso = pecaUpper.contains('SEM ACESSO') ||
-                          pecaUpper.contains('SEMA ACESSO') ||
-                          obsUpper.contains('SEM ACESSO') ||
-                          obsUpper.contains('SEMA ACESSO') ||
-                          obsUpper.contains('NÃO É AVARIA') ||
-                          obsUpper.contains('NAO E AVARIA') ||
-                          obsUpper.contains('NÃO REPRESENTA AVARIA');
-
-                      final valPeca = isSemAcesso ? 'R\$ 0,00' : formatCurrency(item['valor_peca_estimado']);
-                      final valMaoObra = isSemAcesso ? 'R\$ 0,00' : formatCurrency(item['valor_mao_de_obra_estimado']);
+                      final valPeca = formatCurrency(item['valor_peca_estimado']);
+                      final valMaoObra = formatCurrency(item['valor_mao_de_obra_estimado']);
 
                       return pw.TableRow(children: [
                         buildSoftTd(peca),
