@@ -950,7 +950,8 @@ class PdfGeneratorService {
             .where((e) =>
                 e.value != 'CONFORME' &&
                 e.value != 'NÃO ANALISADO' &&
-                !e.value.toUpperCase().contains('ORIGINAL'))
+                !e.value.toUpperCase().contains('ORIGINAL') &&
+                !e.value.toUpperCase().contains('PADRÃO DO FABRICANTE'))
             .map((e) {
           final nomeLimpo = e.key.replaceAll('_', ' ').toUpperCase();
           final obs = wState.checklistObs[e.key] ?? '';
@@ -1159,43 +1160,47 @@ class PdfGeneratorService {
 
 
   pw.Widget _buildPdfFooter(pw.Context context, _PdfStyles styles) {
-    return pw.Container(
-      width: double.infinity,
-      decoration: pw.BoxDecoration(
-        color: PdfColor.fromHex('EAEAEA'),
-        border: pw.Border(top: pw.BorderSide(color: PdfColor.fromHex('F39C12'), width: 3)),
-      ),
-      padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: pw.CrossAxisAlignment.center,
-        children: [
-          pw.Container(
-            width: 80,
-            alignment: pw.Alignment.centerLeft,
-            child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey700)),
+    return pw.Stack(
+      alignment: pw.Alignment.centerRight,
+      children: [
+        pw.Container(
+          width: double.infinity,
+          decoration: pw.BoxDecoration(
+            color: PdfColor.fromHex('EAEAEA'),
+            border: pw.Border(top: pw.BorderSide(color: PdfColor.fromHex('F39C12'), width: 3)),
           ),
-          pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: [
-                pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey800)),
-                pw.SizedBox(height: 2),
-                pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
-                pw.SizedBox(height: 2),
-                pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
-              ],
-            ),
+          padding: const pw.EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Container(
+                width: 140,
+                alignment: pw.Alignment.centerLeft,
+                child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey700)),
+              ),
+              pw.Expanded(
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey800)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+                    pw.SizedBox(height: 2),
+                    pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+                  ],
+                ),
+              ),
+              pw.SizedBox(width: 140),
+            ],
           ),
-          _globalRodapeImage != null
-              ? pw.Container(
-                  width: 80,
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Image(_globalRodapeImage!, width: 60),
-                )
-              : pw.SizedBox(width: 80),
-        ],
-      ),
+        ),
+        if (_globalRodapeImage != null)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(right: 16),
+            child: pw.Image(_globalRodapeImage!, width: 120),
+          ),
+      ],
     );
   }
 
@@ -2821,6 +2826,7 @@ class PdfGeneratorService {
         final status = state?.getStatus(id) ?? 'NÃO ANALISADO';
         final isConforme = status.toUpperCase().contains('CONFORME') ||
             status.toUpperCase().contains('ORIGINAL') ||
+            status.toUpperCase().contains('PADRÃO DO FABRICANTE') ||
             status.toUpperCase().contains('PADRÕES');
         final color = isConforme
             ? _kGreen
@@ -3556,7 +3562,7 @@ class PdfGeneratorService {
 
   PdfColor _getPinturaColor(String status) {
     status = status.toUpperCase();
-    if (status.contains('ORIGINAL') || status.contains('CONFORME')) {
+    if (status.contains('ORIGINAL') || status.contains('CONFORME') || status.contains('PADRÃO DO FABRICANTE')) {
       return _kGreen;
     } else if (status.contains('REPINTURA E/OU MASSA') ||
         status.contains('SUBSTITUÍDO') ||
@@ -3641,6 +3647,7 @@ class PdfGeneratorService {
     } else if (status.contains('CONFORME') ||
         status.contains('SEM REPARO') ||
         status.contains('ORIGINAL') ||
+        status.contains('PADRÃO DO FABRICANTE') ||
         status.contains('PADRÕES') ||
         status == 'APROVADO') {
       color = _kGreen;
