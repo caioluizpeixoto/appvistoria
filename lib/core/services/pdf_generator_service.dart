@@ -289,6 +289,7 @@ class PdfGeneratorService {
     // ── Geração de Fotos Padronizada (Item 15) ──────────────────────────────
     final Map<String, List<String>> secoesFotos = {
       'FOTOS PRINCIPAIS - IDENTIFICAÇÃO': [
+        'foto_placa',
         'chassi_gravacao',
         'motor_gravacao',
         'frente_esquerda',
@@ -303,18 +304,18 @@ class PdfGeneratorService {
           'vidro_traseiro',
         'vidro_dianteiro_direito',
         'vidro_dianteiro_esquerdo',
-        if (!isCaminhao) 'vidro_traseiro_direito',
-        if (!isCaminhao) 'vidro_traseiro_esquerdo',
+        'vidro_traseiro_direito',
+        'vidro_traseiro_esquerdo',
         if (isCaminhao) 'plaqueta_da_cabine',
         if (isCaminhao) 'Plaqueta da cabine',
         if (wizardState != null) ...wizardState.vidrosExtrasIds,
       ],
       'FOTOS PRINCIPAIS - MOTOR / CHASSI': [
-        if (!isCaminhao) 'painel_hodometro',
-        if (!isCaminhao) 'compartimento_motor',
+        'painel_hodometro',
+        'compartimento_motor',
         'cambio_gravacao',
-        if (!isCaminhao) 'etiqueta_vis_motor',
-        if (!isCaminhao) 'etiqueta_vis_porta',
+        'etiqueta_vis_motor',
+        'etiqueta_vis_porta',
       ],
       if (temCroqui && !isCaminhao)
         'FOTOS - ESTRUTURAL': [
@@ -748,65 +749,40 @@ class PdfGeneratorService {
                 );
               }
 
+              final allFlatFotos = <Map<String, dynamic>>[];
               for (final section in allSections) {
-                final titulo = section['titulo'] as String;
                 final fotos = section['fotos'] as List<Map<String, dynamic>>;
+                allFlatFotos.addAll(fotos);
+              }
 
-                final isIdentificacao =
-                    titulo.toUpperCase().contains('IDENTIFICA');
-                final itemsPerRow = isIdentificacao ? 2 : 3;
-
-                final firstRow = fotos.take(itemsPerRow).toList();
-                final rest = fotos.skip(itemsPerRow).toList();
-
-                widgets.add(pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Expanded(
-                          child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                            pw.Container(
-                              width: double.infinity,
-                              color: PdfColor.fromHex('2D3035'),
-                              padding: const pw.EdgeInsets.symmetric(
-                                  horizontal: 6, vertical: 4),
-                              child: pw.Text(titulo.toUpperCase(),
-                                  style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 8,
-                                      color: PdfColors.white)),
-                            ),
-                            pw.SizedBox(height: 8),
-                            pw.Center(
-                              child: pw.Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                alignment: pw.WrapAlignment.center,
-                                children: firstRow
-                                    .map((f) => buildPhotoItem(f,
-                                        isLarge: isIdentificacao))
-                                    .toList(),
-                              ),
-                            ),
-                          ]))
-                    ]));
-
-                if (rest.isNotEmpty) {
-                  widgets.add(pw.SizedBox(height: 8));
-                  widgets.add(pw.Center(
-                    child: pw.Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: pw.WrapAlignment.center,
-                      children: rest
-                          .map((f) => buildPhotoItem(f, isLarge: isIdentificacao))
-                          .toList(),
-                    ),
+              if (allFlatFotos.isNotEmpty) {
+                // Primeiras 6 fotos (isLarge: true, 2 por linha)
+                final firstSix = allFlatFotos.take(6).toList();
+                for (int i = 0; i < firstSix.length; i += 2) {
+                  final rowFotos = firstSix.skip(i).take(2).toList();
+                  widgets.add(pw.Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: rowFotos
+                        .map((f) => buildPhotoItem(f, isLarge: true))
+                        .toList(),
                   ));
+                  widgets.add(pw.SizedBox(height: 8));
                 }
 
-                widgets.add(pw.SizedBox(height: 16));
+                // Restante das fotos (isLarge: false, 3 por linha)
+                final rest = allFlatFotos.skip(6).toList();
+                for (int i = 0; i < rest.length; i += 3) {
+                  final rowFotos = rest.skip(i).take(3).toList();
+                  widgets.add(pw.Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: rowFotos
+                        .map((f) => buildPhotoItem(f, isLarge: false))
+                        .toList(),
+                  ));
+                  widgets.add(pw.SizedBox(height: 8));
+                }
               }
 
               return widgets;
@@ -1208,7 +1184,7 @@ class PdfGeneratorService {
             crossAxisAlignment: pw.CrossAxisAlignment.center,
             children: [
               pw.Container(
-                width: 140,
+                width: 120,
                 alignment: pw.Alignment.centerLeft,
                 child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey700)),
               ),
@@ -1218,13 +1194,13 @@ class PdfGeneratorService {
                   children: [
                     pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
-                    pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+                    pw.FittedBox(fit: pw.BoxFit.scaleDown, child: pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800))),
                     pw.SizedBox(height: 2),
-                    pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800)),
+                    pw.FittedBox(fit: pw.BoxFit.scaleDown, child: pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: styles.regular, fontSize: 6, color: PdfColors.grey800))),
                   ],
                 ),
               ),
-              pw.SizedBox(width: 140),
+              pw.SizedBox(width: 120),
             ],
           ),
         ),
@@ -1688,7 +1664,7 @@ class PdfGeneratorService {
               pw.Positioned.fill(
                 child: pw.Center(
                   child: pw.Opacity(
-                    opacity: 0.25,
+                    opacity: 0.10,
                     child: pw.Image(marcaAgua),
                   ),
                 ),
@@ -1699,7 +1675,7 @@ class PdfGeneratorService {
                 pw.Container(
                   color: bgColor,
                   padding: const pw.EdgeInsets.only(
-                      top: 20, left: 20, right: 20, bottom: 10),
+                      top: 15, left: 20, right: 20, bottom: 10),
                   child: pw.Row(
                     crossAxisAlignment: pw.CrossAxisAlignment.center,
                     mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -1715,12 +1691,6 @@ class PdfGeneratorService {
                                     color: PdfColors.white,
                                     font: styles.bold,
                                     fontSize: 24)),
-                          pw.SizedBox(height: 8),
-                          pw.Text('PERÍCIA CAUTELAR',
-                              style: pw.TextStyle(
-                                  color: PdfColors.white,
-                                  font: styles.bold,
-                                  fontSize: 16)),
                         ],
                       ),
                       // Auto Score Card and CNPJ
@@ -1781,20 +1751,15 @@ class PdfGeneratorService {
 
                 // Content below header with normal margins
                 pw.Expanded(
-                  child: pw.FittedBox(
-                    fit: pw.BoxFit.scaleDown,
-                    alignment: pw.Alignment.topCenter,
-                    child: pw.Container(
-                      width: PdfPageFormat.a4.width,
-                      child: pw.Padding(
-                        padding: const pw.EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 8),
-                        child: pw.Column(
-                          children: [
-                                                        pw.Container(
-                              padding: const pw.EdgeInsets.all(16),
-                              margin: const pw.EdgeInsets.only(bottom: 12),
-                              decoration: pw.BoxDecoration(
+                  child: pw.Padding(
+                    padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 4),
+                    child: pw.Column(
+                      children: [
+                        pw.Container(
+                          padding: const pw.EdgeInsets.all(12),
+                          margin: const pw.EdgeInsets.only(bottom: 6),
+                          decoration: pw.BoxDecoration(
                                 color: PdfColor.fromHex('F9F9F9'),
                                 borderRadius: pw.BorderRadius.circular(8),
                                 border: pw.Border.all(color: PdfColors.grey300, width: 1),
@@ -1887,13 +1852,13 @@ class PdfGeneratorService {
                               ],
                             ),
 
-                            pw.SizedBox(height: 14),
+                            pw.SizedBox(height: 6),
                             pw.Text('SITUAÇÃO GERAL',
                                 style: pw.TextStyle(
                                     font: styles.bold,
                                     fontSize: 11,
                                     color: PdfColors.grey800)),
-                            pw.SizedBox(height: 8),
+                            pw.SizedBox(height: 4),
                             pw.Row(
                                 crossAxisAlignment: pw.CrossAxisAlignment.center,
                                 children: [
@@ -1929,41 +1894,33 @@ class PdfGeneratorService {
                                             isCross: true),
                                       ]))
                                 ]),
-                            pw.SizedBox(height: 6),
+                            pw.SizedBox(height: 4),
                             pw.Container(height: 0.5, color: PdfColors.grey300),
-                            pw.SizedBox(height: 12),
-                            pw.Container(
-                                height: 350,
-                                child: pw.Row(
-                                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                    children: [
-                                      _buildCategoryColumn(
-                                          'IDENTIFICAÇÃO',
-                                          grupos['IDENTIFICAÇÃO']!,
-                                          styles,
-                                          limeGreen,
-                                          warningYellow,
-                                          dangerRed),
-                                      pw.Container(
-                                          width: 0.5,
-                                          height: double.infinity,
-                                          color: PdfColors.grey200),
-                                      _buildCategoryColumn('ESTRUTURA', grupos['ESTRUTURA']!,
-                                          styles, limeGreen, warningYellow, dangerRed),
-                                      pw.Container(
-                                          width: 0.5,
-                                          height: double.infinity,
-                                          color: PdfColors.grey200),
-                                      _buildCategoryColumn(
-                                          'PINTURA E LATARIA',
-                                          grupos['PINTURA E LATARIA']!,
-                                          styles,
-                                          limeGreen,
-                                          warningYellow,
-                                          dangerRed),
-                                    ])),
+                            pw.SizedBox(height: 6),
+                            pw.Expanded(
+                              child: (grupos['IDENTIFICAÇÃO']!.isEmpty && grupos['ESTRUTURA']!.isEmpty && grupos['PINTURA E LATARIA']!.isEmpty)
+                                  ? pw.SizedBox()
+                                  : pw.FittedBox(
+                                      fit: pw.BoxFit.scaleDown,
+                                      alignment: pw.Alignment.topCenter,
+                                      child: pw.Container(
+                                        width: PdfPageFormat.a4.width - 32,
+                                        child: pw.Row(
+                                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                          children: [
+                                            if (grupos['IDENTIFICAÇÃO']!.isNotEmpty)
+                                              _buildCategoryColumn('IDENTIFICAÇÃO', grupos['IDENTIFICAÇÃO']!, styles, limeGreen, warningYellow, dangerRed),
+                                            if (grupos['IDENTIFICAÇÃO']!.isNotEmpty && (grupos['ESTRUTURA']!.isNotEmpty || grupos['PINTURA E LATARIA']!.isNotEmpty))
+                                              pw.Container(width: 0.5, height: 80, color: PdfColors.grey200),
+                                            if (grupos['ESTRUTURA']!.isNotEmpty)
+                                              _buildCategoryColumn('ESTRUTURA', grupos['ESTRUTURA']!, styles, limeGreen, warningYellow, dangerRed),
+                                            if (grupos['ESTRUTURA']!.isNotEmpty && grupos['PINTURA E LATARIA']!.isNotEmpty)
+                                              pw.Container(width: 0.5, height: 80, color: PdfColors.grey200),
+                                            if (grupos['PINTURA E LATARIA']!.isNotEmpty)
+                                              _buildCategoryColumn('PINTURA E LATARIA', grupos['PINTURA E LATARIA']!, styles, limeGreen, warningYellow, dangerRed),
+                                          ])))),
                             
-                            pw.SizedBox(height: 16),
+                            pw.SizedBox(height: 6),
                             pw.Text(
                                 '* ESTA CONSULTA NÃO SUBSTITUI A VISTORIA FÍSICA DO VEÍCULO.\nAs informações apresentadas neste relatório são baseadas em dados disponibilizados por órgãos oficiais e fontes privadas na data da consulta.',
                                 style: pw.TextStyle(
@@ -1971,13 +1928,11 @@ class PdfGeneratorService {
                                     fontSize: 8,
                                     color: PdfColors.grey600),
                                 textAlign: pw.TextAlign.center),
-                            pw.SizedBox(height: 4),
+                            pw.SizedBox(height: 2),
                           ],
                         ),
                       ),
-                    ),
                   ),
-                ),
                 _buildPdfFooter(context, styles),
               ],
             ),
@@ -2135,7 +2090,7 @@ class PdfGeneratorService {
               pw.Positioned.fill(
                 child: pw.Center(
                   child: pw.Opacity(
-                    opacity: 0.25,
+                    opacity: 0.10,
                     child: pw.Container(
                       width: 380,
                       child:
@@ -2324,30 +2279,16 @@ class PdfGeneratorService {
                     child: pw.Row(
                         crossAxisAlignment: pw.CrossAxisAlignment.start,
                         children: [
-                      _buildCategoryColumn(
-                          'IDENTIFICAÇÃO',
-                          grupos['IDENTIFICAÇÃO']!,
-                          styles,
-                          limeGreen,
-                          warningYellow,
-                          dangerRed),
-                      pw.Container(
-                          width: 0.5,
-                          height: double.infinity,
-                          color: PdfColors.grey200),
-                      _buildCategoryColumn('ESTRUTURA', grupos['ESTRUTURA']!,
-                          styles, limeGreen, warningYellow, dangerRed),
-                      pw.Container(
-                          width: 0.5,
-                          height: double.infinity,
-                          color: PdfColors.grey200),
-                      _buildCategoryColumn(
-                          'PINTURA E LATARIA',
-                          grupos['PINTURA E LATARIA']!,
-                          styles,
-                          limeGreen,
-                          warningYellow,
-                          dangerRed),
+                                      if (grupos['IDENTIFICAÇÃO']!.isNotEmpty)
+                                        _buildCategoryColumn('IDENTIFICAÇÃO', grupos['IDENTIFICAÇÃO']!, styles, limeGreen, warningYellow, dangerRed),
+                                      if (grupos['IDENTIFICAÇÃO']!.isNotEmpty && (grupos['ESTRUTURA']!.isNotEmpty || grupos['PINTURA E LATARIA']!.isNotEmpty))
+                                        pw.Container(width: 0.5, height: 80, color: PdfColors.grey200),
+                                      if (grupos['ESTRUTURA']!.isNotEmpty)
+                                        _buildCategoryColumn('ESTRUTURA', grupos['ESTRUTURA']!, styles, limeGreen, warningYellow, dangerRed),
+                                      if (grupos['ESTRUTURA']!.isNotEmpty && grupos['PINTURA E LATARIA']!.isNotEmpty)
+                                        pw.Container(width: 0.5, height: 80, color: PdfColors.grey200),
+                                      if (grupos['PINTURA E LATARIA']!.isNotEmpty)
+                                        _buildCategoryColumn('PINTURA E LATARIA', grupos['PINTURA E LATARIA']!, styles, limeGreen, warningYellow, dangerRed),
                     ])),
                 pw.Container(
                     padding: const pw.EdgeInsets.only(top: 8),
@@ -2473,9 +2414,12 @@ class PdfGeneratorService {
                   warningYellow, dangerRed),
               pw.SizedBox(height: 12),
               pw.Container(
-                  padding: const pw.EdgeInsets.only(left: 15),
-                  child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  alignment: pw.Alignment.topCenter,
+                  child: pw.Container(
+                      width: 130,
+                      child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          mainAxisSize: pw.MainAxisSize.min,
                       children: itens.map((e) {
                         final statusVal = e['status'] as int;
                         PdfColor dotColor = limeGreen;
@@ -2507,7 +2451,7 @@ class PdfGeneratorService {
                                                   ? PdfColors.black
                                                   : PdfColors.grey800))),
                                 ]));
-                      }).toList())) // Close Container
+                      }).toList())))
             ])));
   }
 
@@ -2521,7 +2465,6 @@ class PdfGeneratorService {
     PdfColor warningYellow,
     PdfColor dangerRed,
   ) {
-    if (total == 0) return pw.SizedBox(height: 80);
     return pw.SizedBox(
         width: 80,
         height: 80,
@@ -2532,6 +2475,14 @@ class PdfGeneratorService {
                 final center = PdfPoint(size.x / 2, size.y / 2);
                 final radius = 32.0;
                 final stroke = 11.0;
+
+                if (total == 0) {
+                  canvas.setStrokeColor(PdfColors.grey300);
+                  canvas.setLineWidth(stroke);
+                  canvas.drawEllipse(center.x, center.y, radius, radius);
+                  canvas.strokePath();
+                  return;
+                }
 
                 double currentAngle = -1.5708; // Top
 
@@ -2602,7 +2553,7 @@ class PdfGeneratorService {
               pw.Positioned.fill(
                 child: pw.Center(
                   child: pw.Opacity(
-                    opacity: 0.25,
+                    opacity: 0.10,
                     child: pw.Container(
                       width: 350,
                       child:

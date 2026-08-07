@@ -169,23 +169,25 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Botão OCR CRLV ───────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          if (state.isChecklist) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: _isLoadingOcr ? null : _scanCrlv,
+                icon: _isLoadingOcr
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.document_scanner_rounded),
+                label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
               ),
-              onPressed: _isLoadingOcr ? null : _scanCrlv,
-              icon: _isLoadingOcr
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.document_scanner_rounded),
-              label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           if (!state.isChecklist)
             SizedBox(
