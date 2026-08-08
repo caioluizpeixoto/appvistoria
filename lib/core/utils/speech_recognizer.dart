@@ -28,12 +28,9 @@ class SpeechRecognizer {
     );
   }
 
-  static Future<String?> stopListening(List<String> availableOptions) async {
+  static Future<String> stopListening() async {
     await _speechToText.stop();
-    if (_lastRecognizedWords.isEmpty) return null;
-    
-    print('Texto reconhecido: $_lastRecognizedWords');
-    return matchChecklistOption(_lastRecognizedWords, availableOptions);
+    return _lastRecognizedWords;
   }
 
   static String normalize(String text) {

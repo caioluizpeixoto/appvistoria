@@ -59,16 +59,27 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   void _onMicLongPressEnd(LongPressEndDetails details) async {
     setState(() => _isListening = false);
     
-    String? matched = await SpeechRecognizer.stopListening(widget.statusOptions);
+    String rawText = await SpeechRecognizer.stopListening();
     
-    if (matched != null) {
+    if (rawText.isNotEmpty) {
+      final currentText = _obsController.text;
+      final newText = currentText.isEmpty ? rawText : '$currentText $rawText';
+      _obsController.text = newText;
+      
       if (mounted) {
-        context.read<VistoriaWizardState>().setStatus(widget.itemId, matched);
+        final state = context.read<VistoriaWizardState>();
+        state.setObs(widget.itemId, newText);
+        
+        // Also try to set status if it matches an option
+        String? matched = SpeechRecognizer.matchChecklistOption(rawText, widget.statusOptions);
+        if (matched != null) {
+          state.setStatus(widget.itemId, matched);
+        }
       }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Não entendi a condição falada. Tente novamente.')),
+          const SnackBar(content: Text('Não consegui captar o áudio. Tente novamente.')),
         );
       }
     }
