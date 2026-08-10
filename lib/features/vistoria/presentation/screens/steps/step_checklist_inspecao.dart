@@ -178,6 +178,9 @@ class StepChecklistInspecao extends StatelessWidget {
           const SizedBox(height: 4),
           const Text('C = Conforme | NC = Não Conforme | NP = Não Possui',
               style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+          const SizedBox(height: 2),
+          const Text('P/E = Possui/Escritório | E/C = Está com Cliente | N = Não Tem',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
         ],
       ),
     );
@@ -228,9 +231,9 @@ class StepChecklistInspecao extends StatelessWidget {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 80,
-      maxWidth: 800,
-      maxHeight: 800,
+      imageQuality: 40,
+      maxWidth: 600,
+      maxHeight: 600,
     );
     if (xfile != null) {
       state.addFotoLocal(itemId, xfile.path);
@@ -748,13 +751,13 @@ class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
   }
 
 
-  Future<void> _tirarFoto(String itemId) async {
+  Future<void> _tirarFoto(String itemId, ImageSource source) async {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-      maxWidth: 800,
-      maxHeight: 800,
+      source: source,
+      imageQuality: 40,
+      maxWidth: 600,
+      maxHeight: 600,
     );
     if (xfile != null) {
       widget.state.addFotoLocal(itemId, xfile.path);
@@ -862,8 +865,18 @@ class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
                       : Icons.camera_alt_outlined,
                   color: temFoto ? AppTheme.primary : AppTheme.textSecondary,
                 ),
-                onPressed: () => _tirarFoto(widget.item.id),
-                tooltip: 'Adicionar Foto (Opcional)',
+                onPressed: () => _tirarFoto(widget.item.id, ImageSource.camera),
+                tooltip: 'Adicionar Foto (Câmera)',
+              ),
+              IconButton(
+                icon: Icon(
+                  temFoto
+                      ? Icons.photo_library_rounded
+                      : Icons.photo_library_outlined,
+                  color: temFoto ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+                onPressed: () => _tirarFoto(widget.item.id, ImageSource.gallery),
+                tooltip: 'Adicionar Foto (Galeria)',
               ),
             ],
           ),

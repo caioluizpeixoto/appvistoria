@@ -247,20 +247,25 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
   Future<void> _retryRadarConsulta({bool blockUI = false}) async {
     if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento') {
-      showDialog(
+      final forcar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Pesquisa em Andamento'),
-          content: const Text('Já existe uma pesquisa rodando para este veículo no momento. O aplicativo aguardará a conclusão. Por favor, aguarde a nuvem ficar verde.'),
+          content: const Text('Já existe uma pesquisa rodando para este veículo no momento. O aplicativo aguardará a conclusão.\n\nSe a consulta travou, você pode forçar uma nova pesquisa.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Entendi'),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Aguardar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Forçar Nova'),
             ),
           ],
         ),
       );
-      return;
+      if (forcar != true) return;
     }
 
     if (_wizardState.statusConsulta == 'concluida') {
@@ -1017,17 +1022,24 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               ),
               actions: [
                 if (!_wizardState.isChecklist) ...[
-                  if (_wizardState.statusConsulta == 'pendente')
-                    const Center(
+                  if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento')
+                    Center(
                       child: Padding(
-                        padding: EdgeInsets.only(right: 16),
+                        padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
-                          message: 'Pesquisando na base...',
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
+                          message: 'Pesquisando na base... (Toque para opções)',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              ),
+                            ),
                           ),
                         ),
                       ),

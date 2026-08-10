@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { produto, param, value, forcarNova, tokenConsulta } = await req.json();
+    const { produto, param, value, forcarNova, tokenConsulta, aguardarRetorno } = await req.json();
 
     if (!produto || !param || !value) {
       throw new Error("Parâmetros 'produto', 'param' e 'value' são obrigatórios.");
@@ -20,6 +20,7 @@ serve(async (req) => {
     const produtosMap: Record<string, string> = {
       "auto_bin": "21589A1C74E953B1486494836NQ70TJ0EUZFTS9K7GGLAMHKOJ",
       "auto_pericia": "2158B04671523351487947377ALQNCW8LN4VGIJHLHSFJDD5G9",
+      "auto_pericia_hrf": "2162AB9E27B63CD1655414311NO8UOXTCZ2SC4CW1L75PRFEVN",
       "auto_completa": "21588A87D591BBD1485473749QJKNKEIFTWHHBWDJJVDNEOB76",
       "auto_leilao": "2158DD027974724149087909770OG7270OE8LK17N7RET0LSJ3",
       "auto_base_estadual": "21589C4F6FE5D851486638959Z74PAKY8WJ4M8EF5LQB945K5N",
@@ -67,7 +68,9 @@ serve(async (req) => {
       bodyParams.append("produto", tokenProduto);
       bodyParams.append("param", normalizedParam);
       bodyParams.append("value", normalizedValue);
-      bodyParams.append("aguardar-retorno", "true");
+      
+      const aguardar = aguardarRetorno ?? true;
+      bodyParams.append("aguardar-retorno", aguardar ? "true" : "false");
       
       if (forcarNova) {
         bodyParams.append("forcar-nova", "true");
@@ -92,6 +95,17 @@ serve(async (req) => {
 
     if (data?.result === 0 && data?.message) {
       throw new Error(data.message);
+    }
+
+    if (data?.["token-consulta"] || (data?.consulta && data.consulta.status !== 1)) {
+      return new Response(JSON.stringify({
+        sucesso: true,
+        emProcessamento: true,
+        tokenConsulta: data["token-consulta"] || data.consulta?.token || tokenConsulta,
+        raw: data
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // extrair dados

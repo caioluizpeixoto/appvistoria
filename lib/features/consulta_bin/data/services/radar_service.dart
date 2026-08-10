@@ -72,26 +72,43 @@ class RadarService {
         dadosTratados: {},
       );
 
-      final response = await supabase.functions.invoke(
-        'radar-consultar',
-        body: {
-          'produto': produto,
-          'param': param,
-          'value': value,
-          'forcarNova': forcarNova,
-          'tokenConsulta': tokenConsulta,
-        },
-      ).timeout(const Duration(minutes: 35));
+      String? currentToken = tokenConsulta;
+      Map<String, dynamic>? finalData;
 
-      if (response.data is Map<String, dynamic> &&
-          response.data['sucesso'] == false) {
-        throw Exception(
-            response.data['error'] ?? 'Erro desconhecido na Radar Consultas');
+      while (true) {
+        final response = await supabase.functions.invoke(
+          'radar-consultar',
+          body: {
+            'produto': produto,
+            'param': param,
+            'value': value,
+            'forcarNova': forcarNova,
+            'tokenConsulta': currentToken,
+            'aguardarRetorno': false,
+          },
+        ).timeout(const Duration(minutes: 2));
+
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          if (data['sucesso'] == false) {
+            throw Exception(data['error'] ?? 'Erro desconhecido na Radar Consultas');
+          }
+
+          if (data['emProcessamento'] == true) {
+            currentToken = data['tokenConsulta'];
+            await Future.delayed(const Duration(seconds: 10)); // Consulta a cada 10s
+            continue;
+          }
+
+          finalData = data;
+          break;
+        } else {
+          throw Exception('Resposta inválida da API Radar.');
+        }
       }
 
-      final data = response.data;
-      final parsed = data['parsed'] as Map<String, dynamic>;
-      final raw = data['raw'];
+      final parsed = finalData!['parsed'] as Map<String, dynamic>;
+      final raw = finalData['raw'];
 
       final veiculo = RadarVeiculo.fromJson(parsed);
 

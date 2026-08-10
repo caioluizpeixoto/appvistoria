@@ -218,6 +218,7 @@ Future<String?> generateChecklistPdf({
           final itemId = mapEntry.key;
           final itemLabel = mapEntry.value;
           final status = wState.getStatus(itemId);
+          final obs = wState.checklistObs[itemId] ?? '';
 
           PdfColor statusColor = PdfColors.black;
           if (status == 'Conforme' ||
@@ -241,11 +242,24 @@ Future<String?> generateChecklistPdf({
             children: [
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: pw.Text(itemLabel,
-                    style: pw.TextStyle(
-                        font: fontRegular,
-                        fontSize: 10,
-                        color: secondaryColor)),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(itemLabel,
+                        style: pw.TextStyle(
+                            font: fontRegular,
+                            fontSize: 10,
+                            color: secondaryColor)),
+                    if (obs.isNotEmpty) ...[
+                      pw.SizedBox(height: 2),
+                      pw.Text('Obs: $obs',
+                          style: pw.TextStyle(
+                              font: fontRegular,
+                              fontSize: 8,
+                              color: PdfColors.grey600)),
+                    ]
+                  ],
+                ),
               ),
               pw.Padding(
                 padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -264,28 +278,79 @@ Future<String?> generateChecklistPdf({
     ];
   }
 
+  final bool hasFotos = wizardState != null &&
+      wizardState!.fotosLocais.entries.where((e) => e.value.isNotEmpty).isNotEmpty;
+
+  pw.Widget buildAssinaturas() {
+    return pw.Column(
+      children: [
+        pw.SizedBox(height: 10),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+          children: [
+            pw.Column(
+              children: [
+                if (assinaturaImage != null)
+                  pw.Container(
+                    height: 30,
+                    width: 150,
+                    child: pw.Image(assinaturaImage, fit: pw.BoxFit.contain),
+                  )
+                else
+                  pw.SizedBox(height: 30),
+                pw.Container(width: 200, height: 1, color: PdfColors.black),
+                pw.SizedBox(height: 4),
+                pw.Text('VISTORIADOR: ${vistoria.vistoriadorNome ?? ''}',
+                    style: pw.TextStyle(font: fontBold, fontSize: 10)),
+              ],
+            ),
+            if (!isChecklist)
+              pw.Column(
+                children: [
+                  if (assinaturaClienteImage != null)
+                    pw.Container(
+                      height: 30,
+                      width: 150,
+                      child: pw.Image(assinaturaClienteImage,
+                          fit: pw.BoxFit.contain),
+                    )
+                  else
+                    pw.SizedBox(height: 30),
+                  pw.Container(width: 200, height: 1, color: PdfColors.black),
+                  pw.SizedBox(height: 4),
+                  pw.Text('CLIENTE: ${vistoria.clienteNome ?? ''}',
+                      style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                ],
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
   // Página 1: Relatório e Checklist
   pdf.addPage(pw.MultiPage(
     pageFormat: PdfPageFormat.a4,
-    margin: const pw.EdgeInsets.all(32),
+    margin: const pw.EdgeInsets.only(top: 16, bottom: 32, left: 32, right: 32),
     footer: (context) => _buildPdfFooter(context),
     header: (context) {
       return pw.Container(
         margin: const pw.EdgeInsets.only(bottom: 20),
         child: pw.Column(
           children: [
-            if (logoImage != null)
+            /* if (logoImage != null)
               pw.Container(
                 width: double.infinity,
                 height: 120, // Limite de altura
                 margin: const pw.EdgeInsets.only(bottom: 12),
                 child: pw.Image(logoImage, fit: pw.BoxFit.contain),
-              ),
+              ), */
             pw.Row(
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
-                pw.Text(logoImage == null ? 'LOGO' : '',
-                    style: pw.TextStyle(font: fontBold, fontSize: 24)),
+                pw.SizedBox(), // Placeholder for the removed logo
+                // pw.Text(logoImage == null ? 'LOGO' : '',
+                //     style: pw.TextStyle(font: fontBold, fontSize: 24)),
                 pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.end,
                   children: [
@@ -411,124 +476,53 @@ Future<String?> generateChecklistPdf({
           ...buildItemCategory('Itens Escritório', _getItensEscritorio(isPesado)),
         ],
 
-        pw.SizedBox(height: 30),
+        // Anexos (Fotos)
+        if (hasFotos && wizardState != null) ...[
+          pw.SizedBox(height: 20),
+          pw.Container(
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Text('ANEXOS FOTOGRÁFICOS', style: pw.TextStyle(font: fontBold, fontSize: 16, color: primaryColor)),
+          ),
+          pw.SizedBox(height: 15),
+          pw.Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            children: wizardState!.fotosLocais.entries.where((e) => e.value.isNotEmpty).expand((entry) {
+              final item = entry.key;
+              return entry.value.map((path) {
+                final file = File(path);
+                if (!file.existsSync()) return pw.SizedBox();
+                final image = pw.MemoryImage(file.readAsBytesSync());
+                return pw.Container(
+                  width: 200,
+                  margin: const pw.EdgeInsets.only(bottom: 15),
+                  child: pw.Column(
+                    children: [
+                      pw.Container(
+                        height: 150,
+                        width: 200,
+                        decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                        child: pw.Image(image, fit: pw.BoxFit.contain),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(item.toUpperCase(), style: pw.TextStyle(font: fontBold, fontSize: 10)),
+                      if (wizardState!.checklistObs.containsKey(item) && wizardState!.checklistObs[item]!.isNotEmpty) ...[
+                        pw.SizedBox(height: 2),
+                        pw.Text(wizardState!.checklistObs[item]!, style: pw.TextStyle(font: fontRegular, fontSize: 8, color: PdfColors.grey600), textAlign: pw.TextAlign.center),
+                      ],
+                    ],
+                  ),
+                );
+              }).toList();
+            }).toList(),
+          ),
+        ],
 
-        // Assinaturas
-        pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
-          children: [
-            pw.Column(
-              children: [
-                if (assinaturaImage != null)
-                  pw.Container(
-                    height: 50,
-                    width: 150,
-                    child: pw.Image(assinaturaImage, fit: pw.BoxFit.contain),
-                  )
-                else
-                  pw.SizedBox(height: 50),
-                pw.Container(width: 200, height: 1, color: PdfColors.black),
-                pw.SizedBox(height: 4),
-                pw.Text('VISTORIADOR: ${vistoria.vistoriadorNome ?? ''}',
-                    style: pw.TextStyle(font: fontBold, fontSize: 10)),
-              ],
-            ),
-            if (!isChecklist)
-              pw.Column(
-                children: [
-                  if (assinaturaClienteImage != null)
-                    pw.Container(
-                      height: 50,
-                      width: 150,
-                      child: pw.Image(assinaturaClienteImage,
-                          fit: pw.BoxFit.contain),
-                    )
-                  else
-                    pw.SizedBox(height: 50),
-                  pw.Container(width: 200, height: 1, color: PdfColors.black),
-                  pw.SizedBox(height: 4),
-                  pw.Text('CLIENTE: ${vistoria.clienteNome ?? ''}',
-                      style: pw.TextStyle(font: fontBold, fontSize: 10)),
-                ],
-              ),
-          ],
-        ),
+        pw.SizedBox(height: 40),
+        buildAssinaturas(),
       ];
     },
   ));
-
-  // Anexos (Fotos)
-  if (wizardState != null) {
-    final fotosComImagens = wizardState.fotosLocais.entries
-        .where((e) => e.value.isNotEmpty)
-        .toList();
-
-    if (fotosComImagens.isNotEmpty) {
-      pdf.addPage(pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
-        footer: (context) => _buildPdfFooter(context),
-    header: (context) {
-          return pw.Container(
-            margin: const pw.EdgeInsets.only(bottom: 20),
-            alignment: pw.Alignment.centerLeft,
-            child: pw.Text('ANEXOS FOTOGRÁFICOS',
-                style: pw.TextStyle(
-                    font: fontBold, fontSize: 16, color: primaryColor)),
-          );
-        },
-        build: (context) {
-          List<pw.Widget> photoWidgets = [];
-
-          for (final entry in fotosComImagens) {
-            final item = entry.key;
-            for (final path in entry.value) {
-              try {
-                final file = File(path);
-                if (file.existsSync()) {
-                  final image = pw.MemoryImage(file.readAsBytesSync());
-                  photoWidgets.add(
-                    pw.Container(
-                      width: 200,
-                      margin: const pw.EdgeInsets.only(bottom: 15),
-                      child: pw.Column(
-                        children: [
-                          pw.Container(
-                            height: 150,
-                            width: 200,
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border.all(color: PdfColors.grey300),
-                            ),
-                            child: pw.Image(image, fit: pw.BoxFit.cover),
-                          ),
-                          pw.SizedBox(height: 4),
-                          pw.Text(item.toUpperCase(), style: pw.TextStyle(font: fontBold, fontSize: 10)),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-              } catch (_) {}
-            }
-          }
-
-          if (photoWidgets.isEmpty) {
-            photoWidgets.add(pw.Text(
-                'Nenhuma foto encontrada para esta vistoria.',
-                style: pw.TextStyle(color: PdfColors.grey)));
-          }
-
-          return [
-            pw.Wrap(
-              spacing: 20,
-              runSpacing: 20,
-              children: photoWidgets,
-            )
-          ];
-        },
-      ));
-    }
-  }
 
   // Salvar o arquivo
   try {

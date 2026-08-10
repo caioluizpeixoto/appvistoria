@@ -72,24 +72,32 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   }
 
   void _onStateChanged() {
-    if (_wizardStateRef.statusConsulta == 'concluida' && !_foiPreenchidoPelaConsulta) {
-      _foiPreenchidoPelaConsulta = true;
-      if (mounted) {
+    if (!mounted) return;
+
+    if (_wizardStateRef.statusConsulta == 'concluida') {
+      // Como o DB pode disparar o 'statusConsulta = concluida' antes de o DAO de Veiculo sincronizar
+      // os dados do veículo, aguardamos até que pelo menos um dado básico tenha chegado.
+      if (_wizardStateRef.marca.isEmpty && _wizardStateRef.anoFabricacao.isEmpty && _wizardStateRef.renavam.isEmpty) {
+        return;
+      }
+
+      if (!_foiPreenchidoPelaConsulta) {
+        _foiPreenchidoPelaConsulta = true;
         setState(() {
-          if (_wizardStateRef.placa.isNotEmpty) _placaCtrl.text = _wizardStateRef.placa;
-          if (_wizardStateRef.marca.isNotEmpty) _marcaCtrl.text = _wizardStateRef.marca;
-          if (_wizardStateRef.modelo.isNotEmpty) _modeloCtrl.text = _wizardStateRef.modelo;
-          if (_wizardStateRef.anoFabricacao.isNotEmpty) _anoFabCtrl.text = _wizardStateRef.anoFabricacao;
-          if (_wizardStateRef.anoModelo.isNotEmpty) _anoModCtrl.text = _wizardStateRef.anoModelo;
-          if (_wizardStateRef.cor.isNotEmpty) _corCtrl.text = _wizardStateRef.cor;
-          if (_wizardStateRef.combustivel.isNotEmpty) _combustivelCtrl.text = _wizardStateRef.combustivel;
-          if (_wizardStateRef.municipio.isNotEmpty) _municipioCtrl.text = _wizardStateRef.municipio;
-          if (_wizardStateRef.uf.isNotEmpty) _ufCtrl.text = _wizardStateRef.uf;
-          if (_wizardStateRef.renavam.isNotEmpty) _renavamCtrl.text = _wizardStateRef.renavam;
-          if (_wizardStateRef.chassiBin.isNotEmpty) _chassiBinCtrl.text = _wizardStateRef.chassiBin;
-          if (_wizardStateRef.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = _wizardStateRef.chassiVeiculo;
-          if (_wizardStateRef.motorBin.isNotEmpty) _motorBinCtrl.text = _wizardStateRef.motorBin;
-          if (_wizardStateRef.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = _wizardStateRef.motorVeiculo;
+          if (_placaCtrl.text.isEmpty && _wizardStateRef.placa.isNotEmpty) _placaCtrl.text = _wizardStateRef.placa;
+          if (_marcaCtrl.text.isEmpty && _wizardStateRef.marca.isNotEmpty) _marcaCtrl.text = _wizardStateRef.marca;
+          if (_modeloCtrl.text.isEmpty && _wizardStateRef.modelo.isNotEmpty) _modeloCtrl.text = _wizardStateRef.modelo;
+          if (_anoFabCtrl.text.isEmpty && _wizardStateRef.anoFabricacao.isNotEmpty) _anoFabCtrl.text = _wizardStateRef.anoFabricacao;
+          if (_anoModCtrl.text.isEmpty && _wizardStateRef.anoModelo.isNotEmpty) _anoModCtrl.text = _wizardStateRef.anoModelo;
+          if (_corCtrl.text.isEmpty && _wizardStateRef.cor.isNotEmpty) _corCtrl.text = _wizardStateRef.cor;
+          if (_combustivelCtrl.text.isEmpty && _wizardStateRef.combustivel.isNotEmpty) _combustivelCtrl.text = _wizardStateRef.combustivel;
+          if (_municipioCtrl.text.isEmpty && _wizardStateRef.municipio.isNotEmpty) _municipioCtrl.text = _wizardStateRef.municipio;
+          if (_ufCtrl.text.isEmpty && _wizardStateRef.uf.isNotEmpty) _ufCtrl.text = _wizardStateRef.uf;
+          if (_renavamCtrl.text.isEmpty && _wizardStateRef.renavam.isNotEmpty) _renavamCtrl.text = _wizardStateRef.renavam;
+          if (_chassiBinCtrl.text.isEmpty && _wizardStateRef.chassiBin.isNotEmpty) _chassiBinCtrl.text = _wizardStateRef.chassiBin;
+          if (_chassiVeiculoCtrl.text.isEmpty && _wizardStateRef.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = _wizardStateRef.chassiVeiculo;
+          if (_motorBinCtrl.text.isEmpty && _wizardStateRef.motorBin.isNotEmpty) _motorBinCtrl.text = _wizardStateRef.motorBin;
+          if (_motorVeiculoCtrl.text.isEmpty && _wizardStateRef.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = _wizardStateRef.motorVeiculo;
         });
       }
     } else if (_wizardStateRef.statusConsulta == 'pendente' || _wizardStateRef.statusConsulta == 'andamento') {
@@ -136,25 +144,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   Widget build(BuildContext context) {
     final state = context.watch<VistoriaWizardState>();
     
-    // Auto-preenchimento assíncrono caso o campo esteja vazio e o estado tenha o dado
-    if (_placaCtrl.text.isEmpty && state.placa.isNotEmpty) _placaCtrl.text = state.placa;
-    if (_marcaCtrl.text.isEmpty && state.marca.isNotEmpty) _marcaCtrl.text = state.marca;
-    if (_modeloCtrl.text.isEmpty && state.modelo.isNotEmpty) _modeloCtrl.text = state.modelo;
-    if (_anoFabCtrl.text.isEmpty && state.anoFabricacao.isNotEmpty) _anoFabCtrl.text = state.anoFabricacao;
-    if (_anoModCtrl.text.isEmpty && state.anoModelo.isNotEmpty) _anoModCtrl.text = state.anoModelo;
-    if (_corCtrl.text.isEmpty && state.cor.isNotEmpty) _corCtrl.text = state.cor;
-    if (_combustivelCtrl.text.isEmpty && state.combustivel.isNotEmpty) _combustivelCtrl.text = state.combustivel;
-    if (_municipioCtrl.text.isEmpty && state.municipio.isNotEmpty) _municipioCtrl.text = state.municipio;
-    if (_ufCtrl.text.isEmpty && state.uf.isNotEmpty) _ufCtrl.text = state.uf;
-    if (_renavamCtrl.text.isEmpty && state.renavam.isNotEmpty) _renavamCtrl.text = state.renavam;
-    if (_kmCtrl.text.isEmpty && state.km.isNotEmpty) _kmCtrl.text = state.km;
-    if (_numeroGrvCtrl.text.isEmpty && state.numeroGrv.isNotEmpty) _numeroGrvCtrl.text = state.numeroGrv;
-    if (_chassiBinCtrl.text.isEmpty && state.chassiBin.isNotEmpty) _chassiBinCtrl.text = state.chassiBin;
-    if (_chassiVeiculoCtrl.text.isEmpty && state.chassiVeiculo.isNotEmpty) _chassiVeiculoCtrl.text = state.chassiVeiculo;
-    if (_motorBinCtrl.text.isEmpty && state.motorBin.isNotEmpty) _motorBinCtrl.text = state.motorBin;
-    if (_motorVeiculoCtrl.text.isEmpty && state.motorVeiculo.isNotEmpty) _motorVeiculoCtrl.text = state.motorVeiculo;
-    if (_cambioBinCtrl.text.isEmpty && state.cambioBin.isNotEmpty) _cambioBinCtrl.text = state.cambioBin;
-    if (_cambioVeiculoCtrl.text.isEmpty && state.cambioVeiculo.isNotEmpty) _cambioVeiculoCtrl.text = state.cambioVeiculo;
+    // O preenchimento automático agora é tratado apenas no _onStateChanged para evitar bugs de TextField no build()
 
     final chassiDivergente = _chassiBinCtrl.text.isNotEmpty &&
         _chassiVeiculoCtrl.text.isNotEmpty &&
@@ -169,25 +159,23 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Botão OCR CRLV ───────────────────────────────────────────────
-          if (state.isChecklist) ...[
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: AppTheme.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-                onPressed: _isLoadingOcr ? null : _scanCrlv,
-                icon: _isLoadingOcr
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.document_scanner_rounded),
-                label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
+              onPressed: _isLoadingOcr ? null : () => _scanCrlv(ImageSource.camera),
+              icon: _isLoadingOcr
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.document_scanner_rounded),
+              label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
             ),
-            const SizedBox(height: 16),
-          ],
+          ),
+          const SizedBox(height: 16),
 
           if (!state.isChecklist)
             SizedBox(
@@ -512,9 +500,9 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
     );
   }
 
-  Future<void> _scanCrlv() async {
+  Future<void> _scanCrlv(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.camera, imageQuality: 90);
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 40, maxWidth: 600, maxHeight: 600);
     if (pickedFile == null) return;
 
     setState(() => _isLoadingOcr = true);

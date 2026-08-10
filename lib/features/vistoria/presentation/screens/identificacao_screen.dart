@@ -69,6 +69,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   final List<Map<String, dynamic>> _tiposConsulta = [
     {'nome': 'AUTO BIN', 'codigo': 'auto_bin'},
     {'nome': 'AUTO PERÍCIA', 'codigo': 'auto_pericia'},
+    {'nome': 'AUTO PERÍCIA HRF', 'codigo': 'auto_pericia_hrf'},
     {'nome': 'AUTO COMPLETA', 'codigo': 'auto_completa'},
     {'nome': 'AUTO LEILÃO', 'codigo': 'auto_leilao'},
     {'nome': 'AUTO BASE ESTADUAL', 'codigo': 'auto_base_estadual'},
@@ -185,7 +186,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     if (hasPending) {
       if (!mounted) return null;
       setState(() { _buscandoVeiculo = false; });
-      await showDialog(
+      final querForcar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -203,21 +204,29 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               const Expanded(child: Text('Pesquisa em Andamento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
             ],
           ),
-          content: const Text('Já existe uma pesquisa em andamento para este veículo.\n\nA vistoria será iniciada utilizando a pesquisa existente e o resultado ficará disponível para atualização na tela de resumo.'),
+          content: const Text('Já existe uma pesquisa em andamento para este veículo.\n\nSe a tentativa anterior falhou ou travou, você pode forçar uma nova consulta.'),
           actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Aguardar', style: TextStyle(color: Colors.grey)),
+            ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Entendi'),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Forçar Nova'),
             )
           ],
         )
       );
-      return {'forcarNova': false, 'fonte': 'local', 'dados_tratados': null};
+
+      if (querForcar != true) {
+        return {'forcarNova': false, 'fonte': 'local', 'dados_tratados': null};
+      }
+      // Se forçar nova, ignoramos que está pendente e o fluxo continua para as concluídas ou nova.
     }
 
     List<Map<String, dynamic>> consultasNuvem = [];

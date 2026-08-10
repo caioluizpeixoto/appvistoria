@@ -49,24 +49,28 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        imageQuality: 80,
-        maxWidth: 800,
-        maxHeight: 800,
+        imageQuality: 40,
+        maxWidth: 600,
+        maxHeight: 600,
       );
 
       if (image != null) {
         final croppedFile = await ImageCropper().cropImage(
           sourcePath: image.path,
+          aspectRatio: const CropAspectRatio(ratioX: 3, ratioY: 2),
           uiSettings: [
             AndroidUiSettings(
-              toolbarTitle: 'Editar Foto',
+              toolbarTitle: 'Enquadrar Foto (Obrigatório)',
               toolbarColor: AppTheme.primary,
               toolbarWidgetColor: Colors.white,
-              initAspectRatio: CropAspectRatioPreset.original,
-              lockAspectRatio: false,
+              initAspectRatio: CropAspectRatioPreset.ratio3x2,
+              lockAspectRatio: true,
+              hideBottomControls: false,
             ),
             IOSUiSettings(
-              title: 'Editar Foto',
+              title: 'Enquadrar Foto',
+              aspectRatioLockEnabled: true,
+              resetAspectRatioEnabled: false,
             ),
           ],
         );
@@ -223,15 +227,26 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            TextButton.icon(
-              onPressed: () => _pickImage(ImageSource.camera),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Substituir'),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera),
+                icon: const Icon(Icons.camera_alt_rounded, size: 18),
+                label: const Text('Câmera', style: TextStyle(fontSize: 12)),
+              ),
             ),
-            TextButton.icon(
-              onPressed: _deletePhoto,
-              icon: const Icon(Icons.delete_outline, color: Colors.red),
-              label: const Text('Excluir', style: TextStyle(color: Colors.red)),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery),
+                icon: const Icon(Icons.photo_library_rounded, size: 18),
+                label: const Text('Galeria', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+            Expanded(
+              child: TextButton.icon(
+                onPressed: _deletePhoto,
+                icon: const Icon(Icons.delete_outline, color: Colors.red, size: 18),
+                label: const Text('Excluir', style: TextStyle(color: Colors.red, fontSize: 12)),
+              ),
             ),
           ],
         )

@@ -101,6 +101,14 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
               _PesquisaCard(
+                titulo: 'AUTO PERÍCIA HRF',
+                codigo: 'auto_pericia_hrf',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'auto_pericia_hrf');
+                },
+              ),
+              _PesquisaCard(
                 titulo: 'AUTO COMPLETA',
                 codigo: 'auto_completa',
                 onTap: () {

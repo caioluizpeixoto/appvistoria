@@ -132,9 +132,9 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
   Future<void> _pickImage(ImageSource source) async {
     final xFile = await _imagePicker.pickImage(
       source: source,
-      imageQuality: 80,
-      maxWidth: 800,
-      maxHeight: 800,
+      imageQuality: 40,
+      maxWidth: 600,
+      maxHeight: 600,
     );
     if (xFile == null || !mounted) return;
 

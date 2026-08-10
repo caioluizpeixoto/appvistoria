@@ -165,7 +165,8 @@ class PdfRadarGenerator {
   }
 
   static Future<List<pw.Page>> buildRadarPages(
-      Map<String, dynamic> dadosPesquisa) async {
+      Map<String, dynamic> dadosPesquisa,
+      {pw.Widget? footerWidget}) async {
     final List<pw.Page> pages = [];
 
     final String marca =
@@ -233,6 +234,16 @@ class PdfRadarGenerator {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
+        footer: (context) {
+          if (context.pageNumber == context.pagesCount &&
+              footerWidget != null) {
+            return pw.Padding(
+              padding: const pw.EdgeInsets.only(top: 20),
+              child: footerWidget,
+            );
+          }
+          return pw.SizedBox.shrink();
+        },
         build: (context) => contentWidgets,
       ),
     );

@@ -208,7 +208,7 @@ class RadarRepository {
       if (response != null && response is List && response.isNotEmpty) {
         final createdAt = DateTime.parse(response.first['created_at'].toString());
         final now = DateTime.now();
-        if (now.difference(createdAt).inMinutes < 45) {
+        if (now.difference(createdAt).inMinutes < 5) {
           return true;
         }
       }
