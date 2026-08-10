@@ -893,15 +893,61 @@ class PdfGeneratorService {
       // Continua gerando o PDF normalmente
     }
 
-    // Inserir a página de Disclaimer no final do nosso PDF local
-    pdf.addPage(_buildPageDisclaimer(
-      vistoria: vistoria,
-      styles: styles,
-      logo: logoImage,
-      assinatura: assinaturaImage,
-      assinaturaCliente: assinaturaClienteImage,
-      state: wizardState,
+    // ── Página de Disclaimer ─────────────────────────────────────────────────
+    pw.Widget _disclaimerText(String text, _PdfStyles styles, {bool bold = false}) {
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 8),
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: bold ? styles.bold : styles.regular,
+            fontSize: 9,
+            color: _kBlack,
+          ),
+          textAlign: pw.TextAlign.justify,
+        ),
+      );
+    }
+
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(16),
+      build: (ctx) {
+        return pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            _buildHeader(vistoria, styles, logoImage, state: wizardState),
+            pw.SizedBox(height: 16),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _disclaimerText('Este laudo trata-se da vistoria cautelar do veículo, possuindo caráter informativo da análise de itens, conforme padrões estabelecidos pelos fabricantes.', styles),
+                  _disclaimerText('NÃO substituindo em nenhuma hipótese a Perícia Oficial do Instituto de Criminalística.', styles, bold: true),
+                  _disclaimerText('Cabe destacar que a unidade não se responsabiliza por quaisquer modificações nos itens do veículo contemplados nesta vistoria, posteriores à realização deste laudo, cuja validade tem sua garantia certificada no momento da realização da vistoria.', styles),
+                  _disclaimerText('O resultado do laudo técnico segue critérios de avaliação estabelecidos, podendo sofrer alterações necessárias em determinado momento, sem prévia comunicação.', styles),
+                  _disclaimerText('As informações dos veículos, obtidas através de pesquisa via base de dados dos órgãos públicos e empresas privadas, são de responsabilidade da empresa fornecedora da pesquisa, cabendo apenas reiterar os dados cadastrados nas referidas bases de consulta.', styles),
+                  _disclaimerText('Ao receber este laudo, o cliente fica ciente que as companhias de seguro possuem métodos e critérios próprios de avaliação do risco para aceitação ou não de veículos.', styles),
+                  _disclaimerText('Não obstante, o critério de avaliação bem como o resultado final da vistoria, independe da aceitação ou não da seguradora.', styles),
+                  _disclaimerText('Importante notar que NÃO são examinados itens de mecânica, elétrica, transmissão, suspensão e freios.', styles, bold: true),
+                  _disclaimerText('A análise de pintura é realizada através de medidores digitais que informam a espessura da camada de tinta, apenas em caráter informativo de retoques ou reparos expressivos em sua lataria, que não afetam a estrutura do veículo, NÃO apontamos pequenos riscos nem desgastes na pintura.', styles),
+                  _disclaimerText('NÃO nos responsabilizamos por defeitos ou fraudes em equipamentos de Air-Bag.', styles, bold: true),
+                  _disclaimerText('A verificação da numeração da caixa de câmbio somente é realizada se tal item está aparente, sem a necessidade de desmontar partes do veículo que tornem a gravação obstruída.', styles),
+                  _disclaimerText('A vistoria cautelar não afere a idoneidade da quilometragem constante no hodômetro do veículo, sendo apenas registrado em caráter informativo a quilometragem aparente em seu painel de instrumentos.', styles),
+                  _disclaimerText('Alguns itens obrigatórios e acessórios como pneus, setas, cintos e outros acessórios, são apenas informados quanto à sua existência e funcionamento mínimo, não sendo atestada calibração ou cumprimento de normas técnicas específicas.', styles),
+                  _disclaimerText('A análise proposta é particular, restrita exclusivamente aos itens analisados e não à vistoria regulamentada pelo CONTRAN ou à perícia realizada pelo Instituto de Criminalística.', styles),
+                  if (vistoria.tipoVistoria.toLowerCase().contains('caminh'))
+                    _disclaimerText('ATENÇÃO (VEÍCULO DE CARGA): As modificações nas dimensões do chassi (alongamento ou encurtamento) estão sujeitas à regulamentação específica (Resolução CONTRAN nº 292/2008 e atualizações como a Res. 916/2022). Este laudo aponta apenas as condições aparentes da estrutura para fins de vistoria cautelar, não suprindo a exigência legal do Certificado de Segurança Veicular (CSV) nem garantindo a regularização das modificações perante o DETRAN.', styles, bold: true),
+                ],
+              ),
+            ),
+            _buildFooter(vistoria, styles, ctx, assinaturaImage,
+                assinaturaCliente: assinaturaClienteImage, showSignatures: true),
+          ],
+        );
+      },
     ));
+
 
     // ── Anexar Pesquisa (Radar) se existir ──────────────────────────────────
     try {
@@ -950,48 +996,7 @@ class PdfGeneratorService {
     return file.path;
   }
 
-  // ── Página de Disclaimer ─────────────────────────────────────────────────
 
-  pw.Page _buildPageDisclaimer({
-    required Vistoria vistoria,
-    required _PdfStyles styles,
-    pw.ImageProvider? logo,
-    pw.ImageProvider? assinatura,
-    pw.ImageProvider? assinaturaCliente,
-    VistoriaWizardState? state,
-  }) {
-    return pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(16),
-      build: (ctx) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            _buildHeader(vistoria, styles, logo, state: state),
-            pw.Spacer(),
-            _buildFooter(vistoria, styles, ctx, assinatura,
-                assinaturaCliente: assinaturaCliente, showSignatures: true),
-          ],
-        );
-      },
-    );
-  }
-
-  pw.Widget _disclaimerText(String text, _PdfStyles styles,
-      {bool bold = false}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Text(
-        text,
-        style: pw.TextStyle(
-          font: bold ? styles.bold : styles.regular,
-          fontSize: 9,
-          color: _kBlack,
-        ),
-        textAlign: pw.TextAlign.justify,
-      ),
-    );
-  }
 
   // ── Seções Compartilhadas ────────────────────────────────────────────────
 
@@ -1153,6 +1158,7 @@ class PdfGeneratorService {
         children: [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceEvenly,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Column(
                 children: [
@@ -1171,8 +1177,11 @@ class PdfGeneratorService {
                           pw.Positioned.fill(
                             child: pw.Padding(
                               padding: const pw.EdgeInsets.only(bottom: 2),
-                              child:
-                                  pw.Image(assinatura, fit: pw.BoxFit.contain),
+                              child: pw.Center(
+                                child: pw.Image(assinatura,
+                                    fit: pw.BoxFit.contain,
+                                    alignment: pw.Alignment.center),
+                              ),
                             ),
                           ),
                       ],
@@ -1205,8 +1214,11 @@ class PdfGeneratorService {
                           pw.Positioned.fill(
                             child: pw.Padding(
                               padding: const pw.EdgeInsets.only(bottom: 2),
-                              child: pw.Image(assinaturaCliente,
-                                  fit: pw.BoxFit.contain),
+                              child: pw.Center(
+                                child: pw.Image(assinaturaCliente,
+                                    fit: pw.BoxFit.contain,
+                                    alignment: pw.Alignment.center),
+                              ),
                             ),
                           ),
                       ],

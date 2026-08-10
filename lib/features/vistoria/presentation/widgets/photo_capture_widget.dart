@@ -5,6 +5,9 @@ import 'package:image_cropper/image_cropper.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+
+import '../../../../core/theme/app_theme.dart';
+import '../screens/image_viewer_screen.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class PhotoCaptureWidget extends StatefulWidget {
@@ -210,16 +213,26 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          child: Image.file(
-            _currentPhoto!,
-            height: 200,
-            width: double.infinity,
-            fit: BoxFit.cover,
-            errorBuilder: (context, error, stackTrace) => Container(
+          child: GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ImageViewerScreen(imagePath: _currentPhoto!.path),
+                ),
+              );
+            },
+            child: Image.file(
+              _currentPhoto!,
               height: 200,
               width: double.infinity,
-              color: Colors.grey[200],
-              child: const Icon(Icons.broken_image, color: Colors.grey),
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: 200,
+                width: double.infinity,
+                color: Colors.grey[200],
+                child: const Icon(Icons.broken_image, color: Colors.grey),
+              ),
             ),
           ),
         ),
