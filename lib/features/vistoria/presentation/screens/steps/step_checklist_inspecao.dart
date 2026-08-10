@@ -231,9 +231,9 @@ class StepChecklistInspecao extends StatelessWidget {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
       source: ImageSource.camera,
-      imageQuality: 40,
-      maxWidth: 600,
-      maxHeight: 600,
+      imageQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1600,
     );
     if (xfile != null) {
       state.addFotoLocal(itemId, xfile.path);
@@ -755,9 +755,9 @@ class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
     final picker = ImagePicker();
     final xfile = await picker.pickImage(
       source: source,
-      imageQuality: 40,
-      maxWidth: 600,
-      maxHeight: 600,
+      imageQuality: 85,
+      maxWidth: 1600,
+      maxHeight: 1600,
     );
     if (xfile != null) {
       widget.state.addFotoLocal(itemId, xfile.path);

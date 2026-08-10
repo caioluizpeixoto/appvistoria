@@ -676,6 +676,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           renavam: drift.Value(_renavamEditCtrl.text.isNotEmpty
               ? _renavamEditCtrl.text
               : (veiculoExistente?.renavam ?? '')),
+          combustivel: drift.Value(veiculoExistente?.combustivel ?? ''),
         ));
       }
 
@@ -780,6 +781,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         String placa =
             _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
 
+        String combustivel = (veiculoExistente?.combustivel ?? '');
+
         if (dadosReaproveitados != null &&
             dadosReaproveitados['dados_tratados'] != null) {
           try {
@@ -788,6 +791,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             if (veiculoNuvem.placa.isNotEmpty) placa = veiculoNuvem.placa;
             if (veiculoNuvem.chassi.isNotEmpty) chassi = veiculoNuvem.chassi;
             if (veiculoNuvem.motor.isNotEmpty) motor = veiculoNuvem.motor;
+            if (veiculoNuvem.combustivel.isNotEmpty) combustivel = veiculoNuvem.combustivel;
           } catch (_) {}
         }
 
@@ -797,6 +801,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           placa: placa,
           chassiVeiculo: drift.Value(chassi),
           motorVeiculo: drift.Value(motor),
+          combustivel: drift.Value(combustivel),
         ));
       }
 
@@ -809,7 +814,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           param: _modoEntrada,
           value: valor,
           vistoriaId: vistoriaId,
-          forcarNova: false,
+          forcarNova: forcarNova,
           tokenConsulta: tokenConsulta,
         )
             .then((veiculoApi) async {
@@ -856,6 +861,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               uf: drift.Value(veiculoApi.estado.isNotEmpty
                   ? veiculoApi.estado
                   : veiculoDb.uf),
+              combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty
+                  ? veiculoApi.combustivel
+                  : veiculoDb.combustivel),
             ));
           }
         }).catchError((_) {

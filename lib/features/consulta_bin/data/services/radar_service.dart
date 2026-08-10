@@ -30,8 +30,7 @@ class RadarService {
 
       final response = await supabase.functions
           .invoke('radar-listar-consultas', body: body)
-          .timeout(const Duration(
-              minutes: 10)); // Usando um timeout de 10 min, igual ao consultar
+          .timeout(const Duration(seconds: 5));
 
       final data = response.data;
       if (data != null &&
@@ -74,36 +73,81 @@ class RadarService {
 
       String? currentToken = tokenConsulta;
       Map<String, dynamic>? finalData;
+      bool isForcarNova = forcarNova;
+      int retryCount = 0;
 
       while (true) {
-        final response = await supabase.functions.invoke(
-          'radar-consultar',
-          body: {
-            'produto': produto,
-            'param': param,
-            'value': value,
-            'forcarNova': forcarNova,
-            'tokenConsulta': currentToken,
-            'aguardarRetorno': false,
-          },
-        ).timeout(const Duration(minutes: 2));
+        try {
+          final response = await supabase.functions.invoke(
+            'radar-consultar',
+            body: {
+              'produto': produto,
+              'param': param,
+              'value': value,
+              'forcarNova': isForcarNova,
+              'tokenConsulta': currentToken,
+              'aguardarRetorno': false,
+            },
+          ).timeout(const Duration(minutes: 2));
 
-        final data = response.data;
-        if (data is Map<String, dynamic>) {
-          if (data['sucesso'] == false) {
-            throw Exception(data['error'] ?? 'Erro desconhecido na Radar Consultas');
+          isForcarNova = false;
+          retryCount = 0;
+
+          final data = response.data;
+          if (data is Map<String, dynamic>) {
+            if (data['sucesso'] == false) {
+              final erroMsg = data['error']?.toString() ?? 'Erro desconhecido na Radar Consultas';
+              if (erroMsg.contains('já está em andamento')) {
+                // Ao invés de morrer, continua aguardando
+                await Future.delayed(const Duration(seconds: 10));
+                continue;
+              }
+              throw Exception(erroMsg);
+            }
+
+            if (data['emProcessamento'] == true) {
+              currentToken = data['tokenConsulta'];
+              await Future.delayed(const Duration(seconds: 10)); // Consulta a cada 10s
+              continue;
+            }
+
+            finalData = data;
+            break;
+          } else {
+            throw Exception('Resposta inválida da API Radar.');
           }
-
-          if (data['emProcessamento'] == true) {
-            currentToken = data['tokenConsulta'];
-            await Future.delayed(const Duration(seconds: 10)); // Consulta a cada 10s
-            continue;
+        } catch (innerError) {
+          String errStr = innerError.toString();
+          if (innerError is FunctionException) {
+            final details = innerError.details;
+            if (details is Map && details.containsKey('error')) {
+              errStr = details['error'].toString();
+            }
           }
-
-          finalData = data;
-          break;
-        } else {
-          throw Exception('Resposta inválida da API Radar.');
+          
+          bool isNetworkError = errStr.contains('ClientSoftware caused connection abort') ||
+                                errStr.contains('SocketException') ||
+                                errStr.contains('Failed host lookup') ||
+                                innerError is TimeoutException ||
+                                errStr.toLowerCase().contains('timeout') ||
+                                errStr.contains('502') ||
+                                errStr.contains('503') ||
+                                errStr.contains('504') ||
+                                errStr.contains('Relay Error') ||
+                                errStr.contains('upstream request');
+                                
+          if (!isNetworkError) {
+             rethrow; 
+          }
+          
+          retryCount++;
+          if (currentToken == null && retryCount > 3) {
+             throw Exception('Falha de conexão. Verifique sua internet e tente novamente.');
+          } else if (currentToken != null && retryCount > 15) {
+             throw Exception('A conexão com o servidor está muito instável. Verifique sua internet.');
+          }
+          
+          await Future.delayed(const Duration(seconds: 10));
         }
       }
 
@@ -130,7 +174,14 @@ class RadarService {
 
       String mensagemErro = e.toString();
 
-      if (e is TimeoutException) {
+      if (e is FunctionException) {
+        final details = e.details;
+        if (details is Map && details.containsKey('error')) {
+          mensagemErro = details['error'].toString();
+        }
+      }
+
+      if (e is TimeoutException || mensagemErro.contains('timeout')) {
         mensagemErro =
             'A consulta demorou muito para responder. Verifique sua conexão ou tente novamente.';
       } else if (mensagemErro
@@ -139,11 +190,6 @@ class RadarService {
           mensagemErro.contains('Failed host lookup')) {
         mensagemErro =
             'Falha de conexão. Verifique sua internet e tente novamente.';
-      } else if (e is FunctionException) {
-        final details = e.details;
-        if (details is Map && details.containsKey('error')) {
-          mensagemErro = details['error'].toString();
-        }
       } else {
         mensagemErro = mensagemErro
             .replaceAll('Exception: ', '')

@@ -97,11 +97,26 @@ serve(async (req) => {
       throw new Error(data.message);
     }
 
-    if (data?.["token-consulta"] || (data?.consulta && data.consulta.status !== 1)) {
+    const isPolling = !!tokenConsulta;
+    let emProcessamento = false;
+    let returnedToken = tokenConsulta;
+
+    if (isPolling) {
+      if (!data?.consulta || data.consulta.status !== 1) {
+        emProcessamento = true;
+      }
+    } else {
+      if (data?.["token-consulta"]) {
+        emProcessamento = true;
+        returnedToken = data["token-consulta"];
+      }
+    }
+
+    if (emProcessamento) {
       return new Response(JSON.stringify({
         sucesso: true,
         emProcessamento: true,
-        tokenConsulta: data["token-consulta"] || data.consulta?.token || tokenConsulta,
+        tokenConsulta: returnedToken,
         raw: data
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

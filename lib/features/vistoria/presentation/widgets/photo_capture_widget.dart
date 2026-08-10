@@ -52,9 +52,9 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
     try {
       final XFile? image = await _picker.pickImage(
         source: source,
-        imageQuality: 40,
-        maxWidth: 600,
-        maxHeight: 600,
+        imageQuality: 85,
+        maxWidth: 1600,
+        maxHeight: 1600,
       );
 
       if (image != null) {

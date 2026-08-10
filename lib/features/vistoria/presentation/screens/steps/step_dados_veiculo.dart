@@ -502,7 +502,7 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
 
   Future<void> _scanCrlv(ImageSource source) async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source, imageQuality: 40, maxWidth: 600, maxHeight: 600);
+    final pickedFile = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
     if (pickedFile == null) return;
 
     setState(() => _isLoadingOcr = true);

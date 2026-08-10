@@ -380,6 +380,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               : veiculoDb.municipio),
           uf: drift.Value(
               veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+          combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty
+              ? veiculoApi.combustivel
+              : veiculoDb.combustivel),
         ));
       }
 
@@ -400,6 +403,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         _wizardState.motorBin = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorBin;
         _wizardState.municipio = veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : _wizardState.municipio;
         _wizardState.uf = veiculoApi.estado.isNotEmpty ? veiculoApi.estado : _wizardState.uf;
+        _wizardState.combustivel = veiculoApi.combustivel.isNotEmpty ? veiculoApi.combustivel : _wizardState.combustivel;
         
         setState(() {
           _wizardState.setStatusConsulta('concluida');
@@ -468,6 +472,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                   title: const Text('AUTO PERÍCIA'),
                   onTap: () => Navigator.pop(ctx,
                       {'produto': 'auto_pericia', 'forcarNova': forcarNova}),
+                ),
+                ListTile(
+                  title: const Text('AUTO PERÍCIA HRF'),
+                  onTap: () => Navigator.pop(ctx,
+                      {'produto': 'auto_pericia_hrf', 'forcarNova': forcarNova}),
                 ),
                 ListTile(
                   title: const Text('AUTO COMPLETA'),

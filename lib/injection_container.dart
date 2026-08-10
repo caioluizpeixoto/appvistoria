@@ -11,6 +11,7 @@ import 'features/consulta_bin/data/services/radar_service.dart';
 import 'core/services/image_service.dart';
 import 'core/services/ocr_service.dart';
 import 'core/services/pdf_generator_service.dart';
+import 'core/services/sync_service.dart';
 
 final sl = GetIt.instance;
 
@@ -60,5 +61,8 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<PdfGeneratorService>(
     () => PdfGeneratorService(),
+  );
+  sl.registerLazySingleton<SyncService>(
+    () => SyncService(),
   );
 }

@@ -7,12 +7,19 @@ import '../../../auth/presentation/blocs/auth_bloc.dart';
 import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/services/sync_service.dart';
+import '../screens/historico_nuvem_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final role = user?.userMetadata?['role'] as String? ?? 'empresa';
+    final isUsuarioOnly = role == 'usuario';
+
     return Drawer(
       backgroundColor: AppTheme.surface,
       child: Column(
@@ -55,6 +62,65 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 const Divider(),
+                /* Ocultado temporariamente para testes de produção sem nuvem
+                if (!isUsuarioOnly) ...[
+                  ListTile(
+                    leading: const Icon(Icons.cloud_done_rounded,
+                        color: AppTheme.textSecondary),
+                    title: const Text(
+                      'Histórico na Nuvem',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const HistoricoNuvemScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.sync_rounded,
+                        color: AppTheme.textSecondary),
+                    title: const Text(
+                      'Sincronizar Vistorias',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                        fontSize: 15,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(context); // fecha o drawer primeiro
+                      // mostra a mensagem
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Sincronizando vistorias...')),
+                      );
+                      try {
+                        await sl<SyncService>().syncVistoriasPendentes();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vistorias enviadas para a nuvem com sucesso!'), backgroundColor: Colors.green),
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Erro ao sincronizar: $e'), backgroundColor: Colors.red),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const Divider(),
+                ],
+                */
               ],
             ),
           ),
