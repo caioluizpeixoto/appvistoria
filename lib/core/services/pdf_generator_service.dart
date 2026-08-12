@@ -38,6 +38,40 @@ Uint8List _processGrayscaleImage(Uint8List uint8list) {
   return uint8list;
 }
 
+String _cleanItemName(String rawId) {
+  var clean = rawId.trim();
+  clean = clean.replaceFirst(
+      RegExp(r'^(peca[_\s]+cam[_\s]+|peça[_\s]+cam[_\s]+|peca[_\s]+|peça[_\s]+|cam[_\s]+)',
+          caseSensitive: false),
+      '');
+  clean = clean.replaceAll('_', ' ').trim().toUpperCase();
+
+  const Map<String, String> mapLabels = {
+    'CAPO': 'CAPÔ',
+    'TETO': 'TETO',
+    'PAINEL TRAS': 'PAINEL TRASEIRO',
+    'PARACHOQUE DIAN': 'PARA-CHOQUE DIANTEIRO',
+    'GRADE': 'GRADE',
+    'PORTA ESQ': 'PORTA DIANTEIRA ESQUERDA',
+    'PARALAMA ESQ': 'PARA-LAMA DIANTEIRO ESQUERDO',
+    'COLUNA A ESQ': 'COLUNA A ESQUERDA',
+    'COLUNA B ESQ': 'COLUNA B ESQUERDA',
+    'LAT ESQ': 'LATERAL ESQUERDA',
+    'SAIA ESQ': 'SAIA LATERAL ESQUERDA',
+    'PARALAMA TRAS ESQ': 'PARA-LAMA TRASEIRO ESQUERDO',
+    'PORTA DIR': 'PORTA DIANTEIRA DIREITA',
+    'PARALAMA DIR': 'PARA-LAMA DIANTEIRO DIREITO',
+    'COLUNA A DIR': 'COLUNA A DIREITA',
+    'COLUNA B DIR': 'COLUNA B DIREITA',
+    'LAT DIR': 'LATERAL DIREITA',
+    'SAIA DIR': 'SAIA LATERAL DIREITA',
+    'PARALAMA TRAS DIR': 'PARA-LAMA TRASEIRO DIREITO',
+    'PARACHOQUE TRAS': 'PARA-CHOQUE TRASEIRO',
+  };
+
+  return mapLabels[clean] ?? clean;
+}
+
 // ── Paleta PDF ──────────────────────────────────────────────────────────────
 const _kBlack = PdfColor.fromInt(0xFF222222);
 const _kWhite = PdfColors.white;
@@ -191,11 +225,14 @@ class PdfGeneratorService {
     final dao = sl<AutocredDao>();
     final consulta = await dao.buscarConsultaPorVistoria(vistoria.id);
     RadarVeiculo? radarVeiculo;
+    Map<String, dynamic>? dadosConsultaJson;
     if (consulta != null && consulta.dadosTratadosJson != null) {
       try {
-        final Map<String, dynamic> jsonMap =
-            json.decode(consulta.dadosTratadosJson!);
-        radarVeiculo = RadarVeiculo.fromJson(jsonMap);
+        final decoded = json.decode(consulta.dadosTratadosJson!);
+        if (decoded is Map<String, dynamic>) {
+          dadosConsultaJson = decoded;
+          radarVeiculo = RadarVeiculo.fromJson(decoded);
+        }
       } catch (e) {
         print('Erro ao decodificar JSON do Radar: $e');
       }
@@ -275,7 +312,8 @@ class PdfGeneratorService {
         assinatura: assinaturaImage,
         assinaturaCliente: assinaturaClienteImage,
         marcaAgua: marcaAguaBw,
-        radarVeiculo: radarVeiculo));
+        radarVeiculo: radarVeiculo,
+        dadosConsultaJson: dadosConsultaJson));
 
     // A página 2 antiga foi fundida com a página 1
 
@@ -400,11 +438,7 @@ class PdfGeneratorService {
           for (final localPath in locals) {
             final f = File(localPath);
             if (f.existsSync()) {
-              var label = id.toUpperCase();
-              if (label.startsWith('PECA_') || label.startsWith('PEÇA_')) {
-                label = label.replaceFirst(RegExp(r'^PE[CÇ]A_'), '');
-              }
-              label = label.replaceAll('_', ' ');
+              var label = _cleanItemName(id);
 
               fotosSecao.add({
                 'id': id,
@@ -668,6 +702,12 @@ class PdfGeneratorService {
                 }
               }
 
+              final parecerStr = wizardState?.parecerTecnico ?? vistoria.parecerTecnico ?? '';
+              if (parecerStr.trim().isNotEmpty) {
+                widgets.add(pw.SizedBox(height: 12));
+                widgets.add(_buildParecerTecnicoBox(parecerStr, styles));
+              }
+
               return widgets;
             }));
       }
@@ -829,7 +869,11 @@ class PdfGeneratorService {
                         child: pw.Center(
                             child: pw.Text('Nenhuma foto capturada.',
                                 style: pw.TextStyle(
-                                    color: PdfColors.grey600, fontSize: 10))))
+                                    color: PdfColors.grey600, fontSize: 10)))),
+                    if ((wizardState?.parecerTecnico ?? vistoria.parecerTecnico ?? '').trim().isNotEmpty) ...[
+                      pw.SizedBox(height: 10),
+                      _buildParecerTecnicoBox((wizardState?.parecerTecnico ?? vistoria.parecerTecnico!).trim(), styles),
+                    ],
                   ])));
     }
 
@@ -845,7 +889,7 @@ class PdfGeneratorService {
                 !e.value.toUpperCase().contains('ORIGINAL') &&
                 !e.value.toUpperCase().contains('PADRÃO DO FABRICANTE'))
             .map((e) {
-          final nomeLimpo = e.key.replaceAll('_', ' ').toUpperCase();
+          final nomeLimpo = _cleanItemName(e.key);
           final obs = wState.checklistObs[e.key] ?? '';
           final valUpper = e.value.toUpperCase();
           final obsUpper = obs.toUpperCase();
@@ -975,13 +1019,16 @@ class PdfGeneratorService {
     final Uint8List finalBytes = await pdf.save();
 
     final dir = await getApplicationDocumentsDirectory();
-    final fileName =
-        'Laudo_${vistoria.numeroLaudo}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final placaClean =
+        veiculo.placa.trim().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final nomeBase =
+        placaClean.isNotEmpty ? placaClean : 'Laudo_${vistoria.numeroLaudo}';
+    final fileName = '$nomeBase.pdf';
     final file = File('${dir.path}/$fileName');
     await file.writeAsBytes(finalBytes);
 
     try {
-      final storagePath = '${vistoria.id}/${vistoria.numeroLaudo}.pdf';
+      final storagePath = '${vistoria.id}/$nomeBase.pdf';
       // Removido o 'await' para que o upload ocorra em segundo plano e não trave a geração local
       Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
             storagePath,
@@ -1255,12 +1302,14 @@ class PdfGeneratorService {
     pw.ImageProvider? assinaturaCliente,
     pw.ImageProvider? marcaAgua,
     RadarVeiculo? radarVeiculo,
+    Map<String, dynamic>? dadosConsultaJson,
   }) async {
     final bgColor =
         PdfColor.fromHex('0B3B24'); // Verde muito escuro (cabeçalho)
     final bannerColor = PdfColor.fromHex('1F5E3D');
     final iconBlockGreen = PdfColor.fromHex('1F5E3D');
     final iconBlockRed = PdfColor.fromHex('C62828');
+    final iconBlockYellow = PdfColor.fromHex('D97706');
     final zebraGrey = PdfColor.fromHex('F5F5F5');
     final greyBorder = PdfColor.fromHex('E0E0E0');
     final textColor = PdfColor.fromHex('424242');
@@ -1345,7 +1394,7 @@ class PdfGeneratorService {
       for (final entry in state.checklistStatus.entries) {
         final id = entry.key;
         final rawStatus = entry.value;
-        final nome = id.replaceAll('_', ' ').toUpperCase();
+        final nome = _cleanItemName(id);
         if (nome.contains('OPCIONAL')) continue;
         if (rawStatus.toUpperCase() == 'NÃO ANALISADO') continue;
         final cat = getStatusCategory(rawStatus);
@@ -1418,6 +1467,9 @@ class PdfGeneratorService {
         blockTextColor = PdfColors.white;
       } else if (bgType == 'red') {
         blockBgColor = iconBlockRed;
+        blockTextColor = PdfColors.white;
+      } else if (bgType == 'yellow') {
+        blockBgColor = iconBlockYellow;
         blockTextColor = PdfColors.white;
       } else if (bgType == 'white') {
         blockBgColor = PdfColors.white;
@@ -1511,7 +1563,10 @@ class PdfGeneratorService {
         .getPublicUrl('${vistoria.id}/${vistoria.numeroLaudo}.pdf');
 
     // Radar Logic
-    final res = radarVeiculo?.resultadoCompleto ?? {};
+    final Map<String, dynamic> res = {
+      if (dadosConsultaJson != null) ...dadosConsultaJson,
+      ...?radarVeiculo?.resultadoCompleto,
+    };
 
     final String? Function(List<dynamic>) getFirstValid = (List<dynamic> list) {
       for (final item in list) {
@@ -1614,29 +1669,174 @@ class PdfGeneratorService {
         getFirstValid([res['categoria'], veiculo.tipo])?.toUpperCase() ??
             'PARTICULAR';
 
+    bool isPositiveValue(dynamic val) {
+      if (val == null) return false;
+      if (val is bool) return val;
+      if (val is List) {
+        if (val.isEmpty) return false;
+        for (final elem in val) {
+          if (isPositiveValue(elem)) return true;
+        }
+        return false;
+      }
+      if (val is Map) {
+        if (val.isEmpty) return false;
+        if (val.containsKey('quantidadeRestricoesAtivas') &&
+            val['quantidadeRestricoesAtivas'] is num &&
+            val['quantidadeRestricoesAtivas'] > 0) {
+          return true;
+        }
+        if (val.containsKey('restricoesJudiciais') &&
+            isPositiveValue(val['restricoesJudiciais'])) {
+          return true;
+        }
+        for (final elem in val.values) {
+          if (isPositiveValue(elem)) return true;
+        }
+        return false;
+      }
+      final str = val.toString().trim().toUpperCase();
+      if (str.isEmpty) return false;
+      if (str == 'NÃO' ||
+          str == 'NAO' ||
+          str == 'FALSE' ||
+          str == '0' ||
+          str == 'NADA CONSTA' ||
+          str == 'NÃO POSSUI' ||
+          str == 'NAO POSSUI' ||
+          str == 'SEM RESTRICAO' ||
+          str == 'SEM RESTRIÇÃO' ||
+          str == 'NENHUMA' ||
+          str == 'NENHUM' ||
+          str == '-' ||
+          str.contains('SEM OCORRENCIA') ||
+          str.contains('NÃO POSSUI RESTRIÇÃO') ||
+          str.contains('NAO POSSUI RESTRICAO') ||
+          str.contains('NÃO FOI ENCONTRADO') ||
+          str.contains('NAO FOI ENCONTRADO') ||
+          str.contains('NÃO POSSUÍ INDÍCIO DE SINISTRO') ||
+          str.contains('FORNECEDOR INDISPONÍVEL') ||
+          str.contains('FORNECEDOR INDISPONIVEL')) {
+        return false;
+      }
+      return true;
+    }
+
+    dynamic findVal(dynamic node, List<String> targetKeys) {
+      if (node == null) return null;
+      if (node is Map) {
+        for (final key in targetKeys) {
+          final kLower = key.toLowerCase();
+          for (final entry in node.entries) {
+            if (entry.key.toString().toLowerCase() == kLower) {
+              if (entry.value != null) return entry.value;
+            }
+          }
+        }
+        for (final val in node.values) {
+          final found = findVal(val, targetKeys);
+          if (found != null) return found;
+        }
+      } else if (node is List) {
+        for (final elem in node) {
+          final found = findVal(elem, targetKeys);
+          if (found != null) return found;
+        }
+      }
+      return null;
+    }
+
+    bool checkAnyKey(List<String> keys) {
+      final val = findVal(res, keys);
+      return isPositiveValue(val);
+    }
+
     // Evaluate blocks
-    final bool hasLeilao =
-        res['possuileilao']?.toString().toUpperCase() == 'SIM' ||
-            res['leilao'] == true;
-    final bool hasSinistro = res['sinistro'] == true;
-    final bool hasRoubo =
-        res['roubofurto']?.toString().toUpperCase() == 'SIM' ||
-            res['roubo_furto'] != null;
-    final bool hasDebitos = res['debitos'] == true ||
-        res['multas'] == true ||
-        res['debitos_multas'] == true;
-    final bool hasComunicacao =
-        res['comunicacaovenda']?.toString().toUpperCase() == 'SIM';
-    final bool hasRestricaoFin = res['restricaofinanceira'] != null &&
-        res['restricaofinanceira'] != 'NADA CONSTA';
-    final bool hasRecall = res['recall'] != null &&
-        !res['recall'].toString().toUpperCase().contains('NÃO POSSUI');
-    final bool hasRestricoes = res['ind_restricoes'] == true ||
-        hasRestricaoFin ||
-        res['restricaotributaria'] != null ||
-        res['restricaojudicial'] != null ||
-        res['restricaoambiental'] != null ||
-        res['restricaoadministrativa'] != null;
+    final bool hasRenajud = checkAnyKey([
+      'renajud',
+      'restricaorenajud',
+      'restricoesrenajud',
+      'possuirestricaorenajud',
+      'restricao_renajud',
+      'indicadorrestricaorenajud'
+    ]);
+
+    final bool hasRestricoes = hasRenajud ||
+        checkAnyKey([
+          'ind_restricoes',
+          'indrestricoes',
+          'restricaotributaria',
+          'restricaojudicial',
+          'restricaoambiental',
+          'restricaoadministrativa',
+          'restricaorfb',
+          'restricoesbloqueioguincho',
+          'restricoesfurto',
+          'restricao1',
+          'restricao2',
+          'restricao3',
+          'restricao4',
+          'restricao1_br',
+          'restricao2_br',
+          'restricao3_br',
+          'restricao4_br'
+        ]);
+
+    final bool hasFinanciamento = checkAnyKey([
+      'restricaofinanceira',
+      'restricoesfinanceiras',
+      'alienacao',
+      'indica_alienacao',
+      'gravame',
+      'tipoarrendatario',
+      'nomearrendatario',
+      'financiamento'
+    ]);
+
+    final bool hasLeilao = checkAnyKey([
+      'possuileilao',
+      'leilao',
+      'leilao1',
+      'leilao2',
+      'ofertasleilao1',
+      'ofertasleilao2',
+      'remarketing',
+      'indicadorleilao'
+    ]);
+
+    final bool hasSinistro = checkAnyKey([
+      'sinistro',
+      'sinistro_base',
+      'indicio_sinistro',
+      'analisetecnica'
+    ]);
+
+    final bool hasRoubo = checkAnyKey([
+      'roubofurto',
+      'roubo_furto',
+      'queixaderoubo',
+      'queixa_roubo',
+      'historico_roubo_furto'
+    ]);
+
+    final bool hasDebitos = checkAnyKey([
+      'debitos',
+      'multas',
+      'debitos_multas',
+      'debitomultas',
+      'debitosipva',
+      'debitolicenciamento',
+      'debitosmultas',
+      'indica_debitos_multas',
+      'indica_debitos_ipva'
+    ]);
+
+    final bool hasComunicacao = checkAnyKey([
+      'comunicacaovenda',
+      'comunicadovenda'
+    ]);
+
+    final bool hasRecall = checkAnyKey(['recall']);
     final bool hasHistoricoKm = res['historico_km'] != null &&
         res['historico_km'] != 'NADA CONSTA' &&
         res['historico_km'] != 'NÃO CONSTA';
@@ -1713,10 +1913,8 @@ class PdfGeneratorService {
                               pw.SizedBox(width: 8),
                               pw.Expanded(
                                 child: pw.Column(
-                                  crossAxisAlignment:
-                                      pw.CrossAxisAlignment.start,
-                                  mainAxisAlignment:
-                                      pw.MainAxisAlignment.center,
+                                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                  mainAxisAlignment: pw.MainAxisAlignment.center,
                                   children: [
                                     pw.Text('PARECER FINAL DA VISTORIA',
                                         style: pw.TextStyle(
@@ -1731,11 +1929,15 @@ class PdfGeneratorService {
                                             color: PdfColors.black)),
                                     pw.SizedBox(height: 2),
                                     pw.Text(
-                                        'Conclusão baseada na análise dos itens',
+                                        (state?.parecerTecnico != null && state!.parecerTecnico!.isNotEmpty)
+                                            ? state!.parecerTecnico!.trim()
+                                            : 'Conclusão baseada na análise dos itens',
                                         style: pw.TextStyle(
                                             font: styles.regular,
                                             fontSize: 7,
-                                            color: PdfColors.grey500)),
+                                            color: PdfColors.grey700),
+                                        maxLines: 4,
+                                        overflow: pw.TextOverflow.clip),
                                   ],
                                 ),
                               ),
@@ -1822,7 +2024,7 @@ class PdfGeneratorService {
                             buildBlock('RESTRIÇÕES',
                                 hasRestricoes ? 'red' : 'green', svgCarShield),
                             buildBlock('DÉBITOS E\nMULTAS',
-                                hasDebitos ? 'red' : 'green', svgReceipt),
+                                hasDebitos ? 'yellow' : 'green', svgReceipt),
                             buildBlock(
                                 'LEILÃO /\nSINISTRO',
                                 (hasLeilao || hasSinistro) ? 'red' : 'green',
@@ -1832,7 +2034,7 @@ class PdfGeneratorService {
                             buildBlock('ROUBO /\nFURTO',
                                 hasRoubo ? 'red' : 'green', svgCarWarning),
                             buildBlock('FINANCIAMENTO',
-                                hasRestricaoFin ? 'red' : 'green', svgBank),
+                                hasFinanciamento ? 'yellow' : 'green', svgBank),
                             buildBlock('COMUNICAÇÃO\nDE VENDA',
                                 hasComunicacao ? 'red' : 'green', svgHandshake),
                             buildBlock(
@@ -2036,7 +2238,7 @@ class PdfGeneratorService {
       for (final entry in state.checklistStatus.entries) {
         final id = entry.key;
         final rawStatus = entry.value;
-        final nome = id.replaceAll('_', ' ').toUpperCase();
+        final nome = _cleanItemName(id);
 
         if (nome.contains('OPCIONAL')) continue;
         if (rawStatus.toUpperCase() == 'NÃO ANALISADO') continue;
@@ -5034,6 +5236,53 @@ class PdfGeneratorService {
             pw.SizedBox(width: 4),
           ])
         ]));
+  }
+
+  static pw.Widget _buildParecerTecnicoBox(String parecerText, _PdfStyles styles) {
+    final primaryColor = PdfColor.fromHex('133B66');
+    return pw.Container(
+      width: double.infinity,
+      margin: const pw.EdgeInsets.symmetric(vertical: 6),
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        color: PdfColor.fromHex('F8F9FA'),
+        borderRadius: pw.BorderRadius.circular(6),
+        border: pw.Border.all(color: primaryColor, width: 1),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            children: [
+              pw.Container(
+                width: 4,
+                height: 12,
+                color: primaryColor,
+              ),
+              pw.SizedBox(width: 6),
+              pw.Text(
+                'PARECER TÉCNICO',
+                style: pw.TextStyle(
+                  font: styles.bold,
+                  fontSize: 10,
+                  color: primaryColor,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            parecerText,
+            style: pw.TextStyle(
+              font: styles.regular,
+              fontSize: 9,
+              color: PdfColors.grey900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   static pw.Widget _buildBanner(String text, _PdfStyles styles) {

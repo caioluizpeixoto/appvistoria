@@ -125,12 +125,39 @@ serve(async (req) => {
 
     // extrair dados
     let resultData: any = {};
-    if (data?.consulta?.resultados?.[0]?.retorno?.data) {
-       resultData = data.consulta.resultados[0].retorno.data;
+    let ipvaData: any[] = [];
+    let multasData: any[] = [];
+    let renajudData: any[] = [];
+
+    const resultados = data?.consulta?.resultados;
+    if (Array.isArray(resultados)) {
+      for (const item of resultados) {
+        const rData = item?.retorno?.data || item?.retorno;
+        if (rData) {
+          if (rData.placa && !resultData.placa) {
+            resultData = { ...resultData, ...rData };
+          } else {
+            resultData = { ...rData, ...resultData };
+          }
+          if (Array.isArray(rData.ipva)) {
+            ipvaData = rData.ipva;
+          }
+          if (Array.isArray(rData.multas)) {
+            multasData = rData.multas;
+          }
+          if (Array.isArray(rData.renajud)) {
+            renajudData = rData.renajud;
+          }
+        }
+      }
     } else {
-       // Tentar buscar em fallback caso mude algo
-       resultData = data;
+      resultData = data;
     }
+
+    if (ipvaData.length > 0) resultData.ipva = ipvaData;
+    if (multasData.length > 0) resultData.multas = multasData;
+    if (renajudData.length > 0) resultData.renajud = renajudData;
+    resultData.resultados_completos = resultados;
 
     return new Response(JSON.stringify({
       sucesso: true,
@@ -158,6 +185,9 @@ serve(async (req) => {
         restricoes3: resultData.restricoes3 || "",
         restricoes4: resultData.restricoes4 || "",
         informacoesRelevantes: resultData.informacoesRelevantes || resultData.informacoesrelevantes || "",
+        ipva: ipvaData,
+        multas: multasData,
+        renajud: renajudData,
         radar_pdf_url: data.consulta?.view?.full || data.consulta?.resultados?.[0]?.view?.full || "",
         resultadoCompleto: resultData,
       }

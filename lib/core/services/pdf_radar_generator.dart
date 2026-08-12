@@ -7,11 +7,12 @@ import 'package:dio/dio.dart';
 import 'dart:convert';
 
 class PdfRadarGenerator {
-  static const _kPrimaryHeader = PdfColor.fromInt(0xFF1F5E3D);
+  static const _kPrimaryHeader = PdfColor.fromInt(0xFF133B66);
   static const _kYellowHeader = PdfColor.fromInt(0xFFFDF7CC);
   static const _kYellowHeaderDarkText = PdfColor.fromInt(0xFF8B7500);
   static const _kBlueLight = PdfColor.fromInt(0xFFF2F2F2);
   static const _kTextDark = PdfColor.fromInt(0xFF333333);
+  static const _kValueBlue = PdfColor.fromInt(0xFF0066CC);
   static const _kTeal = PdfColor.fromInt(0xFF008298);
   static const _kOrange = PdfColor.fromInt(0xFFEF7F1A);
   static const _kGreen = PdfColor.fromInt(0xFF4DB848);
@@ -164,66 +165,155 @@ class PdfRadarGenerator {
     return s;
   }
 
+  static final Map<String, pw.ImageProvider?> _brandLogoCache = {};
+
+  static String _extractBrandSlug(String input) {
+    if (input.isEmpty) return '';
+    final upper = input.toUpperCase().trim();
+
+    final knownBrands = {
+      'VOLKSWAGEN': 'volkswagen',
+      'VW': 'vw',
+      'FIAT': 'fiat',
+      'CHEVROLET': 'chevrolet',
+      'GM': 'chevrolet',
+      'FORD': 'ford',
+      'HONDA': 'honda',
+      'TOYOTA': 'toyota',
+      'HYUNDAI': 'hyundai',
+      'RENAULT': 'renault',
+      'BMW': 'bmw',
+      'MERCEDES': 'mercedes',
+      'BENZ': 'mercedes',
+      'AUDI': 'audi',
+      'NISSAN': 'nissan',
+      'JEEP': 'jeep',
+      'PEUGEOT': 'peugeot',
+      'CITROEN': 'citroen',
+      'CHERY': 'chery',
+      'KIA': 'kia',
+      'VOLVO': 'volvo',
+      'MITSUBISHI': 'mitsubishi',
+      'SUZUKI': 'suzuki',
+      'DODGE': 'dodge',
+      'JAGUAR': 'jaguar',
+      'PORSCHE': 'porsche',
+      'SUBARU': 'subaru',
+      'LIFAN': 'lifan',
+      'JAC': 'jac',
+      'RAM': 'ram',
+      'YAMAHA': 'yamaha',
+      'KAWASAKI': 'kawasaki',
+      'HARLEY': 'harley-davidson',
+      'TRIUMPH': 'triumph',
+      'DUCATI': 'ducati',
+      'AGRALE': 'agrale',
+      'IVECO': 'iveco',
+      'SCANIA': 'scania',
+      'MAN': 'man',
+    };
+
+    for (final entry in knownBrands.entries) {
+      if (upper.contains(entry.key)) {
+        return entry.value;
+      }
+    }
+
+    String clean = upper
+        .replaceAll(RegExp(r'^(I|IMP|MMC|I\/|IMP\/)\s*'), '')
+        .replaceAll(RegExp(r'[^A-Z0-9\s-]'), ' ')
+        .trim();
+
+    final parts = clean.split(RegExp(r'\s+'));
+    if (parts.isNotEmpty) {
+      final firstWord = parts.first.toLowerCase();
+      if (firstWord.length >= 2) return firstWord;
+    }
+
+    return '';
+  }
+
+  static Future<pw.ImageProvider?> _fetchBrandLogo(String slug) async {
+    if (slug.isEmpty) return null;
+    if (_brandLogoCache.containsKey(slug)) {
+      return _brandLogoCache[slug];
+    }
+
+    try {
+      final url =
+          'https://www.radarconsultas.com.br/rdrv2/webfiles/img/marcas/$slug.png';
+      final dio = Dio();
+      final response = await dio.get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          sendTimeout: const Duration(seconds: 4),
+          receiveTimeout: const Duration(seconds: 4),
+        ),
+      );
+
+      if (response.statusCode == 200 &&
+          response.data != null &&
+          response.data!.length > 100) {
+        final bytes = Uint8List.fromList(response.data!);
+        final image = pw.MemoryImage(bytes);
+        _brandLogoCache[slug] = image;
+        return image;
+      }
+    } catch (e) {
+      print('Erro ao carregar logo da marca ($slug): $e');
+    }
+
+    _brandLogoCache[slug] = null;
+    return null;
+  }
+
   static Future<List<pw.Page>> buildRadarPages(
       Map<String, dynamic> dadosPesquisa,
       {pw.Widget? footerWidget}) async {
     final List<pw.Page> pages = [];
-
-    final String marca =
-        _v(dadosPesquisa, ['marca', 'marcamodelo', 'marcaModelo'], fallback: '')
-            .toUpperCase();
-    pw.MemoryImage? marcaLogo;
-    final marcaBusca = marca.split(' ').first.toLowerCase();
-
-    try {
-      final ByteData data =
-          await rootBundle.load('assets/logos/$marcaBusca.png');
-      marcaLogo = pw.MemoryImage(data.buffer.asUint8List());
-    } catch (_) {
-      try {
-        final response = await Dio().get(
-          'https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/$marcaBusca.png',
-          options: Options(
-              responseType: ResponseType.bytes,
-              receiveTimeout: const Duration(seconds: 3)),
-        );
-        if (response.statusCode == 200 && response.data != null) {
-          marcaLogo = pw.MemoryImage(response.data);
-        }
-      } catch (_) {}
-    }
 
     final placa = _v(dadosPesquisa, ['placa'], fallback: '');
     final chassi = _v(dadosPesquisa, ['chassi'], fallback: '');
     final renavam = _v(dadosPesquisa, ['renavam'], fallback: '');
     final anomodelo =
         _v(dadosPesquisa, ['anomodelo', 'anoModelo'], fallback: '');
+    final estado = _v(dadosPesquisa, ['uf', 'estado'], fallback: '');
+    final procedencia =
+        _v(dadosPesquisa, ['procedencia'], fallback: 'NACIONAL');
+    final marcaStr = _v(
+        dadosPesquisa, ['marcamodelo', 'marcaModelo', 'marca'],
+        fallback: '');
+
+    final brandSlug = _extractBrandSlug(marcaStr);
+    final brandLogo = await _fetchBrandLogo(brandSlug);
 
     final List<pw.Widget> contentWidgets = [
       _buildSectionHeader('Bin **',
           svgIcon: null, bgColor: _kPrimaryHeader, textColor: PdfColors.white),
       pw.SizedBox(height: 10),
-      _buildTopHeader(marca, marcaLogo, placa, chassi, renavam, anomodelo),
+      _buildTopHeader(placa, chassi, renavam, anomodelo, estado, procedencia,
+          brandLogoImage: brandLogo),
       pw.SizedBox(height: 10),
-      _buildSectionBin(dadosPesquisa),
+      ..._buildSectionBin(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildInformacoesRelevantesBin(dadosPesquisa),
+      ..._buildInformacoesRelevantesBin(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildBaseEstadual(dadosPesquisa),
+      ..._buildBaseEstadual(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildInformacoesRelevantesEstadual(dadosPesquisa),
+      ..._buildInformacoesRelevantesEstadual(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildProprietario(dadosPesquisa),
+      ..._buildProprietario(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildChassi(dadosPesquisa),
+      ..._buildChassi(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildPrecificador(dadosPesquisa),
+      ..._buildPrecificador(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildHistoricoLaudos(dadosPesquisa),
+      ..._buildHistoricoLaudos(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildSenatranInfo(dadosPesquisa),
+      ..._buildSenatranInfo(dadosPesquisa),
       pw.SizedBox(height: 10),
-      _buildSenatranRestricoes(dadosPesquisa),
+      ..._buildSenatranRestricoes(dadosPesquisa),
       pw.SizedBox(height: 10),
       ..._buildDetalhesComplementares(dadosPesquisa),
       pw.SizedBox(height: 10),
@@ -251,8 +341,14 @@ class PdfRadarGenerator {
     return pages;
   }
 
-  static pw.Widget _buildTopHeader(String marcaNome, pw.MemoryImage? logo,
-      String placa, String chassi, String renavam, String anomodelo) {
+  static pw.Widget _buildTopHeader(
+      String placa,
+      String chassi,
+      String renavam,
+      String anomodelo,
+      String estado,
+      String procedencia,
+      {pw.ImageProvider? brandLogoImage}) {
     return pw.Row(children: [
       pw.Expanded(
           flex: 1,
@@ -262,11 +358,38 @@ class PdfRadarGenerator {
             decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: _kBorder, width: 0.5),
                 color: PdfColors.white),
-            child: logo != null
-                ? pw.Image(logo, height: 35)
-                : pw.Text(marcaNome,
-                    style: pw.TextStyle(
-                        fontWeight: pw.FontWeight.bold, color: _kTextDark)),
+            child: brandLogoImage != null
+                ? pw.Padding(
+                    padding: const pw.EdgeInsets.all(6),
+                    child: pw.Image(brandLogoImage,
+                        height: 48, fit: pw.BoxFit.contain),
+                  )
+                : pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.center,
+                    children: [
+                      pw.SvgImage(
+                          svg: _svgCar.replaceAll(
+                              '{color}', _kPrimaryHeader.toHex()),
+                          height: 24),
+                      pw.SizedBox(width: 4),
+                      pw.Column(
+                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('AUTO PERÍCIA',
+                              style: pw.TextStyle(
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _kPrimaryHeader,
+                                  fontSize: 8)),
+                          pw.Text('HRF',
+                              style: pw.TextStyle(
+                                  fontWeight: pw.FontWeight.bold,
+                                  color: _kOrange,
+                                  fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
           )),
       pw.SizedBox(width: 8),
       pw.Expanded(
@@ -285,7 +408,11 @@ class PdfRadarGenerator {
                             '{color}', _kTextDark.toHex()),
                         height: 20),
                     pw.SizedBox(height: 2),
-                    pw.Text('NACIONAL', style: const pw.TextStyle(fontSize: 8)),
+                    pw.Text(
+                        procedencia.isNotEmpty
+                            ? procedencia.toUpperCase()
+                            : 'NACIONAL',
+                        style: const pw.TextStyle(fontSize: 8)),
                   ]))),
       pw.SizedBox(width: 8),
       pw.Expanded(
@@ -304,7 +431,9 @@ class PdfRadarGenerator {
                     child: pw.Row(children: [
                   _buildTopGridCell('CHASSI', chassi),
                   pw.SizedBox(width: 8),
-                  _buildTopGridCell('ANO MOD.', anomodelo),
+                  _buildTopGridCell(
+                      estado.isNotEmpty ? 'ESTADO' : 'ANO MOD.',
+                      estado.isNotEmpty ? estado : anomodelo),
                 ]))
               ])))
     ]);
@@ -356,47 +485,44 @@ class PdfRadarGenerator {
         ]));
   }
 
-  static pw.Widget _buildDataGrid(List<List<String>> rows) {
-    return pw.Container(
-      decoration:
-          pw.BoxDecoration(border: pw.Border.all(color: _kBorder, width: 0.5)),
-      child: pw.Column(
-        children: List.generate(rows.length, (index) {
-          final isEven = index % 2 == 0;
-          final rowData = rows[index];
+  static List<pw.Widget> _buildDataGrid(List<List<String>> rows) {
+    return List.generate(rows.length, (index) {
+      final isEven = index % 2 == 0;
+      final rowData = rows[index];
 
-          if (rowData.length == 1) {
-            return pw.Container(
-              color: isEven ? PdfColors.white : _kBlueLight,
-              padding:
-                  const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-              width: double.infinity,
-              child: _buildValueBlock(rowData[0], isTitle: true),
-            );
-          }
+      if (rowData.length == 1) {
+        return pw.Container(
+          decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: _kBorder, width: 0.5),
+              color: isEven ? PdfColors.white : _kBlueLight),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          width: double.infinity,
+          child: _buildValueBlock(rowData[0], isTitle: true),
+        );
+      }
 
-          return pw.Container(
-            color: isEven ? PdfColors.white : _kBlueLight,
-            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-            child: pw.Row(
-              children: [
-                if (rowData.isNotEmpty)
-                  pw.Expanded(
-                      child: _buildLabelValue(
-                          rowData[0], rowData.length > 1 ? rowData[1] : '')),
-                if (rowData.length >= 4)
-                  pw.Expanded(child: _buildLabelValue(rowData[2], rowData[3])),
-              ],
-            ),
-          );
-        }),
-      ),
-    );
+      return pw.Container(
+        decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _kBorder, width: 0.5),
+            color: isEven ? PdfColors.white : _kBlueLight),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: pw.Row(
+          children: [
+            if (rowData.isNotEmpty)
+              pw.Expanded(
+                  child: _buildLabelValue(
+                      rowData[0], rowData.length > 1 ? rowData[1] : '')),
+            if (rowData.length >= 4)
+              pw.Expanded(child: _buildLabelValue(rowData[2], rowData[3])),
+          ],
+        ),
+      );
+    });
   }
 
   static pw.Widget _buildValueBlock(String value, {bool isTitle = false}) {
     final vUpper = value.toUpperCase();
-    PdfColor color = _kTextDark;
+    PdfColor color = _kValueBlue;
     String? icon;
 
     if (vUpper.contains('VEICULO NÃO POSSUI RESTRIÇÃO') ||
@@ -441,31 +567,74 @@ class PdfRadarGenerator {
   }
 
   static pw.Widget _buildLabelValue(String label, String value) {
-    PdfColor color = _kTextDark;
-    pw.FontWeight weight = pw.FontWeight.normal;
+    PdfColor color = _kValueBlue;
+    pw.FontWeight weight = pw.FontWeight.bold;
     String? icon;
-    PdfColor iconColor = PdfColors.black;
+    PdfColor iconColor = _kValueBlue;
 
     final vUpper = value.toUpperCase();
     final lUpper = label.toUpperCase();
 
-    if (lUpper == 'CHASSI' ||
-        lUpper == 'MOTOR' ||
-        lUpper == 'NUMERO DO MOTOR') {
-      color = _kTeal;
+    final bool isNegativeValue = vUpper == 'NAO' ||
+        vUpper == 'NÃO' ||
+        vUpper == 'NADA CONSTA' ||
+        vUpper == 'NÃO POSSUI' ||
+        vUpper == 'NAO POSSUI' ||
+        vUpper == 'SEM RESTRICAO' ||
+        vUpper == 'SEM RESTRIÇÃO' ||
+        vUpper == 'SEM RESTRICAO DE ROUBO/FURTO' ||
+        vUpper == 'FORNECEDOR INDISPONÍVEL' ||
+        vUpper == 'FORNECEDOR INDISPONIVEL' ||
+        vUpper.contains('NÃO FOI ENCONTRADO') ||
+        vUpper.contains('NAO FOI ENCONTRADO') ||
+        vUpper.contains('NÃO POSSUI RESTRIÇÃO') ||
+        vUpper.contains('VEÍCULO NÃO POSSUÍ INDÍCIO DE SINISTRO') ||
+        vUpper == '-';
+
+    if ((lUpper.contains('RENAJUD') || vUpper.contains('RENAJUD')) &&
+        !isNegativeValue) {
+      color = PdfColor.fromInt(0xFFD67362);
       weight = pw.FontWeight.bold;
-      icon = _svgWrench;
-      iconColor = _kTeal;
-    } else if (lUpper == 'DATA DE EMISSÃO DO CRV') {
-      color = _kTeal;
-    } else if (lUpper.startsWith('RESTRIÇÃO') ||
-        lUpper.startsWith('RESTRICAO') ||
-        lUpper.startsWith('RESTRIÇÕES') ||
-        lUpper.startsWith('RESTRICOES') ||
-        lUpper.startsWith('IND. RESTRI') ||
-        lUpper == 'RESTRIÇÕES ADMINISTRATIVAS') {
+      icon = _svgWarning;
+      iconColor = PdfColor.fromInt(0xFFD67362);
+    } else if ((lUpper.contains('LEILÃO') ||
+            lUpper.contains('LEILAO') ||
+            lUpper.contains('SINISTRO')) &&
+        !isNegativeValue &&
+        !vUpper.contains('QUANTIDADE DE PESQUISAS')) {
+      color = PdfColor.fromInt(0xFFD67362);
+      weight = pw.FontWeight.bold;
+      icon = _svgWarning;
+      iconColor = PdfColor.fromInt(0xFFD67362);
+    } else if ((lUpper.contains('FINANCI') ||
+            lUpper.contains('ALIENAÇ') ||
+            lUpper.contains('GRAVAME') ||
+            lUpper.contains('ARRENDAT')) &&
+        !isNegativeValue) {
       color = _kOrange;
       weight = pw.FontWeight.bold;
+      iconColor = _kOrange;
+    } else if (lUpper == 'CHASSI' ||
+        lUpper == 'MOTOR' ||
+        lUpper == 'NUMERO DO MOTOR' ||
+        lUpper == 'Nº SERIE CHASSI' ||
+        lUpper == 'ANO FAB/MOD') {
+      color = _kOrange;
+      weight = pw.FontWeight.bold;
+      if (lUpper != 'ANO FAB/MOD') {
+        icon = _svgWrench;
+      }
+      iconColor = _kOrange;
+    } else if ((lUpper.startsWith('RESTRIÇÃO') ||
+            lUpper.startsWith('RESTRICAO') ||
+            lUpper.startsWith('RESTRIÇÕES') ||
+            lUpper.startsWith('RESTRICOES') ||
+            lUpper.startsWith('IND. RESTRI') ||
+            lUpper == 'RESTRIÇÕES ADMINISTRATIVAS') &&
+        !isNegativeValue) {
+      color = _kOrange;
+      weight = pw.FontWeight.bold;
+      iconColor = _kOrange;
     } else if (lUpper == 'ROUBO/FURTO' && vUpper == 'NÃO POSSUI') {
       color = PdfColor.fromInt(0xFFD67362);
       weight = pw.FontWeight.bold;
@@ -473,13 +642,16 @@ class PdfRadarGenerator {
       iconColor = PdfColor.fromInt(0xFFD67362);
     } else if (vUpper == 'CIRCULACAO' ||
         vUpper == 'EM CIRCULACAO' ||
-        vUpper == 'CIRCULAÇÃO') {
-      color = _kTeal;
+        vUpper == 'CIRCULAÇÃO' ||
+        vUpper == 'VEICULO EM CIRCULACAO' ||
+        vUpper == 'NORMAL') {
+      color = _kGreen;
       weight = pw.FontWeight.bold;
       icon = _svgCheck;
-      iconColor = _kTeal;
+      iconColor = _kGreen;
     } else if (vUpper.contains('VEICULO NÃO POSSUI RESTRIÇÃO') ||
-        vUpper.contains('CHASSI NÃO POSSUÍ IRREGULARIDADES')) {
+        vUpper.contains('CHASSI NÃO POSSUÍ IRREGULARIDADES') ||
+        vUpper.contains('VEICULO SEM OCORRENCIA DE ROUBO FURTO')) {
       color = _kGreen;
       weight = pw.FontWeight.bold;
       icon = _svgCheck;
@@ -488,10 +660,9 @@ class PdfRadarGenerator {
         (lUpper == 'SITUAÇÃO CHASSI' ||
             lUpper == 'REMARCAÇÃO CHASSI' ||
             lUpper == 'REMARCACAO CHASSI')) {
-      color = _kTeal;
+      color = _kValueBlue;
       weight = pw.FontWeight.bold;
-      icon = _svgCheck;
-      iconColor = _kTeal;
+      iconColor = _kValueBlue;
     }
 
     return pw.Row(
@@ -519,10 +690,8 @@ class PdfRadarGenerator {
     );
   }
 
-  static pw.Widget _buildSectionBin(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
-        _buildDataGrid([
+  static List<pw.Widget> _buildSectionBin(Map<String, dynamic> data) {
+    return _buildDataGrid([
           [
             'Placa',
             _v(data, ['placa']),
@@ -604,21 +773,28 @@ class PdfRadarGenerator {
           ],
           [
             'Emplacamento Eletrônico',
-            _v(data, ['emplacamento_eletronico', 'emplacamentoeletronico'])
+            _v(data, ['emplacamento_eletronico', 'emplacamentoeletronico']),
+            'Histórico Roubo e Furto *',
+            _v(
+                data,
+                [
+                  'historico_roubo_furto',
+                  'roubo_furto',
+                  'roubofurto',
+                  'queixaderoubo'
+                ],
+                fallback: 'Nada Consta')
           ],
-        ]),
-      ],
-    );
+        ]);
   }
 
-  static pw.Widget _buildInformacoesRelevantesBin(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildInformacoesRelevantesBin(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('Informações Relevantes',
             svgIcon: _svgEye,
             bgColor: _kYellowHeader,
             textColor: _kYellowHeaderDarkText),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Queixa de Roubo e/ou Furto',
             _v(data, ['queixaderoubo', 'roubofurto', 'queixa_roubo'],
@@ -663,15 +839,13 @@ class PdfRadarGenerator {
             _v(data, ['placamercosul', 'mercosul'])
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildBaseEstadual(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildBaseEstadual(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('Base Estadual **', svgIcon: _svgFlag),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Placa',
             _v(data, ['placa']),
@@ -800,19 +974,17 @@ class PdfRadarGenerator {
             _v(data, ['roubofurto', 'roubo_furto'], fallback: 'Não Possui')
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildInformacoesRelevantesEstadual(
+  static List<pw.Widget> _buildInformacoesRelevantesEstadual(
       Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+    return [
         _buildSectionHeader('Informações Relevantes',
             svgIcon: _svgEye,
             bgColor: _kYellowHeader,
             textColor: _kYellowHeaderDarkText),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Comunicação de Venda',
             _v(data, ['comunicacaovenda', 'comunicadovenda'], fallback: 'Não'),
@@ -878,50 +1050,47 @@ class PdfRadarGenerator {
             'Restrições Financeiras',
             _v(data, ['restricoesfinanceiras', 'restricaofinanceira']),
             'Restrição 1',
-            _v(data, ['restricao1_est', 'restricaobaseestadual1'],
-                fallback: 'SEM RESTRICAO')
-          ],
-          [
+            _v(data, ['restricao1_br', 'restricaobaseagregadores1'],
+                fallback: 'SEM RESTRICAO'),
             'Restrição 2',
-            _v(data, ['restricao2_est', 'restricaobaseestadual2'],
-                fallback: 'SEM RESTRICAO'),
-            'Restrição 3',
-            _v(data, ['restricao3_est', 'restricaobaseestadual3'],
+            _v(data, ['restricao2_br', 'restricaobaseagregadores2'],
                 fallback: 'SEM RESTRICAO')
           ],
           [
-            'Restrição 4',
-            _v(data, ['restricao4_est', 'restricaobaseestadual4'],
+            'Restrição 3',
+            _v(data, ['restricao3_br', 'restricaobaseagregadores3'],
                 fallback: 'SEM RESTRICAO'),
-            '',
-            ''
+            'Restrição 4',
+            _v(data, ['restricao4_br', 'restricaobaseagregadores4'],
+                fallback: 'SEM RESTRICAO')
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildProprietario(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildProprietario(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('Informações de Proprietário', svgIcon: _svgPerson),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Anterior',
             _v(data, ['proprietarioanterior', 'nomeproprietarioanterior']),
             'Atual',
-            _v(data, ['proprietario', 'nomeproprietario'])
+            _v(data, [
+              'proprietario',
+              'nomeproprietario',
+              'proprietario_atual',
+              'nome_proprietario_atual'
+            ])
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildChassi(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildChassi(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('Decodificador de Chassi', svgIcon: _svgWrench),
-        _buildDataGrid([
+        ..._buildDataGrid([
           ['CHASSI NÃO POSSUÍ IRREGULARIDADES'],
           [
             'Chassi',
@@ -949,9 +1118,14 @@ class PdfRadarGenerator {
           ],
           [
             'COD. Categoria',
-            _v(data, ['codcategoria']),
+            _v(data, ['codigocategoria', 'codcategoria']),
             'Categoria',
-            _v(data, ['categoria'])
+            _v(data, [
+              'categoria_chassi',
+              'chassi_categoria',
+              'chassicategoria',
+              'categoria'
+            ])
           ],
           [
             'Local fabricação',
@@ -966,124 +1140,154 @@ class PdfRadarGenerator {
             _v(data, ['chassi_regiao', 'regiao'])
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildPrecificador(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
-        _buildSectionHeader('Precificador I - FIPE', svgIcon: _svgChart),
+  static List<pw.Widget> _buildPrecificador(Map<String, dynamic> data) {
+    List<dynamic> fipes = [];
+    if (data['fipe'] is List) {
+      fipes = data['fipe'] as List<dynamic>;
+    } else if (data['fipes'] is List) {
+      fipes = data['fipes'] as List<dynamic>;
+    } else if (data['precificador'] is List) {
+      fipes = data['precificador'] as List<dynamic>;
+    } else if (data['fipe'] is Map) {
+      fipes = [data['fipe']];
+    } else {
+      fipes = [data]; // Fallback to root data
+    }
+
+    List<pw.Widget> fipeRows = [];
+    for (var i = 0; i < fipes.length; i++) {
+      var f = fipes[i] is Map ? (fipes[i] as Map<String, dynamic>) : data;
+      fipeRows.add(
         pw.Container(
-          decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: _kBorder, width: 0.5)),
-          child: pw.Column(
+          color: i % 2 == 0 ? PdfColors.white : _kBlueLight,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          child: pw.Row(
             children: [
-              pw.Container(
-                color: _kBlueLight,
-                padding:
-                    const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text('Código',
-                            style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text('Combustível',
-                            style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text('Marca',
-                            style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 3,
-                        child: pw.Text('Modelo',
-                            style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text('Valor R\$',
-                            style: pw.TextStyle(
-                                fontSize: 8,
-                                fontWeight: pw.FontWeight.bold,
-                                color: _kTextDark))),
-                  ],
-                ),
-              ),
-              pw.Container(
-                color: PdfColors.white,
-                padding:
-                    const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: pw.Row(
-                  children: [
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text(_v(data, ['codigofipe', 'fipe_codigo']),
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text(_v(data, ['combustivel']),
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text(_v(data, ['marca']),
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 3,
-                        child: pw.Text(_v(data, ['modelo', 'fipe_modelo']),
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextDark))),
-                    pw.Expanded(
-                        flex: 2,
-                        child: pw.Text(_v(data, ['valorfipe', 'fipe_valor']),
-                            style: const pw.TextStyle(
-                                fontSize: 8, color: _kTextDark))),
-                  ],
-                ),
-              ),
+              pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(
+                      _v(f, ['codigo_fipe', 'codigofipe', 'fipe_codigo'],
+                          fallback: '-'),
+                      style:
+                          const pw.TextStyle(fontSize: 8, color: _kTextDark))),
+              pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(
+                      _v(
+                          f,
+                          [
+                            'combustivel_fipe',
+                            'fipe_combustivel',
+                            'combustivel'
+                          ],
+                          fallback: '-'),
+                      style:
+                          const pw.TextStyle(fontSize: 8, color: _kTextDark))),
+              pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(
+                      _v(f, ['marca_fipe', 'fipe_marca', 'marca'],
+                          fallback: '-'),
+                      style:
+                          const pw.TextStyle(fontSize: 8, color: _kTextDark))),
+              pw.Expanded(
+                  flex: 3,
+                  child: pw.Text(
+                      _v(f, ['modelo_fipe', 'fipe_modelo', 'modelo'],
+                          fallback: '-'),
+                      style:
+                          const pw.TextStyle(fontSize: 8, color: _kTextDark))),
+              pw.Expanded(
+                  flex: 2,
+                  child: pw.Text(
+                      _v(f, ['valor_fipe', 'fipe_valor', 'valorfipe', 'valor'],
+                          fallback: '-'),
+                      style:
+                          const pw.TextStyle(fontSize: 8, color: _kTextDark))),
             ],
           ),
         ),
-      ],
-    );
+      );
+    }
+
+    return [
+      _buildSectionHeader('Precificador I - FIPE', svgIcon: _svgChart),
+      pw.Container(
+        decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _kBorder, width: 0.5)),
+        child: pw.Column(
+          children: [
+            pw.Container(
+              color: _kBlueLight,
+              padding:
+                  const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: pw.Row(
+                children: [
+                  pw.Expanded(
+                      flex: 2,
+                      child: pw.Text('Código',
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _kTextDark))),
+                  pw.Expanded(
+                      flex: 2,
+                      child: pw.Text('Combustível',
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _kTextDark))),
+                  pw.Expanded(
+                      flex: 2,
+                      child: pw.Text('Marca',
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _kTextDark))),
+                  pw.Expanded(
+                      flex: 3,
+                      child: pw.Text('Modelo',
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _kTextDark))),
+                  pw.Expanded(
+                      flex: 2,
+                      child: pw.Text('Valor R\$',
+                          style: pw.TextStyle(
+                              fontSize: 8,
+                              fontWeight: pw.FontWeight.bold,
+                              color: _kTextDark))),
+                ],
+              ),
+            ),
+            ...fipeRows,
+          ],
+        ),
+      ),
+    ];
   }
 
-  static pw.Widget _buildHistoricoLaudos(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildHistoricoLaudos(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('Histórico de Laudos', svgIcon: _svgDocument),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             _v(data, ['historicolaudos', 'laudos'],
                 fallback: 'VEÍCULO NÃO POSSUÍ LAUDO EM NOSSA PLATAFORMA')
           ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildSenatranInfo(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildSenatranInfo(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('SENATRAN Detalhado Informações - Online',
             svgIcon: _svgCar),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Placa',
             _v(data, ['placa']),
@@ -1194,17 +1398,87 @@ class PdfRadarGenerator {
             'Remarcação Chassi',
             _v(data, ['remarcacaochassi'])
           ],
+          [
+            'Eixo Auxiliar',
+            _v(data, ['eixoauxiliar', 'eixo_auxiliar']),
+            'Eixo Traseiro',
+            _v(data, ['eixotraseiro', 'eixo_traseiro'])
+          ],
+          [
+            'Município de Emplacamento',
+            _v(data, ['municipioemplacamento', 'municipio_emplacamento']),
+            'Quantidade de eixos',
+            _v(data, ['quantidadeeixos', 'quantidade_eixos', 'eixos'])
+          ],
+          [
+            'UF de jurisdição',
+            _v(data, ['ufjurisdicao', 'uf_jurisdicao']),
+            'Data de emissão CRV',
+            _v(data, ['dataemissaocrv', 'data_emissao_crv'])
+          ],
+          [
+            'Data Ultima Atualizacao',
+            _v(data, [
+              'dataultimaatualizacao',
+              'data_ultima_atualizacao',
+              'data_atualizacao'
+            ]),
+            'Natureza Faturado',
+            _v(data, ['naturezafaturado', 'natureza_faturado'])
+          ],
+          [
+            'UF Faturado',
+            _v(data, ['uffaturado', 'uf_faturado']),
+            'Natureza do importador',
+            _v(data, ['naturezaimportador', 'natureza_importador'])
+          ],
+          [
+            'Documento do importandor',
+            _v(data, ['documentoimportador', 'documento_importador']),
+            'País tranferência',
+            _v(data, ['paistransferencia', 'pais_transferencia'])
+          ],
+          [
+            'Documento do proprietário indicado',
+            _v(data, [
+              'documentoproprietarioindicado',
+              'documento_proprietario_indicado'
+            ]),
+            'Declaração de importação',
+            _v(data, ['declaracaoimportacao', 'declaracao_importacao'])
+          ],
+          [
+            'Identificação do faturamento',
+            _v(data, ['identificacaofaturamento', 'identificacao_faturamento']),
+            'Identificação do importador',
+            _v(data, ['identificacaoimportador', 'identificacao_importador'])
+          ],
+          [
+            'Possuidor',
+            'Nome: ' +
+                _v(data, ['nomepossuidor', 'nome_possuidor'], fallback: '-') +
+                '\nDocumento: ' +
+                _v(data, ['documentoposuidort', 'documento_possuidor'],
+                    fallback: '-'),
+            'Registro Aduaneiro',
+            _v(data, ['registroaduaneiro', 'registro_aduaneiro'])
+          ],
+          [
+            'Permite Baixar CRV Digital?',
+            _v(data, ['permitebaixarcrvdigital', 'crv_digital'],
+                fallback: 'Não'),
+            '',
+            ''
+          ],
         ]),
-      ],
-    );
+    ];
   }
 
-  static pw.Widget _buildSenatranRestricoes(Map<String, dynamic> data) {
-    return pw.Column(
-      children: [
+  static List<pw.Widget> _buildSenatranRestricoes(Map<String, dynamic> data) {
+    return [
         _buildSectionHeader('SENATRAN Detalhado Restrições - Online',
             svgIcon: _svgCar),
-        _buildDataGrid([
+        ..._buildDataGrid([
           [
             'Possui Leilão',
             _v(data, ['possuileilao', 'leilao'], fallback: 'Não'),
@@ -1242,23 +1516,31 @@ class PdfRadarGenerator {
             ''
           ],
         ]),
-      ],
-    );
+    ];
   }
 
   static List<pw.Widget> _buildDetalhesComplementares(
       Map<String, dynamic> data) {
     return [
       _buildSectionHeader('Certificados de seguro de veículo emitidos'),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
-          _v(data, ['certificadosseguro', 'seguros'],
+          'Número CSV',
+          _v(
+              data,
+              [
+                'numerocsv',
+                'numero_csv',
+                'csv',
+                'certificadosseguro',
+                'seguros'
+              ],
               fallback: 'Nenhum registro encontrado.')
-        ],
+        ]
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Detalhes de Roubo/Furto'),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           _v(data, ['detalhesroubofurto', 'roubo_furto_detalhes'],
               fallback: 'NÃO FORAM ENCONTRADOS REGISTROS DE ROUBO / FURTO')
@@ -1266,15 +1548,15 @@ class PdfRadarGenerator {
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Detalhes de Multa Renainf'),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           _v(data, ['multasrenainfdetalhes', 'multas_renainf'],
               fallback: 'Nenhum registro encontrado.')
         ],
       ]),
       pw.SizedBox(height: 10),
-      _buildSectionHeader('Comunicado de Venda', svgIcon: _svgMoney),
-      _buildDataGrid([
+      _buildSectionHeader('Comunicado de Venda - Online', svgIcon: _svgMoney),
+      ..._buildDataGrid([
         [
           'Existe comunicação de venda ativa?',
           _v(data, ['comunicadovenda', 'comunicacaovenda'], fallback: 'Sim'),
@@ -1308,7 +1590,7 @@ class PdfRadarGenerator {
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Recall', svgIcon: _svgWrench),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           _v(data, ['recall_texto', 'recalltexto'],
               fallback:
@@ -1317,7 +1599,7 @@ class PdfRadarGenerator {
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Multas de Transito - DNIT', svgIcon: _svgFlag),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           _v(data, ['multasdnit', 'dnit'],
               fallback: 'VEICULO NÃO POSSUI INFORMAÇÕES NO DNIT')
@@ -1325,7 +1607,7 @@ class PdfRadarGenerator {
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('SSP - Cortesia', svgIcon: _svgBuilding),
-      _buildDataGrid([
+      ..._buildDataGrid([
         ['Dados Veículo'],
         [
           'Placa',
@@ -1399,7 +1681,7 @@ class PdfRadarGenerator {
       pw.SizedBox(height: 10),
       _buildSectionHeader('IPVA - Secretaria de Fazenda',
           svgIcon: _svgBuilding),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           'Placa',
           _v(data, ['placa']),
@@ -1458,14 +1740,160 @@ class PdfRadarGenerator {
       ]),
       pw.SizedBox(height: 10),
       _buildSectionHeader('DPVATs'),
-      _buildDataGrid([
+      ..._buildDataGrid([
         [
           _v(data, ['dpvat_detalhes'], fallback: 'Nenhum registro encontrado.')
         ],
       ]),
       pw.SizedBox(height: 10),
-      _buildSectionHeader('IPVA'),
-      _buildDataGrid([
+      _buildSectionHeader('IPVA (SEFAZ)'),
+      ..._buildIpvaSefazTable(data),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Pagamentos de Débitos'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['pagamentos_debitos'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('IPVA não inscritos'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['ipva_nao_inscritos'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Licenciamentos'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['licenciamentos_detalhes'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+    ];
+  }
+
+  static List<pw.Widget> _buildSecoesFinais(Map<String, dynamic> data) {
+    return [
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Pagamentos Efetuados 2026'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['pagamentos_efetuados', 'pagamentos_efetuados_2026'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Débitos Inscritos na Dívida Ativa'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['divida_ativa', 'dividaativa'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Multas Detalhadas'),
+      ..._buildDataGrid([
+        [
+          _v(data, ['multas_detalhadas', 'multasdetalhadas'],
+              fallback: 'Nenhum registro encontrado.')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Sinistro - Base On-line', svgIcon: _svgThermometer),
+      ..._buildDataGrid([
+        [
+          _v(data, ['sinistro_base'], fallback: 'FORNECEDOR INDISPONÍVEL')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Ofertas de Leilão', svgIcon: _svgHammer),
+      ..._buildDataGrid([
+        [
+          _v(data, ['ofertasleilao1', 'leilao1', 'leilao'],
+              fallback:
+                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE LEILÃO NA BASE 1')
+        ],
+        [
+          _v(data, ['pesquisasleilao'],
+              fallback: 'QUANTIDADE DE PESQUISAS NOS ÚLTIMOS MESES: 0')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('Ofertas de Leilão *', svgIcon: _svgHammer),
+      ..._buildDataGrid([
+        [
+          _v(data, ['ofertasleilao2', 'leilao2'],
+              fallback:
+                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE LEILÃO NA BASE 2')
+        ],
+      ]),
+      pw.Container(
+          width: double.infinity,
+          color: _kBlueLight,
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+              'As informações de leilões são captadas por empresas privadas e não de órgãos públicos como Detran e Denatran. Essas empresas não obtém 100% de informações de leilões. Sendo assim não há destas empresas garantia pelas informações de captação de leilão.',
+              style: const pw.TextStyle(fontSize: 6, color: PdfColors.black),
+              textAlign: pw.TextAlign.justify)),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader(
+          'Leilão Corporativo - Remarketing Automotivo / Venda Direta (Cortesia)',
+          svgIcon: _svgHammer),
+      ..._buildDataGrid([
+        [
+          _v(data, ['remarketing'],
+              fallback:
+                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE REMARKETING AUTOMOTIVO')
+        ],
+      ]),
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('[OP] Análise Técnica de Informações',
+          svgIcon: _svgThermometer),
+      ..._buildDataGrid([
+        [
+          _v(data, ['analisetecnica', 'sinistro'],
+              fallback: 'VEÍCULO NÃO POSSUÍ INDÍCIO DE SINISTRO')
+        ],
+      ]),
+      pw.Container(
+          width: double.infinity,
+          color: _kBlueLight,
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+              'Estas informações são confidenciais e deverão ser utilizadas exclusivamente para a orientação das transações comerciais. A responsabilidade da contratada limita-se a transmitir fielmente as informações oriundas das bases de Negativação, Protesto Cartoriais e sobre veículos automotores registrados em base de Dados públicas e privadas detentoras das informações. O levantamento das informações veiculares via consulta eletrônica jamais pode substituir a consulta do órgão oficial. Devido as informações DPVAT (Histórico de Proprietários), que ficou indisponível desde 12/07/2018 no mercado de informações veiculares e o Sinistro de Indenização Integral fornecido pela FENASEG/CNSEG desde 18/07/2018, não há como a empresa vistoriadora e fornecedor da consulta, se responsabilizar por informações de Sinistro de Indenização Integral.',
+              style: const pw.TextStyle(fontSize: 6, color: PdfColors.black),
+              textAlign: pw.TextAlign.justify)),
+    ];
+  }
+
+  static List<pw.Widget> _buildIpvaSefazTable(Map<String, dynamic> data) {
+    List<dynamic>? ipvaList;
+
+    void searchIpvaList(dynamic node) {
+      if (node is Map) {
+        if (node['ipva'] is List) {
+          ipvaList = node['ipva'] as List<dynamic>;
+          return;
+        }
+        for (var v in node.values) {
+          searchIpvaList(v);
+          if (ipvaList != null) return;
+        }
+      } else if (node is List) {
+        for (var item in node) {
+          searchIpvaList(item);
+          if (ipvaList != null) return;
+        }
+      }
+    }
+
+    searchIpvaList(data);
+
+    if (ipvaList == null || ipvaList!.isEmpty) {
+      return _buildDataGrid([
         [
           'Base calculo',
           _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'R\$ 0,00'),
@@ -1506,100 +1934,114 @@ class PdfRadarGenerator {
           '',
           ''
         ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('Pagamentos de Débitos'),
-      _buildDataGrid([
-        [
-          _v(data, ['pagamentos_debitos'],
-              fallback: 'Nenhum registro encontrado.')
-        ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('IPVA não inscritos'),
-      _buildDataGrid([
-        [
-          _v(data, ['ipva_nao_inscritos'],
-              fallback: 'Nenhum registro encontrado.')
-        ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('Licenciamentos'),
-      _buildDataGrid([
-        [
-          _v(data, ['licenciamentos_detalhes'],
-              fallback: 'Nenhum registro encontrado.')
-        ],
-      ]),
+      ]);
+    }
+
+    List<List<String>> rows = [
+      [
+        'Parcela / Tributo',
+        'Situação',
+        'Vencimento',
+        'Valor Total',
+        'Data Pagamento'
+      ]
     ];
+
+    for (var item in ipvaList!) {
+      if (item is Map) {
+        final tributo = item['tributo-parcela'] ??
+            item['tributo'] ??
+            item['descricao'] ??
+            '-';
+        final situacao = item['situacao'] ?? item['status'] ?? '-';
+        final vencimento = item['vencimento'] ?? '-';
+        final valor = item['valor-total'] ?? item['valor'] ?? '-';
+        final dataPagto =
+            item['data-pagamento'] ?? item['datapagamento'] ?? '-';
+        rows.add([
+          tributo.toString(),
+          situacao.toString(),
+          vencimento.toString(),
+          valor.toString().startsWith('R\$')
+              ? valor.toString()
+              : 'R\$ ${valor.toString()}',
+          (dataPagto != null && dataPagto.toString() != 'null')
+              ? dataPagto.toString()
+              : '-'
+        ]);
+      }
+    }
+
+    return _buildIpvaCustomGrid(rows);
   }
 
-  static List<pw.Widget> _buildSecoesFinais(Map<String, dynamic> data) {
-    return [
-      _buildSectionHeader('Sinistro - Base On-line', svgIcon: _svgThermometer),
-      _buildDataGrid([
-        [
-          _v(data, ['sinistro_base'], fallback: 'FORNECEDOR INDISPONÍVEL')
-        ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('Ofertas de Leilão', svgIcon: _svgHammer),
-      _buildDataGrid([
-        [
-          _v(data, ['ofertasleilao1', 'leilao1', 'leilao'],
-              fallback:
-                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE LEILÃO NA BASE 1')
-        ],
-        [
-          _v(data, ['pesquisasleilao'],
-              fallback: 'QUANTIDADE DE PESQUISAS NOS ÚLTIMOS MESES: 0')
-        ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('Ofertas de Leilão *', svgIcon: _svgHammer),
-      _buildDataGrid([
-        [
-          _v(data, ['ofertasleilao2', 'leilao2'],
-              fallback:
-                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE LEILÃO NA BASE 2')
-        ],
-      ]),
-      pw.Container(
-          width: double.infinity,
-          color: _kBlueLight,
-          padding: const pw.EdgeInsets.all(6),
-          child: pw.Text(
-              'As informações de leilões são captadas por empresas privadas e não de órgãos públicos como Detran e Denatran. Essas empresas não obtém 100% de informações de leilões. Sendo assim não há destas empresas garantia pelas informações de captação de leilão.',
-              style: const pw.TextStyle(fontSize: 6, color: PdfColors.black),
-              textAlign: pw.TextAlign.justify)),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader(
-          'Leilão Corporativo - Remarketing Automotivo / Venda Direta (Cortesia)',
-          svgIcon: _svgHammer),
-      _buildDataGrid([
-        [
-          _v(data, ['remarketing'],
-              fallback:
-                  'NÃO FOI ENCONTRADO NENHUMA OCORRÊNCIA DE REMARKETING AUTOMOTIVO')
-        ],
-      ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('[OP] Análise Técnica de Informações',
-          svgIcon: _svgThermometer),
-      _buildDataGrid([
-        [
-          _v(data, ['analisetecnica', 'sinistro'],
-              fallback: 'VEÍCULO NÃO POSSUÍ INDÍCIO DE SINISTRO')
-        ],
-      ]),
-      pw.Container(
-          width: double.infinity,
-          color: _kBlueLight,
-          padding: const pw.EdgeInsets.all(6),
-          child: pw.Text(
-              'Estas informações são confidenciais e deverão ser utilizadas exclusivamente para a orientação das transações comerciais. A responsabilidade da contratada limita-se a transmitir fielmente as informações oriundas das bases de Negativação, Protesto Cartoriais e sobre veículos automotores registrados em base de Dados públicas e privadas detentoras das informações. O levantamento das informações veiculares via consulta eletrônica jamais pode substituir a consulta do órgão oficial. Devido as informações DPVAT (Histórico de Proprietários), que ficou indisponível desde 12/07/2018 no mercado de informações veiculares e o Sinistro de Indenização Integral fornecido pela FENASEG/CNSEG desde 18/07/2018, não há como a empresa vistoriadora e fornecedor da consulta, se responsabilizar por informações de Sinistro de Indenização Integral.',
-              style: const pw.TextStyle(fontSize: 6, color: PdfColors.black),
-              textAlign: pw.TextAlign.justify)),
-    ];
+  static List<pw.Widget> _buildIpvaCustomGrid(List<List<String>> rows) {
+    return List.generate(rows.length, (index) {
+      final isHeader = index == 0;
+      final isEven = index % 2 == 0;
+      final rowData = rows[index];
+
+      return pw.Container(
+        decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _kBorder, width: 0.5),
+            color: isHeader
+                ? _kBlueLight
+                : (isEven ? PdfColors.white : _kBlueLight)),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: pw.Row(
+          children: [
+            pw.Expanded(
+                flex: 3,
+                child: pw.Text(rowData[0],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: isHeader
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal,
+                        color: _kTextDark))),
+            pw.Expanded(
+                flex: 2,
+                child: pw.Text(rowData[1],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: pw.FontWeight.bold,
+                        color: isHeader
+                            ? _kTextDark
+                            : (rowData[1].toUpperCase() == 'PAGO'
+                                ? _kGreen
+                                : (rowData[1].toUpperCase() == 'PENDENTE'
+                                    ? _kOrange
+                                    : _kTextDark))))),
+            pw.Expanded(
+                flex: 2,
+                child: pw.Text(rowData[2],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: isHeader
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal,
+                        color: _kTextDark))),
+            pw.Expanded(
+                flex: 2,
+                child: pw.Text(rowData[3],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: isHeader
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal,
+                        color: _kTextDark))),
+            pw.Expanded(
+                flex: 2,
+                child: pw.Text(rowData[4],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: isHeader
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal,
+                        color: _kTextDark))),
+          ],
+        ),
+      );
+    });
   }
 }

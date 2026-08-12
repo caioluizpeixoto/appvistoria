@@ -1,30 +1,21 @@
-import 'dart:ffi';
 import 'dart:io';
 import 'package:sqlite3/sqlite3.dart';
-
 void main() {
-  final dbPath = 'C:\\Users\\Caio\\Documents\\cautelar_app.sqlite';
-  print('Opening db at $dbPath');
-  if (!File(dbPath).existsSync()) {
-    print('DB does not exist.');
-    return;
-  }
-
-  final db = sqlite3.open(dbPath);
-  try {
-    final ResultSet resultSet = db.select(
-        'SELECT retorno_bruto FROM consultas_autocred ORDER BY created_at DESC LIMIT 1');
-    if (resultSet.isEmpty) {
-      print('No results found.');
-    } else {
-      for (final row in resultSet) {
-        print('--- RETORNO BRUTO ---');
-        print(row['retorno_bruto']);
+  final dbs = ['app_db.sqlite', 'db.sqlite', 'sqlite.db'];
+  for (var dbPath in dbs) {
+    if (!File(dbPath).existsSync()) continue;
+    print('Testing $dbPath...');
+    final db = sqlite3.open(dbPath);
+    try {
+      final tables = db.select("SELECT name FROM sqlite_master WHERE type='table'");
+      print('Tables: $tables');
+      if (tables.toString().contains('consultas_autocred') || tables.toString().contains('laudos')) {
+        final rs = db.select('SELECT retorno_bruto FROM consultas_autocred ORDER BY id DESC LIMIT 1');
+        for (final row in rs) {
+          final ret = row['retorno_bruto'].toString();
+          print(ret.length > 500 ? ret.substring(0, 500) : ret);
+        }
       }
-    }
-  } catch (e) {
-    print('Error querying db: $e');
-  } finally {
-    db.dispose();
+    } catch(e) { print(e); }
   }
 }

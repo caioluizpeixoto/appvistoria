@@ -518,7 +518,34 @@ Future<String?> generateChecklistPdf({
           ),
         ],
 
-        pw.SizedBox(height: 40),
+        if ((wizardState?.parecerTecnico ?? vistoria.parecerTecnico ?? '').trim().isNotEmpty) ...[
+          pw.SizedBox(height: 20),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromHex('F8F9FA'),
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+              border: pw.Border.all(color: primaryColor, width: 1),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'PARECER TÉCNICO',
+                  style: pw.TextStyle(font: fontBold, fontSize: 11, color: primaryColor),
+                ),
+                pw.SizedBox(height: 6),
+                pw.Text(
+                  (wizardState?.parecerTecnico ?? vistoria.parecerTecnico!).trim(),
+                  style: pw.TextStyle(font: fontRegular, fontSize: 9, color: PdfColors.grey800),
+                ),
+              ],
+            ),
+          ),
+        ],
+
+        pw.SizedBox(height: 30),
         buildAssinaturas(),
       ];
     },
@@ -527,7 +554,11 @@ Future<String?> generateChecklistPdf({
   // Salvar o arquivo
   try {
     final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/checklist_${widgetId(vistoria)}.pdf');
+    final placaClean =
+        veiculo.placa.trim().replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final nomeBase =
+        placaClean.isNotEmpty ? placaClean : 'checklist_${widgetId(vistoria)}';
+    final file = File('${dir.path}/$nomeBase.pdf');
     final bytes = await pdf.save();
     await file.writeAsBytes(bytes);
     return file.path;
