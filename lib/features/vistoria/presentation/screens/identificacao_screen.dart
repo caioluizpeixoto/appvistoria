@@ -642,11 +642,17 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         final shortCode = vistoriaId.substring(0, 8).toUpperCase();
         final currentUserId = Supabase.instance.client.auth.currentUser?.id ??
             'usuario-deslogado';
+        final currentUserMetadata =
+            Supabase.instance.client.auth.currentUser?.userMetadata;
+        final loggedUnidade = (currentUserMetadata?['unidade'] as String?) ??
+            (currentUserMetadata?['empresa'] as String?) ??
+            (currentUserMetadata?['name'] as String?);
 
         await dao.inserirVistoria(VistoriasCompanion.insert(
           id: vistoriaId,
           numeroLaudo: 'VST-$shortCode',
           vistoriadorId: currentUserId,
+          unidade: drift.Value(loggedUnidade),
           tipoVistoria: drift.Value(widget.tipo.titulo),
         ));
 

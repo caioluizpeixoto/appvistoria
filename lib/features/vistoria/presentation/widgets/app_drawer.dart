@@ -165,13 +165,13 @@ class _DrawerHeader extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             padding: const EdgeInsets.all(2),
             child: Image.asset(
-              'assets/images/logo.pdf.png',
+              'assets/images/logo.pdf.PNG',
               fit: BoxFit.contain,
             ),
           ),
           const SizedBox(height: 14),
           const Text(
-            'Home Auto Vistorias',
+            'Prime Auto',
             style: TextStyle(
               color: Colors.white,
               fontSize: 18,

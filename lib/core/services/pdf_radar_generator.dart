@@ -57,9 +57,30 @@ class PdfRadarGenerator {
         final lowerTarget = targetKey.toLowerCase();
         for (var entry in node.entries) {
           if (entry.key.toString().toLowerCase() == lowerTarget) {
-            if (entry.value != null &&
-                entry.value.toString().trim().isNotEmpty) {
-              return entry.value.toString().trim();
+            final val = entry.value;
+            if (val != null) {
+              String valStr = '';
+              if (val is Map) {
+                if (val.containsKey('descricao') && val['descricao'] != null) {
+                  valStr = val['descricao'].toString();
+                } else if (val.containsKey('nome') && val['nome'] != null) {
+                  valStr = val['nome'].toString();
+                } else {
+                  valStr = val.toString();
+                }
+              } else {
+                valStr = val.toString().trim();
+              }
+              
+              final lowerVal = valStr.toLowerCase();
+              if (valStr.isNotEmpty &&
+                  lowerVal != 'não informado' &&
+                  lowerVal != 'nao informado' &&
+                  lowerVal != 'null' &&
+                  lowerVal != 'n/a' &&
+                  lowerVal != '-') {
+                return valStr;
+              }
             }
           }
         }
@@ -318,6 +339,7 @@ class PdfRadarGenerator {
       ..._buildDetalhesComplementares(dadosPesquisa),
       pw.SizedBox(height: 10),
       ..._buildSecoesFinais(dadosPesquisa),
+      ..._buildSecoesDinamicas(dadosPesquisa),
     ];
 
     pages.add(
@@ -775,15 +797,14 @@ class PdfRadarGenerator {
             'Emplacamento Eletrônico',
             _v(data, ['emplacamento_eletronico', 'emplacamentoeletronico']),
             'Histórico Roubo e Furto *',
-            _v(
-                data,
-                [
-                  'historico_roubo_furto',
-                  'roubo_furto',
-                  'roubofurto',
-                  'queixaderoubo'
-                ],
-                fallback: 'Nada Consta')
+            _findList(data, ['rf']).isNotEmpty 
+                ? 'POSSUI OCORRÊNCIA'
+                : _v(data, [
+                    'historico_roubo_furto',
+                    'roubo_furto',
+                    'roubofurto',
+                    'queixaderoubo'
+                  ], fallback: 'Nada Consta')
           ],
         ]);
   }
@@ -947,7 +968,7 @@ class PdfRadarGenerator {
             'Câmbio',
             _v(data, ['cambio']),
             'Eixos',
-            _v(data, ['eixos', 'quantidadeeixos'])
+            _v(data, ['eixos', 'quantidadeeixos', 'qtdeixos', 'numeixos'])
           ],
           [
             'Cilindradas',
@@ -1080,7 +1101,8 @@ class PdfRadarGenerator {
               'proprietario',
               'nomeproprietario',
               'proprietario_atual',
-              'nome_proprietario_atual'
+              'nome_proprietario_atual',
+              'possuidor'
             ])
           ],
         ]),
@@ -1408,7 +1430,7 @@ class PdfRadarGenerator {
             'Município de Emplacamento',
             _v(data, ['municipioemplacamento', 'municipio_emplacamento']),
             'Quantidade de eixos',
-            _v(data, ['quantidadeeixos', 'quantidade_eixos', 'eixos'])
+            _v(data, ['quantidadeeixos', 'quantidade_eixos', 'eixos', 'qtdeixos', 'numeixos'])
           ],
           [
             'UF de jurisdição',
@@ -1538,14 +1560,8 @@ class PdfRadarGenerator {
               fallback: 'Nenhum registro encontrado.')
         ]
       ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('Detalhes de Roubo/Furto'),
-      ..._buildDataGrid([
-        [
-          _v(data, ['detalhesroubofurto', 'roubo_furto_detalhes'],
-              fallback: 'NÃO FORAM ENCONTRADOS REGISTROS DE ROUBO / FURTO')
-        ],
-      ]),
+
+      ..._buildHistoricoRouboFurto(data),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Detalhes de Multa Renainf'),
       ..._buildDataGrid([
@@ -1589,14 +1605,7 @@ class PdfRadarGenerator {
         ],
       ]),
       pw.SizedBox(height: 10),
-      _buildSectionHeader('Recall', svgIcon: _svgWrench),
-      ..._buildDataGrid([
-        [
-          _v(data, ['recall_texto', 'recalltexto'],
-              fallback:
-                  'O VEÍCULO PESQUISADO NÃO POSSUI RECALL PENDENTE OU NÃO PERTENCE A NENHUM RECALL DIVULGADO PELAS MONTADORAS A PARTIR DE 17/03/2011. PARA PERÍODOS ANTERIORES, ENTRE EM CONTATO DIRETAMENTE COM O FABRICANTE DO VEÍCULO.')
-        ],
-      ]),
+      ..._buildRecallTable(data),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Multas de Transito - DNIT', svgIcon: _svgFlag),
       ..._buildDataGrid([
@@ -1745,8 +1754,6 @@ class PdfRadarGenerator {
           _v(data, ['dpvat_detalhes'], fallback: 'Nenhum registro encontrado.')
         ],
       ]),
-      pw.SizedBox(height: 10),
-      _buildSectionHeader('IPVA (SEFAZ)'),
       ..._buildIpvaSefazTable(data),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Pagamentos de Débitos'),
@@ -1794,13 +1801,7 @@ class PdfRadarGenerator {
         ],
       ]),
       pw.SizedBox(height: 10),
-      _buildSectionHeader('Multas Detalhadas'),
-      ..._buildDataGrid([
-        [
-          _v(data, ['multas_detalhadas', 'multasdetalhadas'],
-              fallback: 'Nenhum registro encontrado.')
-        ],
-      ]),
+      ..._buildMultasTable(data, 'Multas Detalhadas'),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Sinistro - Base On-line', svgIcon: _svgThermometer),
       ..._buildDataGrid([
@@ -1858,6 +1859,8 @@ class PdfRadarGenerator {
               fallback: 'VEÍCULO NÃO POSSUÍ INDÍCIO DE SINISTRO')
         ],
       ]),
+      ..._buildProcessos(data),
+      ..._buildImpedimentos(data),
       pw.Container(
           width: double.infinity,
           color: _kBlueLight,
@@ -1867,6 +1870,215 @@ class PdfRadarGenerator {
               style: const pw.TextStyle(fontSize: 6, color: PdfColors.black),
               textAlign: pw.TextAlign.justify)),
     ];
+  }
+
+  static List<dynamic> _findList(Map<String, dynamic> data, List<String> keys) {
+    List<dynamic>? foundList;
+    void searchList(dynamic node, String targetKey) {
+      if (node is Map) {
+        final lowerTarget = targetKey.toLowerCase();
+        for (var entry in node.entries) {
+          if (entry.key.toString().toLowerCase() == lowerTarget) {
+            if (entry.value is List) {
+              foundList = entry.value as List<dynamic>;
+              return;
+            } else if (entry.value is String) {
+              try {
+                final parsed = jsonDecode(entry.value);
+                if (parsed is List) {
+                  foundList = parsed;
+                  return;
+                }
+              } catch (_) {}
+            }
+          }
+        }
+        if (foundList == null) {
+          for (var entry in node.entries) {
+            searchList(entry.value, targetKey);
+            if (foundList != null) return;
+          }
+        }
+      } else if (node is Iterable) {
+        for (var item in node) {
+          searchList(item, targetKey);
+          if (foundList != null) return;
+        }
+      }
+    }
+
+    for (var k in keys) {
+      searchList(data, k);
+      if (foundList != null && foundList!.isNotEmpty) return foundList!;
+    }
+    return [];
+  }
+
+  static List<pw.Widget> _buildGenericGrid(List<List<String>> rows, List<int> flexes) {
+    return List.generate(rows.length, (index) {
+      final isHeader = index == 0;
+      final isEven = index % 2 == 0;
+      final rowData = rows[index];
+
+      return pw.Container(
+        decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _kBorder, width: 0.5),
+            color: isHeader
+                ? _kBlueLight
+                : (isEven ? PdfColors.white : _kBlueLight)),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: List.generate(rowData.length, (colIndex) {
+            return pw.Expanded(
+                flex: flexes.length > colIndex ? flexes[colIndex] : 1,
+                child: pw.Text(rowData[colIndex],
+                    style: pw.TextStyle(
+                        fontSize: 7,
+                        fontWeight: isHeader
+                            ? pw.FontWeight.bold
+                            : pw.FontWeight.normal,
+                        color: _kTextDark)));
+          }),
+        ),
+      );
+    });
+  }
+
+  static List<pw.Widget> _buildRecallTable(Map<String, dynamic> data) {
+    List<dynamic> recalls = _findList(data, ['recall', 'recalls', 'lista_recall']);
+    
+    if (recalls.isEmpty) {
+      return [
+        _buildSectionHeader('Recall', svgIcon: _svgWrench),
+        ..._buildDataGrid([
+          ['O VEÍCULO PESQUISADO NÃO POSSUI RECALL PENDENTE OU NÃO PERTENCE A NENHUM RECALL DIVULGADO PELAS MONTADORAS.']
+        ]),
+      ];
+    }
+
+    List<List<String>> rows = [
+      ['Recall', 'Descrição', 'Data de registro']
+    ];
+
+    for (var item in recalls) {
+      if (item is Map) {
+        final codigo = item['codigo'] ?? item['numero_campanha'] ?? item['campanha'] ?? '-';
+        final descricao = item['descricao'] ?? item['motivo'] ?? '-';
+        final dataReg = item['data_registro'] ?? item['data'] ?? '-';
+        rows.add([
+          codigo.toString(),
+          descricao.toString(),
+          dataReg.toString()
+        ]);
+      }
+    }
+
+    return [
+      _buildSectionHeader('Recall', svgIcon: _svgWrench),
+      ..._buildGenericGrid(rows, [2, 4, 2]),
+    ];
+  }
+
+  static List<pw.Widget> _buildMultasTable(Map<String, dynamic> data, String title) {
+    List<dynamic> multas = [];
+    if (data['multas'] is List && (data['multas'] as List).isNotEmpty) {
+      multas = data['multas'] as List;
+    } else {
+      multas = _findList(data, ['multas', 'multa', 'infracoes']);
+    }
+    
+    if (multas.isEmpty) {
+      return [
+        _buildSectionHeader(title),
+        ..._buildDataGrid([
+          ['Nenhum registro encontrado.']
+        ]),
+      ];
+    }
+
+    List<List<String>> rows = [
+      ['Num.Auto/Situação', 'Descrição', 'Local/Complemento', 'Valor']
+    ];
+
+    for (var item in multas) {
+      if (item is Map) {
+        final auto = item['autoInfracao'] ?? item['auto_infracao'] ?? item['auto'] ?? '-';
+        final renainf = item['autoRenainf'] ?? item['renainf'] ?? '-';
+        final situacao = item['situacao'] ?? item['status'] ?? '-';
+        
+        final autoText = '$auto\n(Renainf: $renainf)\nSituação: $situacao';
+        final descricao = item['descricao'] ?? item['motivo'] ?? '-';
+        
+        final dataInfracao = item['dataInfracao'] ?? item['data'] ?? '-';
+        final local = item['local'] ?? '-';
+        final localText = 'Em $dataInfracao\n$local';
+        
+        final valor = item['valor'] ?? '-';
+        final valorText = valor.toString().startsWith('R\$') ? valor.toString() : 'R\$ $valor';
+
+        rows.add([
+          autoText,
+          descricao.toString(),
+          localText,
+          valorText
+        ]);
+      }
+    }
+
+    return [
+      _buildSectionHeader(title),
+      ..._buildGenericGrid(rows, [3, 4, 3, 2]),
+    ];
+  }
+
+  static List<pw.Widget> _buildProcessos(Map<String, dynamic> data) {
+    final processos = _findList(data, ['ultimo_processo', 'processo', 'processos']);
+    if (processos.isEmpty) return [];
+
+    List<List<String>> rows = [
+      ['Processo', 'Interessado', 'Serviço', 'Operação']
+    ];
+
+    for (var item in processos) {
+      if (item is Map) {
+        rows.add([
+          (item['processo'] ?? '-').toString(),
+          (item['interessado'] ?? '-').toString(),
+          (item['servico'] ?? '-').toString(),
+          (item['operacao'] ?? '-').toString(),
+        ]);
+      }
+    }
+
+    return [
+      _buildSectionHeader('Último Processo', svgIcon: _svgDocument),
+      ..._buildGenericGrid(rows, [2, 3, 3, 3]),
+      pw.SizedBox(height: 10),
+    ];
+  }
+
+  static List<pw.Widget> _buildImpedimentos(Map<String, dynamic> data) {
+    final impedimentos = _findList(data, ['historico_impedimentos', 'impedimentos']);
+    if (impedimentos.isEmpty) return [];
+
+    List<pw.Widget> widgets = [];
+    int idx = 1;
+    for (var item in impedimentos) {
+      if (item is Map) {
+        widgets.add(_buildSectionHeader('Histórico Impedimentos Veículo #$idx'));
+        
+        List<List<String>> grid = [];
+        for (var key in item.keys) {
+           grid.add([key, item[key].toString()]);
+        }
+        
+        widgets.addAll(_buildDataGrid(grid));
+        widgets.add(pw.SizedBox(height: 10));
+        idx++;
+      }
+    }
+    return widgets;
   }
 
   static List<pw.Widget> _buildIpvaSefazTable(Map<String, dynamic> data) {
@@ -1892,9 +2104,20 @@ class PdfRadarGenerator {
 
     searchIpvaList(data);
 
+    final temValor = _v(data, ['ipva_valor', 'valor'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
+    final temBase = _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
+    final temApurado = _v(data, ['ipva_apurado', 'apurado'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
+
     if (ipvaList == null || ipvaList!.isEmpty) {
-      return _buildDataGrid([
-        [
+      if (!temValor && !temBase && !temApurado) {
+        return [];
+      }
+
+      return [
+        pw.SizedBox(height: 10),
+        _buildSectionHeader('IPVA (SEFAZ)'),
+        ..._buildDataGrid([
+          [
           'Base calculo',
           _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'R\$ 0,00'),
           'Aliquota',
@@ -1934,7 +2157,7 @@ class PdfRadarGenerator {
           '',
           ''
         ],
-      ]);
+      ])];
     }
 
     List<List<String>> rows = [
@@ -1972,7 +2195,11 @@ class PdfRadarGenerator {
       }
     }
 
-    return _buildIpvaCustomGrid(rows);
+    return [
+      pw.SizedBox(height: 10),
+      _buildSectionHeader('IPVA (SEFAZ)'),
+      ..._buildIpvaCustomGrid(rows)
+    ];
   }
 
   static List<pw.Widget> _buildIpvaCustomGrid(List<List<String>> rows) {
@@ -2043,5 +2270,154 @@ class PdfRadarGenerator {
         ),
       );
     });
+  }
+
+  static List<pw.Widget> _buildHistoricoRouboFurto(Map<String, dynamic> data) {
+    List<dynamic> rf = _findList(data, ['rf']);
+    
+    if (rf.isEmpty) {
+      return [];
+    }
+
+    List<List<String>> rows = [
+      ['Data', 'Categoria', 'Município/UF', 'B.O']
+    ];
+
+    for (var item in rf) {
+      if (item is Map) {
+        final dataOco = item['data_ocorrencia'] ?? item['data'] ?? '-';
+        final categoria = item['categoria_ocorrencia'] ?? item['categoria'] ?? '-';
+        final municipio = item['municipio_ocorrencia'] ?? item['municipio'] ?? '-';
+        final uf = item['uf_ocorrencia'] ?? item['uf'] ?? '-';
+        final bo = item['boletim'] ?? '-';
+        
+        rows.add([
+          dataOco.toString(),
+          categoria.toString(),
+          '$municipio - $uf',
+          bo.toString(),
+        ]);
+      }
+    }
+
+    return [
+      _buildSectionHeader('Histórico Roubo e Furto', svgIcon: _svgWarning, bgColor: _kOrange, textColor: PdfColors.white),
+      ..._buildGenericGrid(rows, [2, 3, 3, 2]),
+    ];
+  }
+
+  static List<pw.Widget> _buildSecoesDinamicas(Map<String, dynamic> data) {
+    if (data['resultados_completos'] == null || data['resultados_completos'] is! List) {
+      return [];
+    }
+
+    final List<dynamic> resultados = data['resultados_completos'];
+    
+    final knownTitles = [
+      'BIN **',
+      'BASE ESTADUAL **',
+      'SENATRAN DETALHADO INFORMAÇÕES - ONLINE',
+      'SENATRAN DETALHADO RESTRIÇÕES - ONLINE',
+      'COMUNICADO DE VENDA - ONLINE',
+      'DECODIFICADOR DE CHASSI',
+      'PRECIFICADOR I - FIPE',
+      'HISTÓRICO DE LAUDOS',
+      'CERTIFICADOS DE SEGURO DE VEÍCULO EMITIDOS',
+      'DETALHES DE MULTA RENAINF',
+      'HISTÓRICO ROUBO E FURTO *',
+      'HISTÓRICO DE ROUBO E FURTO',
+      'RECALL',
+      'MULTAS DE TRANSITO - DNIT',
+      'SSP - CORTESIA',
+      'IPVA - SECRETARIA DE FAZENDA',
+      'DPVATS',
+      'IPVA (SEFAZ)',
+      'PAGAMENTOS DE DÉBITOS',
+      'IPVA NÃO INSCRITOS',
+      'LICENCIAMENTOS',
+      'PAGAMENTOS EFETUADOS 2026',
+      'DÉBITOS INSCRITOS NA DÍVIDA ATIVA',
+      'MULTAS DETALHADAS',
+      'SINISTRO - BASE ON-LINE',
+      'OFERTAS DE LEILÃO',
+      'OFERTAS DE LEILÃO *',
+      'LEILÃO CORPORATIVO - REMARKETING AUTOMOTIVO / VENDA DIRETA (CORTESIA)',
+      '[OP] ANÁLISE TÉCNICA DE INFORMAÇÕES'
+    ];
+
+    List<pw.Widget> dynamicWidgets = [];
+
+    for (var sec in resultados) {
+      if (sec is! Map) continue;
+      
+      final title = sec['title']?.toString().toUpperCase() ?? '';
+      if (title.isEmpty || knownTitles.contains(title)) {
+        continue;
+      }
+      
+      var retorno = sec['retorno'];
+      if (retorno == null) continue;
+      
+      if (retorno is Map && retorno.containsKey('data')) {
+        retorno = retorno['data'];
+      }
+      
+      if (retorno is! Map || retorno.isEmpty) continue;
+      
+      dynamicWidgets.add(pw.SizedBox(height: 10));
+      dynamicWidgets.add(_buildSectionHeader(sec['title'].toString()));
+      
+      List<List<String>> gridRows = [];
+      List<String> currentRow = [];
+      
+      for (var entry in (retorno as Map).entries) {
+        String keyStr = entry.key.toString();
+        String valStr = '';
+        
+        final val = entry.value;
+        if (val == null) continue;
+        
+        if (val is Map) {
+          if (val.containsKey('descricao') && val['descricao'] != null) {
+            valStr = val['descricao'].toString();
+          } else if (val.containsKey('nome') && val['nome'] != null) {
+            valStr = val['nome'].toString();
+          } else {
+            valStr = val.toString();
+          }
+        } else if (val is List) {
+           valStr = 'Lista de registros (\${val.length})';
+        } else {
+          valStr = val.toString();
+        }
+        
+        final lowerVal = valStr.toLowerCase();
+        if (valStr.isEmpty || lowerVal == 'não informado' || lowerVal == 'nao informado' || lowerVal == 'null') {
+          continue;
+        }
+        
+        currentRow.add(keyStr);
+        currentRow.add(valStr);
+        
+        if (currentRow.length == 4) {
+          gridRows.add(List.from(currentRow));
+          currentRow.clear();
+        }
+      }
+      
+      if (currentRow.isNotEmpty) {
+        if (currentRow.length == 2) {
+           gridRows.add([currentRow[0], currentRow[1], '', '']);
+        }
+      }
+      
+      if (gridRows.isNotEmpty) {
+        dynamicWidgets.addAll(_buildDataGrid(gridRows));
+      } else {
+        dynamicWidgets.addAll(_buildDataGrid([['Nenhum dado retornado para esta sessão.']]));
+      }
+    }
+    
+    return dynamicWidgets;
   }
 }

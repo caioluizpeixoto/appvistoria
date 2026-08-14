@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../database/app_database.dart';
 import '../../features/vistoria/domain/vistoria_type.dart';
@@ -10,6 +11,16 @@ import '../../features/vistoria/domain/vistoria_wizard_state.dart';
 import '../../features/vistoria/domain/checklist_definitions.dart';
 import '../../injection_container.dart';
 import '../../database/daos/vistoria_dao.dart';
+
+Future<pw.ImageProvider?> _loadAssetImage(List<String> paths) async {
+  for (final path in paths) {
+    try {
+      final bytes = await rootBundle.load(path);
+      return pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (_) {}
+  }
+  return null;
+}
 
 Future<String?> generateChecklistPdf({
   required Vistoria vistoria,
@@ -94,17 +105,19 @@ Future<String?> generateChecklistPdf({
       tipoEnum == TipoVistoria.vistoriaEntrada;
   final isDynamicChecklist = isPesado || isOnibus || isMicroOnibus;
 
-  pw.ImageProvider? logoImage;
-  try {
-    final logoBytes = await rootBundle.load('assets/images/topo.pdf.png');
-    logoImage = pw.MemoryImage(logoBytes.buffer.asUint8List());
-  } catch (_) {}
+  pw.ImageProvider? logoImage = await _loadAssetImage([
+    'assets/images/topo.pdf.png',
+    'assets/images/topo.pdf.PNG',
+    'assets/images/topo.png',
+    'assets/images/logo.pdf.png',
+    'assets/images/logo.png',
+  ]);
 
-  pw.ImageProvider? rodapeImage;
-  try {
-    final rodapeBytes = await rootBundle.load('assets/images/rodape.pdf.png');
-    rodapeImage = pw.MemoryImage(rodapeBytes.buffer.asUint8List());
-  } catch (_) {}
+  pw.ImageProvider? rodapeImage = await _loadAssetImage([
+    'assets/images/logo.pdf.PNG',
+    'assets/images/logo.pdf.png',
+    'assets/images/logo.png',
+  ]);
 
   pw.ImageProvider? assinaturaImage;
   if (wizardState?.assinaturaPath != null) {
@@ -164,7 +177,7 @@ Future<String?> generateChecklistPdf({
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
-                    pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
+                    pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(), textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
                     pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
@@ -177,9 +190,15 @@ Future<String?> generateChecklistPdf({
           ),
         ),
         if (rodapeImage != null)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(right: 16),
-            child: pw.Image(rodapeImage!, width: 120),
+          pw.Positioned(
+            right: 16,
+            top: 2,
+            bottom: 2,
+            child: pw.Container(
+              width: 80,
+              alignment: pw.Alignment.centerRight,
+              child: pw.Image(rodapeImage!, fit: pw.BoxFit.contain),
+            ),
           ),
       ],
     );
@@ -522,23 +541,23 @@ Future<String?> generateChecklistPdf({
           pw.SizedBox(height: 20),
           pw.Container(
             width: double.infinity,
-            padding: const pw.EdgeInsets.all(10),
+            padding: const pw.EdgeInsets.all(12),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('F8F9FA'),
+              color: const PdfColor.fromInt(0xFFFFC107), // Amarelo Escuro (Amber)
               borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              border: pw.Border.all(color: primaryColor, width: 1),
+              border: pw.Border.all(color: const PdfColor.fromInt(0xFFF57F17), width: 2), // Laranja escuro para contraste
             ),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 pw.Text(
                   'PARECER TÉCNICO',
-                  style: pw.TextStyle(font: fontBold, fontSize: 11, color: primaryColor),
+                  style: pw.TextStyle(font: fontBold, fontSize: 12, color: PdfColors.black),
                 ),
-                pw.SizedBox(height: 6),
+                pw.SizedBox(height: 8),
                 pw.Text(
                   (wizardState?.parecerTecnico ?? vistoria.parecerTecnico!).trim(),
-                  style: pw.TextStyle(font: fontRegular, fontSize: 9, color: PdfColors.grey800),
+                  style: pw.TextStyle(font: fontBold, fontSize: 10, color: PdfColors.black),
                 ),
               ],
             ),

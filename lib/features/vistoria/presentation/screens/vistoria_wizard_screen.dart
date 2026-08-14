@@ -268,6 +268,28 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       if (forcar != true) return;
     }
 
+    if (_wizardState.statusConsulta == 'timeout' || _wizardState.statusConsulta == 'erro') {
+      final querPuxar = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(_wizardState.statusConsulta == 'timeout' ? 'Tempo Esgotado' : 'Erro na Pesquisa'),
+          content: const Text('A pesquisa anterior falhou ou demorou muito. Deseja verificar se ela já foi concluída na base?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Puxar Dados / Atualizar'),
+            ),
+          ],
+        ),
+      );
+      if (querPuxar != true) return;
+    }
+
     if (_wizardState.statusConsulta == 'concluida') {
       final querNova = await showDialog<bool>(
         context: context,
@@ -300,7 +322,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       return;
     }
 
-    final result = await _showSelectProdutoDialog();
+    final isTimeoutOrError = _wizardState.statusConsulta == 'timeout' || _wizardState.statusConsulta == 'erro';
+    final result = await _showSelectProdutoDialog(hideForcarNova: isTimeoutOrError);
     if (result == null) return;
 
     final produto = result['produto'] as String;
@@ -335,10 +358,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         value: placa,
         vistoriaId: widget.vistoriaId,
         forcarNova: forcarNova,
-      )
-          .timeout(const Duration(minutes: 35), onTimeout: () {
-        throw Exception("Tempo limite de pesquisa excedido.");
-      });
+      );
 
       // Atualizar o banco de dados com os dados retornados
       final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
@@ -446,7 +466,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
   }
 
-  Future<Map<String, dynamic>?> _showSelectProdutoDialog() async {
+  Future<Map<String, dynamic>?> _showSelectProdutoDialog({bool hideForcarNova = false}) async {
     bool forcarNova = false;
     return showDialog<Map<String, dynamic>>(
       context: context,
@@ -459,9 +479,14 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                    'Dica: Para apenas atualizar/puxar o resultado de uma consulta demorada, deixe a caixa abaixo DESMARCADA.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey)),
+                if (!hideForcarNova)
+                  const Text(
+                      'Dica: Para apenas atualizar/puxar o resultado de uma consulta demorada, deixe a caixa abaixo DESMARCADA.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                if (hideForcarNova)
+                  const Text(
+                      'Selecione a base para puxar os dados atualizados.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 16),
                 ListTile(
                   title: const Text('AUTO BIN (Simples)'),
@@ -488,22 +513,24 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                   onTap: () => Navigator.pop(ctx,
                       {'produto': 'auto_leilao', 'forcarNova': forcarNova}),
                 ),
-                const Divider(),
-                CheckboxListTile(
-                  title: const Text('Forçar NOVA consulta',
-                      style: TextStyle(fontSize: 14)),
-                  subtitle: const Text(
-                      'Faz uma nova busca na base (Pode demorar mais)',
-                      style: TextStyle(fontSize: 11)),
-                  value: forcarNova,
-                  onChanged: (val) {
-                    setStateBuilder(() {
-                      forcarNova = val ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                ),
+                if (!hideForcarNova) ...[
+                  const Divider(),
+                  CheckboxListTile(
+                    title: const Text('Forçar NOVA consulta',
+                        style: TextStyle(fontSize: 14)),
+                    subtitle: const Text(
+                        'Faz uma nova busca na base (Pode demorar mais)',
+                        style: TextStyle(fontSize: 11)),
+                    value: forcarNova,
+                    onChanged: (val) {
+                      setStateBuilder(() {
+                        forcarNova = val ?? false;
+                      });
+                    },
+                    controlAffinity: ListTileControlAffinity.leading,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ],
               ],
             ),
             actions: [
@@ -1087,6 +1114,25 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                               padding: EdgeInsets.all(4.0),
                               child: Icon(Icons.cloud_off_rounded,
                                   color: Colors.redAccent, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_wizardState.statusConsulta == 'timeout')
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message:
+                              'A pesquisa está demorando. Toque para puxar os dados atualizados.',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.schedule_rounded,
+                                  color: Colors.amber, size: 22),
                             ),
                           ),
                         ),

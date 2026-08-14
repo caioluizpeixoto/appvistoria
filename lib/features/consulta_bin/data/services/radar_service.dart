@@ -88,7 +88,7 @@ class RadarService {
               'tokenConsulta': currentToken,
               'aguardarRetorno': false,
             },
-          ).timeout(const Duration(minutes: 2));
+          );
 
           isForcarNova = false;
           retryCount = 0;
@@ -141,12 +141,10 @@ class RadarService {
           }
           
           retryCount++;
-          if (currentToken == null && retryCount > 3) {
-             throw Exception('Falha de conexão. Verifique sua internet e tente novamente.');
-          } else if (currentToken != null && retryCount > 15) {
-             throw Exception('A conexão com o servidor está muito instável. Verifique sua internet.');
+          if (currentToken == null && retryCount > 5) {
+             throw Exception('Falha de conexão ao iniciar a pesquisa. Verifique sua internet e tente novamente.');
           }
-          
+          // Se currentToken != null, mantemos consultando indefinidamente pois está em processamento no backend.
           await Future.delayed(const Duration(seconds: 10));
         }
       }
@@ -166,14 +164,7 @@ class RadarService {
 
       return veiculo;
     } catch (e) {
-      await repository.atualizarConsulta(
-        idPesquisaRadar: idPesquisa,
-        status: 'erro',
-        retornoBruto: e.toString(),
-      );
-
       String mensagemErro = e.toString();
-
       if (e is FunctionException) {
         final details = e.details;
         if (details is Map && details.containsKey('error')) {
@@ -181,11 +172,23 @@ class RadarService {
         }
       }
 
-      if (e is TimeoutException || mensagemErro.contains('timeout')) {
+      bool isTimeout = e is TimeoutException ||
+          mensagemErro.toLowerCase().contains('timeout') ||
+          mensagemErro.contains('504') ||
+          mensagemErro.contains('503') ||
+          mensagemErro.contains('já está em andamento');
+
+      await repository.atualizarConsulta(
+        idPesquisaRadar: idPesquisa,
+        status: isTimeout ? 'timeout' : 'erro',
+        retornoBruto: e.toString(),
+      );
+
+      if (isTimeout) {
         mensagemErro =
-            'A consulta demorou muito para responder. Verifique sua conexão ou tente novamente.';
-      } else if (mensagemErro
-              .contains('ClientSoftware caused connection abort') ||
+            'A consulta está demorando muito para responder. Clique no relógio amarelo para puxar os dados.';
+        throw TimeoutException(mensagemErro);
+      } else if (mensagemErro.contains('ClientSoftware caused connection abort') ||
           mensagemErro.contains('SocketException') ||
           mensagemErro.contains('Failed host lookup')) {
         mensagemErro =

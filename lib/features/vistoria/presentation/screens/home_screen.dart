@@ -152,7 +152,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
       appBar: AppBar(
-        title: const Text('Prime Auto'),
+        title: Text(user?.userMetadata?['name'] as String? ?? 'App Vistoria'),
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu_rounded),
@@ -451,7 +451,7 @@ class _WelcomeBanner extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 padding: const EdgeInsets.all(2),
                 child: Image.asset(
-                  'assets/images/logo.pdf.png',
+                  'assets/images/logo.pdf.PNG',
                   fit: BoxFit.contain,
                 ),
               ),

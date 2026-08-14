@@ -38,6 +38,16 @@ Uint8List _processGrayscaleImage(Uint8List uint8list) {
   return uint8list;
 }
 
+Future<pw.ImageProvider?> _loadAssetImage(List<String> paths) async {
+  for (final path in paths) {
+    try {
+      final bytes = await rootBundle.load(path);
+      return pw.MemoryImage(bytes.buffer.asUint8List());
+    } catch (_) {}
+  }
+  return null;
+}
+
 String _cleanItemName(String rawId) {
   var clean = rawId.trim();
   clean = clean.replaceFirst(
@@ -248,15 +258,14 @@ class PdfGeneratorService {
     final styles = _PdfStyles(regular: fontRegular, bold: fontBold);
 
     // Carregar logo se existir (senão usa placeholder)
-    pw.ImageProvider? logoImage;
-    pw.ImageProvider? marcaAguaBw;
-    try {
-      final logoBytes = await rootBundle.load('assets/images/topo.pdf.png');
-      final uint8list = logoBytes.buffer.asUint8List();
-      logoImage = pw.MemoryImage(uint8list);
-
-      marcaAguaBw = logoImage;
-    } catch (_) {}
+    pw.ImageProvider? logoImage = await _loadAssetImage([
+      'assets/images/topo.pdf.png',
+      'assets/images/topo.pdf.PNG',
+      'assets/images/topo.png',
+      'assets/images/logo.pdf.png',
+      'assets/images/logo.png',
+    ]);
+    pw.ImageProvider? marcaAguaBw = logoImage;
 
     pw.ImageProvider? carroEstruturaImage;
     pw.ImageProvider? caminhaoEstruturaImage;
@@ -275,12 +284,11 @@ class PdfGeneratorService {
       carroPinturaImage = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (_) {}
 
-    try {
-      if (_globalRodapeImage == null) {
-        final bytes = await rootBundle.load('assets/images/rodape.pdf.png');
-        _globalRodapeImage = pw.MemoryImage(bytes.buffer.asUint8List());
-      }
-    } catch (_) {}
+    _globalRodapeImage = await _loadAssetImage([
+      'assets/images/logo.pdf.PNG',
+      'assets/images/logo.pdf.png',
+      'assets/images/logo.png',
+    ]);
 
     pw.ImageProvider? assinaturaImage;
     if (wizardState?.assinaturaPath != null) {
@@ -1077,7 +1085,7 @@ class PdfGeneratorService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.center,
                   children: [
-                    pw.Text('SUMARÉ VISTORIAS VEICULARES LTDA',
+                    pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(),
                         textAlign: pw.TextAlign.center,
                         style: pw.TextStyle(
                             font: styles.bold,
@@ -1111,9 +1119,15 @@ class PdfGeneratorService {
           ),
         ),
         if (_globalRodapeImage != null)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(right: 16),
-            child: pw.Image(_globalRodapeImage!, width: 120),
+          pw.Positioned(
+            right: 16,
+            top: 2,
+            bottom: 2,
+            child: pw.Container(
+              width: 80,
+              alignment: pw.Alignment.centerRight,
+              child: pw.Image(_globalRodapeImage!, fit: pw.BoxFit.contain),
+            ),
           ),
       ],
     );
@@ -1455,6 +1469,10 @@ class PdfGeneratorService {
         '<svg viewBox="0 0 24 24"><path fill="{color}" d="M12 1L3 5v2h18V5l-9-4zm-2 15h4V9h-4v7zm-5 0h4V9H5v7zm10 0h4V9h-4v7zM2 19h20v2H2v-2z"/></svg>';
     final String svgLeilao =
         '<svg viewBox="0 0 512 512"><path fill="{color}" d="M222.716,311.307l-109.3-84.325c-8.698-6.709-21.195-5.09-27.898,3.602c-6.708,8.691-5.103,21.189,3.601,27.898l109.293,84.318c8.705,6.708,21.196,5.103,27.905-3.595C233.026,330.506,231.414,318.015,222.716,311.307z"/><path fill="{color}" d="M236.318,67.662l109.307,84.318c8.698,6.716,21.189,5.104,27.898-3.594c6.709-8.698,5.097-21.182-3.601-27.898l-109.3-84.324c-8.698-6.709-21.189-5.09-27.898,3.601C226.015,48.462,227.628,60.954,236.318,67.662z"/><polygon fill="{color}" points="226.824,78.068 122.491,213.304 233.65,299.048 337.977,163.812"/><path fill="{color}" d="M501.529,363.144l-185.626-143.2l-32.864,42.598l185.633,143.2c11.764,9.075,28.652,6.901,37.72-4.864C515.474,389.107,513.293,372.219,501.529,363.144z"/><path fill="{color}" d="M186.936,409.748c0-14.274-11.565-25.847-25.84-25.847H39.689c-14.274,0-25.84,11.572-25.84,25.847v19.166h173.087V409.748z"/><rect fill="{color}" x="0" y="445.143" width="200.786" height="34.833"/></svg>';
+    final String svgLock =
+        '<svg viewBox="0 0 24 24"><path fill="{color}" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>';
+    final String svgChassis =
+        '<svg viewBox="0 0 24 24"><path fill="{color}" d="M6 3v2H4v2h2v10H4v2h2v2h2v-2h8v2h2v-2h2v-2h-2V7h2V5h-2V3h-2v2H8V3H6zm2 4h8v10H8V7z"/></svg>';
 
     pw.Widget buildBlock(String title, String bgType, String svgRaw) {
       PdfColor blockBgColor = PdfColors.white;
@@ -1480,9 +1498,9 @@ class PdfGeneratorService {
       final String finalSvg = svgRaw.replaceAll(
           '{color}', bgType == 'white' ? '#424242' : '#ffffff');
 
-      // Calculate block width for 5 items per row: (A4 width 595 - 40px margins - 4*6px spacing) / 5 = 106
+      // Calculate block width for 3 items per row: (A4 width 595 - 40px margins - 2*6px spacing) / 3 = 181
       return pw.Container(
-        width: 106,
+        width: 181,
         height: 62,
         decoration: pw.BoxDecoration(
           color: blockBgColor,
@@ -1761,26 +1779,25 @@ class PdfGeneratorService {
       'indicadorrestricaorenajud'
     ]);
 
-    final bool hasRestricoes = hasRenajud ||
-        checkAnyKey([
-          'ind_restricoes',
-          'indrestricoes',
-          'restricaotributaria',
-          'restricaojudicial',
-          'restricaoambiental',
-          'restricaoadministrativa',
-          'restricaorfb',
-          'restricoesbloqueioguincho',
-          'restricoesfurto',
-          'restricao1',
-          'restricao2',
-          'restricao3',
-          'restricao4',
-          'restricao1_br',
-          'restricao2_br',
-          'restricao3_br',
-          'restricao4_br'
-        ]);
+    final bool hasOutrasRestricoes = checkAnyKey([
+      'ind_restricoes',
+      'indrestricoes',
+      'restricaotributaria',
+      'restricaojudicial',
+      'restricaoambiental',
+      'restricaoadministrativa',
+      'restricaorfb',
+      'restricoesbloqueioguincho',
+      'restricoesfurto',
+      'restricao1',
+      'restricao2',
+      'restricao3',
+      'restricao4',
+      'restricao1_br',
+      'restricao2_br',
+      'restricao3_br',
+      'restricao4_br'
+    ]);
 
     final bool hasFinanciamento = checkAnyKey([
       'restricaofinanceira',
@@ -1876,7 +1893,7 @@ class PdfGeneratorService {
                         children: [
                           if (logo != null) pw.Image(logo, height: 85),
                           if (logo == null)
-                            pw.Text('PRIME AUTO',
+                            pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(),
                                 style: pw.TextStyle(
                                     color: PdfColors.white,
                                     font: styles.bold,
@@ -1972,11 +1989,28 @@ class PdfGeneratorService {
                                     mainAxisAlignment:
                                         pw.MainAxisAlignment.center,
                                     children: [
-                                      pw.Text('AUTO SCORE',
+                                      pw.Text(
+                                          (() {
+                                            final meta = Supabase.instance.client.auth.currentUser?.userMetadata;
+                                            final metaUnidade = (meta?['unidade'] as String?) ??
+                                                (meta?['empresa'] as String?) ??
+                                                (meta?['name'] as String?);
+                                            if (metaUnidade != null && metaUnidade.trim().isNotEmpty) {
+                                              return metaUnidade.trim().toUpperCase();
+                                            }
+                                            if (state?.unidade != null && state!.unidade.trim().isNotEmpty) {
+                                              return state.unidade.trim().toUpperCase();
+                                            }
+                                            if (vistoria.unidade != null && vistoria.unidade!.trim().isNotEmpty) {
+                                              return vistoria.unidade!.trim().toUpperCase();
+                                            }
+                                            return 'SUMARÉ VISTORIAS';
+                                          })(),
                                           style: pw.TextStyle(
                                               font: styles.bold,
-                                              fontSize: 12,
-                                              color: bannerColor)),
+                                              fontSize: 10,
+                                              color: bannerColor),
+                                          maxLines: 1),
                                       pw.Divider(color: greyBorder),
                                       pw.Text('CÓDIGO: ${vistoria.numeroLaudo}',
                                           style: pw.TextStyle(
@@ -2015,16 +2049,13 @@ class PdfGeneratorService {
                         buildBanner(
                             'INFORMAÇÕES BASEADAS NA CONSULTA AO VEÍCULO'),
 
-                        // Grid of 10 Blocks (5 cols x 2 rows)
+                        // Grid of 8 Blocks
                         pw.Wrap(
                           spacing: 6,
                           runSpacing: 6,
                           alignment: pw.WrapAlignment.start,
                           children: [
-                            buildBlock('RESTRIÇÕES',
-                                hasRestricoes ? 'red' : 'green', svgCarShield),
-                            buildBlock('DÉBITOS E\nMULTAS',
-                                hasDebitos ? 'yellow' : 'green', svgReceipt),
+
                             buildBlock(
                                 'LEILÃO /\nSINISTRO',
                                 (hasLeilao || hasSinistro) ? 'red' : 'green',
@@ -2033,18 +2064,20 @@ class PdfGeneratorService {
                                 hasRoubo ? 'red' : 'green', svgShieldSearch),
                             buildBlock('ROUBO /\nFURTO',
                                 hasRoubo ? 'red' : 'green', svgCarWarning),
-                            buildBlock('FINANCIAMENTO',
-                                hasFinanciamento ? 'yellow' : 'green', svgBank),
-                            buildBlock('COMUNICAÇÃO\nDE VENDA',
-                                hasComunicacao ? 'red' : 'green', svgHandshake),
-                            buildBlock(
-                                'IPVA\n(ÚLTIMOS 5 ANOS)',
-                                res['debitosipva'] == 'Sim' ? 'red' : 'green',
-                                svgCalendar),
-                            buildBlock('RECALL', hasRecall ? 'red' : 'green',
-                                svgCarWrench),
+                            buildBlock('RENAJUD',
+                                hasRenajud ? 'red' : 'green', svgLock),
+
                             buildBlock('ALERTA DE\nINDÍCIO', 'green',
                                 svgWarningTriangle),
+                            (() {
+                              String color = 'green';
+                              if (grupos['ESTRUTURA']!.any((item) => item['status'] == 2)) {
+                                color = 'red';
+                              } else if (grupos['ESTRUTURA']!.any((item) => item['status'] == 1)) {
+                                color = 'yellow';
+                              }
+                              return buildBlock('ESTRUTURA', color, svgChassis);
+                            })(),
                           ],
                         ),
 
@@ -4793,6 +4826,16 @@ class PdfGeneratorService {
                   ],
                 ),
               ),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'OBSERVAÇÃO: Os valores de peças e mão de obra apresentados neste relatório são estimativas geradas de forma automatizada por Inteligência Artificial. Eles não representam um orçamento exato ou valor de mercado definitivo, podendo sofrer variações conforme a região, oficina ou fornecedor.',
+                style: pw.TextStyle(
+                  fontSize: 7,
+                  color: PdfColors.grey700,
+                  fontStyle: pw.FontStyle.italic,
+                ),
+                textAlign: pw.TextAlign.justify,
+              ),
             ],
             pw.Spacer(),
             _buildFooter(vistoria, styles, ctx, assinatura,
@@ -5239,15 +5282,17 @@ class PdfGeneratorService {
   }
 
   static pw.Widget _buildParecerTecnicoBox(String parecerText, _PdfStyles styles) {
-    final primaryColor = PdfColor.fromHex('133B66');
+    final bgColor = const PdfColor.fromInt(0xFFFFC107); // Amarelo Escuro (Amber)
+    final borderColor = const PdfColor.fromInt(0xFFF57F17); // Laranja escuro para contraste
+    
     return pw.Container(
       width: double.infinity,
       margin: const pw.EdgeInsets.symmetric(vertical: 6),
-      padding: const pw.EdgeInsets.all(10),
+      padding: const pw.EdgeInsets.all(12),
       decoration: pw.BoxDecoration(
-        color: PdfColor.fromHex('F8F9FA'),
+        color: bgColor,
         borderRadius: pw.BorderRadius.circular(6),
-        border: pw.Border.all(color: primaryColor, width: 1),
+        border: pw.Border.all(color: borderColor, width: 2),
       ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -5258,26 +5303,26 @@ class PdfGeneratorService {
               pw.Container(
                 width: 4,
                 height: 12,
-                color: primaryColor,
+                color: PdfColors.black,
               ),
               pw.SizedBox(width: 6),
               pw.Text(
                 'PARECER TÉCNICO',
                 style: pw.TextStyle(
                   font: styles.bold,
-                  fontSize: 10,
-                  color: primaryColor,
+                  fontSize: 11,
+                  color: PdfColors.black,
                 ),
               ),
             ],
           ),
-          pw.SizedBox(height: 6),
+          pw.SizedBox(height: 8),
           pw.Text(
             parecerText,
             style: pw.TextStyle(
-              font: styles.regular,
-              fontSize: 9,
-              color: PdfColors.grey900,
+              font: styles.bold,
+              fontSize: 10,
+              color: PdfColors.black,
             ),
           ),
         ],
