@@ -185,7 +185,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                           size: 16, color: AppTheme.conforme),
                                       SizedBox(width: 6),
                                       Text(
-                                        'Ver Relatório Radar Consultas',
+                                        'Ver Relatório da Pesquisa Veicular',
                                         style: TextStyle(
                                           color: AppTheme.conforme,
                                           fontWeight: FontWeight.w600,

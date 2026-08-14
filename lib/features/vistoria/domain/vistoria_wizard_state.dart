@@ -96,7 +96,8 @@ class VistoriaWizardState extends ChangeNotifier {
       isChecklistPesado ||
       isChecklistPasseio ||
       isChecklistOnibus ||
-      isChecklistMicroOnibus;
+      isChecklistMicroOnibus ||
+      tipoEnum == TipoVistoria.vistoriaEntrada;
   bool get temCroqui =>
       tipoEnum != TipoVistoria.cautelarCaminhao && !isChecklist;
   bool get temAvarias => tipoEnum == TipoVistoria.carroComCroqui;
@@ -140,11 +141,11 @@ class VistoriaWizardState extends ChangeNotifier {
 
   int get totalSteps {
     if (isChecklistPesado) return 5;
-    if (isChecklistPasseio || isChecklistOnibus || isChecklistMicroOnibus)
-      return 4;
+    if (isChecklist) return 4;
     int count = 10;
     if (temCroqui) count++;
     if (temAvarias) count++;
+    if (isCaminhao) count++;
     return count;
   }
 

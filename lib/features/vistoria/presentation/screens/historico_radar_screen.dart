@@ -81,7 +81,7 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico Global Radar'),
+        title: const Text('Histórico de Consultas'),
         backgroundColor: AppTheme.primary,
         actions: [
           IconButton(
@@ -95,7 +95,7 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
           : _consultas.isEmpty
               ? const Center(
                   child:
-                      Text('Nenhuma consulta encontrada na sua conta Radar.'))
+                      Text('Nenhuma consulta veicular encontrada.'))
               : ListView.builder(
                   itemCount: _consultas.length,
                   itemBuilder: (context, index) {

@@ -382,7 +382,7 @@ class _VistoriaCard extends StatelessWidget {
                   },
                   icon: const Icon(Icons.cloud_download_rounded,
                       color: Colors.orange, size: 20),
-                  label: const Text('Baixar Pesquisa Radar Consultas Original',
+                  label: const Text('Baixar Pesquisa Veicular Original',
                       style: TextStyle(
                           color: Colors.orange, fontWeight: FontWeight.w600)),
                 ),
@@ -399,7 +399,7 @@ class _VistoriaCard extends StatelessWidget {
                   onPressed: null, // Desabilitado
                   icon: const Icon(Icons.cloud_off_rounded,
                       color: AppTheme.textHint, size: 20),
-                  label: const Text('Pesquisa Radar Consultas Sem PDF',
+                  label: const Text('Pesquisa Veicular Sem PDF',
                       style: TextStyle(
                           color: AppTheme.textHint,
                           fontWeight: FontWeight.w600)),

@@ -8,6 +8,7 @@ import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
+import '../../../../core/utils/veiculo_parser.dart';
 import 'package:drift/drift.dart' as drift;
 
 import '../../domain/vistoria_wizard_state.dart';
@@ -362,6 +363,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
       // Atualizar o banco de dados com os dados retornados
       final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
+      final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
       if (veiculoDb != null) {
         await _dao.atualizarVeiculo(VeiculosCompanion(
           id: drift.Value(veiculoDb.id),
@@ -374,11 +376,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
               ? veiculoApi.motor
               : veiculoDb.motorVeiculo),
-          marca: drift.Value(veiculoApi.marcaModelo.isNotEmpty
-              ? veiculoApi.marcaModelo.split(' ')[0]
+          marca: drift.Value(mm.marca.isNotEmpty
+              ? mm.marca
               : veiculoDb.marca),
-          modelo: drift.Value(veiculoApi.marcaModelo.isNotEmpty
-              ? veiculoApi.marcaModelo
+          modelo: drift.Value(mm.modelo.isNotEmpty
+              ? mm.modelo
               : veiculoDb.modelo),
           anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ??
               veiculoDb.anoFabricacao),
@@ -413,8 +415,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         _wizardState.placa = veiculoApi.placa.isNotEmpty ? veiculoApi.placa : _wizardState.placa;
         _wizardState.chassiVeiculo = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiVeiculo;
         _wizardState.motorVeiculo = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorVeiculo;
-        _wizardState.marca = veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo.split(' ')[0] : _wizardState.marca;
-        _wizardState.modelo = veiculoApi.marcaModelo.isNotEmpty ? veiculoApi.marcaModelo : _wizardState.modelo;
+        _wizardState.marca = mm.marca.isNotEmpty ? mm.marca : _wizardState.marca;
+        _wizardState.modelo = mm.modelo.isNotEmpty ? mm.modelo : _wizardState.modelo;
         _wizardState.anoFabricacao = veiculoApi.anoFabricacao.isNotEmpty ? veiculoApi.anoFabricacao : _wizardState.anoFabricacao;
         _wizardState.anoModelo = veiculoApi.anoModelo.isNotEmpty ? veiculoApi.anoModelo : _wizardState.anoModelo;
         _wizardState.cor = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.cor;
@@ -861,10 +863,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     await _salvar();
     if (!mounted) return;
 
-    if (_wizardState.isLastStep) {
+    if (_wizardState.currentStep >= _activeSteps.length - 1) {
       _confirmarFinalizar();
     } else {
-      _wizardState.nextStep();
+      _wizardState.goToStep(_wizardState.currentStep + 1);
       _pageController.animateToPage(
         _wizardState.currentStep,
         duration: const Duration(milliseconds: 350),
@@ -874,10 +876,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   }
 
   void _voltar() {
-    if (_wizardState.isFirstStep) {
+    if (_wizardState.currentStep <= 0) {
       _confirmarSair();
     } else {
-      _wizardState.prevStep();
+      _wizardState.goToStep(_wizardState.currentStep - 1);
       _pageController.animateToPage(
         _wizardState.currentStep,
         duration: const Duration(milliseconds: 350),
@@ -1215,8 +1217,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
             // ── Botões de navegação ───────────────────────────────────────
             bottomNavigationBar: _WizardNavBar(
-              isFirst: state.isFirstStep,
-              isLast: state.isLastStep,
+              isFirst: state.currentStep <= 0,
+              isLast: state.currentStep >= _activeSteps.length - 1,
               isSaving: _isSaving,
               onVoltar: _voltar,
               onSalvar: _salvar,

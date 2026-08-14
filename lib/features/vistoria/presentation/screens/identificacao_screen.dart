@@ -14,6 +14,7 @@ import '../../../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
+import '../../../../core/utils/veiculo_parser.dart';
 import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -92,8 +93,14 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         _placaEditCtrl.text = widget.dadosIniciais!['placa'] ?? '';
         _chassiEditCtrl.text = widget.dadosIniciais!['chassi'] ?? '';
         _motorEditCtrl.text = widget.dadosIniciais!['motor'] ?? '';
-        _marcaEditCtrl.text = widget.dadosIniciais!['marca'] ?? '';
-        _modeloEditCtrl.text = widget.dadosIniciais!['modelo'] ?? '';
+        
+        final rawMarcaModelo = widget.dadosIniciais!['marcaModelo'] ??
+            widget.dadosIniciais!['marcamodelo'] ??
+            '${widget.dadosIniciais!['marca'] ?? ''} ${widget.dadosIniciais!['modelo'] ?? ''}'.trim();
+        final mm = VeiculoParser.extrairMarcaModelo(rawMarcaModelo);
+        _marcaEditCtrl.text = mm.marca.isNotEmpty ? mm.marca : (widget.dadosIniciais!['marca'] ?? '');
+        _modeloEditCtrl.text = mm.modelo.isNotEmpty ? mm.modelo : (widget.dadosIniciais!['modelo'] ?? '');
+
         _anoFabEditCtrl.text = widget.dadosIniciais!['anoFabricacao'] ?? '';
         _anoModEditCtrl.text = widget.dadosIniciais!['anoModelo'] ?? '';
         _corEditCtrl.text = widget.dadosIniciais!['cor'] ?? '';
@@ -154,9 +161,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       _chassiEditCtrl.text = veiculo.chassi;
       _motorEditCtrl.text = veiculo.motor;
 
-      final mm = veiculo.marcaModelo.split('/');
-      _marcaEditCtrl.text = mm.isNotEmpty ? mm[0].trim() : '';
-      _modeloEditCtrl.text = mm.length > 1 ? mm[1].trim() : '';
+      final mm = VeiculoParser.extrairMarcaModelo(veiculo.marcaModelo);
+      _marcaEditCtrl.text = mm.marca;
+      _modeloEditCtrl.text = mm.modelo;
 
       _anoFabEditCtrl.text = veiculo.anoFabricacao;
       _anoModEditCtrl.text = veiculo.anoModelo;
@@ -826,9 +833,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             .then((veiculoApi) async {
           final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
           if (veiculoDb != null) {
-            final mm = veiculoApi.marcaModelo.split('/');
-            final marca = mm.isNotEmpty ? mm[0].trim() : '';
-            final modelo = mm.length > 1 ? mm[1].trim() : '';
+            final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
+            final marca = mm.marca;
+            final modelo = mm.modelo;
 
             await dao.atualizarVeiculo(VeiculosCompanion(
               id: drift.Value(veiculoDb.id),

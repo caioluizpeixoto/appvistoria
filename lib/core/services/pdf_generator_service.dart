@@ -24,7 +24,9 @@ import 'pdf_radar_generator.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'pdf_checklist_generator.dart';
+import '../utils/veiculo_parser.dart';
 import '../../features/consulta_bin/domain/entities/radar_veiculo.dart';
+import 'package:flutter_html_to_pdf/flutter_html_to_pdf.dart';
 
 pw.ImageProvider? _globalRodapeImage;
 
@@ -90,6 +92,19 @@ const _kGreyDark = PdfColor.fromInt(0xFF666666);
 const _kGreen = PdfColor.fromInt(0xFF8BC34A);
 const _kOrange = PdfColor.fromInt(0xFFFFCA28);
 const _kRed = PdfColor.fromInt(0xFFEF5350);
+
+bool _isStatusConformeOuOk(String status) {
+  if (status.isEmpty) return true;
+  final s = status.trim().toUpperCase();
+  if (s == 'CONFORME' || s == 'OK' || s == 'SIM') return true;
+  if (s == 'NÃO ANALISADO' || s == 'NAO ANALISADO' || s == 'NÃO APLICÁVEL' || s == 'NAO APLICAVEL') return true;
+  if (s.contains('PADRÃO') || s.contains('PADRAO')) return true;
+  if (s.contains('ORIGINAL')) return true;
+  if (s.contains('GRAVADO') && !s.contains('SEM GRAVAÇÃO') && !s.contains('SEM GRAVACAO')) return true;
+  if (s.contains('FUNCIONAMENTO') && !s.contains('NÃO') && !s.contains('NAO') && !s.contains('SEM')) return true;
+  if (s.contains('CONFORME') && !s.contains('NÃO CONFORME') && !s.contains('NAO CONFORME')) return true;
+  return false;
+}
 
 class PdfGeneratorService {
   Future<File> generateLaudoPdf({
@@ -233,7 +248,13 @@ class PdfGeneratorService {
 
     // Busca histórico radar (se houver)
     final dao = sl<AutocredDao>();
-    final consulta = await dao.buscarConsultaPorVistoria(vistoria.id);
+    var consulta = await dao.buscarConsultaPorVistoria(vistoria.id);
+    if (consulta == null && veiculo.placa.trim().isNotEmpty) {
+      consulta = await dao.buscarConsultaPorPlaca(veiculo.placa.trim());
+    }
+    if (consulta == null && (veiculo.chassiVeiculo ?? '').trim().isNotEmpty) {
+      consulta = await dao.buscarConsultaPorChassi((veiculo.chassiVeiculo ?? '').trim());
+    }
     RadarVeiculo? radarVeiculo;
     Map<String, dynamic>? dadosConsultaJson;
     if (consulta != null && consulta.dadosTratadosJson != null) {
@@ -891,30 +912,36 @@ class PdfGeneratorService {
       final wState = wizardState;
       if (wState != null) {
         apontamentosList = wState.checklistStatus.entries
-            .where((e) =>
-                e.value != 'CONFORME' &&
-                e.value != 'NÃO ANALISADO' &&
-                !e.value.toUpperCase().contains('ORIGINAL') &&
-                !e.value.toUpperCase().contains('PADRÃO DO FABRICANTE'))
+            .where((e) {
+              final status = e.value;
+              final obs = wState.checklistObs[e.key] ?? '';
+              final isOk = _isStatusConformeOuOk(status);
+              if (isOk && obs.trim().isEmpty) return false;
+              if (isOk && obs.trim().isNotEmpty) {
+                final obsUpper = obs.trim().toUpperCase();
+                if (_isStatusConformeOuOk(obsUpper)) return false;
+              }
+              return true;
+            })
             .map((e) {
-          final nomeLimpo = _cleanItemName(e.key);
-          final obs = wState.checklistObs[e.key] ?? '';
-          final valUpper = e.value.toUpperCase();
-          final obsUpper = obs.toUpperCase();
-          final isSemAcesso = valUpper.contains('SEM ACESSO') ||
-              valUpper.contains('SEMA ACESSO') ||
-              valUpper.contains('NÃO LOCALIZADO') ||
-              valUpper.contains('NAO LOCALIZADO') ||
-              valUpper.contains('NÃO CONSTA') ||
-              valUpper.contains('NAO CONSTA') ||
-              obsUpper.contains('SEM ACESSO') ||
-              obsUpper.contains('SEMA ACESSO');
+              final nomeLimpo = _cleanItemName(e.key);
+              final obs = wState.checklistObs[e.key] ?? '';
+              final valUpper = e.value.toUpperCase();
+              final obsUpper = obs.toUpperCase();
+              final isSemAcesso = valUpper.contains('SEM ACESSO') ||
+                  valUpper.contains('SEMA ACESSO') ||
+                  valUpper.contains('NÃO LOCALIZADO') ||
+                  valUpper.contains('NAO LOCALIZADO') ||
+                  valUpper.contains('NÃO CONSTA') ||
+                  valUpper.contains('NAO CONSTA') ||
+                  obsUpper.contains('SEM ACESSO') ||
+                  obsUpper.contains('SEMA ACESSO');
 
-          if (isSemAcesso) {
-            return '$nomeLimpo: ${e.value} [ATENÇÃO: ITEM SEM ACESSO / NÃO É AVARIA - VALOR PEÇA R\$ 0,00 E MÃO DE OBRA R\$ 0,00]${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
-          }
-          return '$nomeLimpo: ${e.value}${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
-        }).toList();
+              if (isSemAcesso) {
+                return '$nomeLimpo: ${e.value} [ATENÇÃO: ITEM SEM ACESSO / NÃO É AVARIA - VALOR PEÇA R\$ 0,00 E MÃO DE OBRA R\$ 0,00]${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
+              }
+              return '$nomeLimpo: ${e.value}${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
+            }).toList();
       }
 
       final resFicha = await Supabase.instance.client.functions.invoke(
@@ -1001,30 +1028,133 @@ class PdfGeneratorService {
     ));
 
 
-    // ── Anexar Pesquisa (Radar) se existir ──────────────────────────────────
+    Uint8List finalBytes = await pdf.save();
+
+    // ── Anexar Pesquisa (Radar) se existir (Baixando PDF / Convertendo HTML) ───
     try {
       final autocredDao = sl<AutocredDao>();
-      final consulta = await autocredDao.buscarConsultaPorVistoria(vistoria.id);
-      if (consulta != null &&
-          consulta.dadosTratadosJson != null &&
-          consulta.dadosTratadosJson!.isNotEmpty) {
-        final Map<String, dynamic> dadosPesquisa =
-            jsonDecode(consulta.dadosTratadosJson!);
-        final radarPages = await PdfRadarGenerator.buildRadarPages(
-          dadosPesquisa,
-          footerWidget: _buildFooter(vistoria, styles, null, assinaturaImage,
-              assinaturaCliente: assinaturaClienteImage, showSignatures: true),
-        );
-        for (var page in radarPages) {
-          pdf.addPage(page);
+      var consulta = await autocredDao.buscarConsultaPorVistoria(vistoria.id);
+      if (consulta == null && veiculo.placa.trim().isNotEmpty) {
+        consulta = await autocredDao.buscarConsultaPorPlaca(veiculo.placa.trim());
+      }
+      if (consulta == null && (veiculo.chassiVeiculo ?? '').trim().isNotEmpty) {
+        consulta = await autocredDao.buscarConsultaPorChassi((veiculo.chassiVeiculo ?? '').trim());
+      }
+
+      if (consulta != null) {
+        Uint8List? bytesRadar;
+        final url = consulta.arquivoPesquisaUrl;
+
+        if (url != null && url.trim().isNotEmpty && url.startsWith('http')) {
+          try {
+            final dio = Dio();
+            final response = await dio.get<List<int>>(
+              url,
+              options: Options(
+                responseType: ResponseType.bytes,
+                sendTimeout: const Duration(seconds: 20),
+                receiveTimeout: const Duration(seconds: 20),
+              ),
+            );
+
+            if (response.statusCode == 200 && response.data != null) {
+              final rawBytes = Uint8List.fromList(response.data!);
+
+              // Checa se já é PDF binário (começa com '%PDF')
+              final isPdf = rawBytes.length > 4 &&
+                  rawBytes[0] == 0x25 && // %
+                  rawBytes[1] == 0x50 && // P
+                  rawBytes[2] == 0x44 && // D
+                  rawBytes[3] == 0x46; // F
+
+              if (isPdf) {
+                bytesRadar = rawBytes;
+              } else {
+                // Conteúdo é página HTML -> Converte para PDF ajustando margens e escala
+                final htmlContent = utf8.decode(rawBytes, allowMalformed: true);
+                
+                // Injeta regras de CSS para garantir que tabelas e bordas caibam no A4 sem cortes
+                const cssPrintFix = '''
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    zoom: 1.0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+  table, .table, div, .container, .row, p, span {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+</style>
+''';
+
+                String adjustedHtml = htmlContent;
+                if (adjustedHtml.contains('</head>')) {
+                  adjustedHtml = adjustedHtml.replaceFirst('</head>', '$cssPrintFix</head>');
+                } else if (adjustedHtml.contains('<body')) {
+                  adjustedHtml = adjustedHtml.replaceFirst('<body', '$cssPrintFix<body');
+                } else {
+                  adjustedHtml = '$cssPrintFix$adjustedHtml';
+                }
+
+                final tempDir = await getTemporaryDirectory();
+                final convertedFile = await FlutterHtmlToPdf.convertFromHtmlContent(
+                  adjustedHtml,
+                  tempDir.path,
+                  'radar_temp_${DateTime.now().millisecondsSinceEpoch}',
+                );
+                if (await convertedFile.exists()) {
+                  bytesRadar = await convertedFile.readAsBytes();
+                  try {
+                    await convertedFile.delete();
+                  } catch (_) {}
+                }
+              }
+            }
+          } catch (err) {
+            print('Aviso ao baixar/converter HTML do Radar para PDF: $err');
+          }
+        }
+
+        if (bytesRadar != null && bytesRadar.isNotEmpty) {
+          final sf.PdfDocument docPrincipal = sf.PdfDocument(inputBytes: finalBytes);
+          final sf.PdfDocument docRadar = sf.PdfDocument(inputBytes: bytesRadar);
+
+          for (int i = 0; i < docRadar.pages.count; i++) {
+            final sf.PdfPage templatePage = docRadar.pages[i];
+            final sf.PdfPage novaPagina = docPrincipal.pages.add();
+            final ui.Size clientSize = novaPagina.getClientSize();
+
+            // Preenche 100% da largura da página alinhando com as outras páginas do laudo
+            final double scale = clientSize.width / templatePage.size.width;
+            final double drawWidth = clientSize.width;
+            final double drawHeight = templatePage.size.height * scale;
+
+            novaPagina.graphics.drawPdfTemplate(
+              templatePage.createTemplate(),
+              const ui.Offset(0, 0),
+              ui.Size(drawWidth, drawHeight),
+            );
+          }
+
+          finalBytes = Uint8List.fromList(docPrincipal.saveSync());
+          docPrincipal.dispose();
+          docRadar.dispose();
         }
       }
     } catch (e, stackTrace) {
-      print('Erro ao anexar pesquisa Radar ao PDF: $e');
+      print('Erro ao baixar e mesclar PDF/HTML da Radar: $e');
       print('Stack trace: $stackTrace');
     }
-
-    final Uint8List finalBytes = await pdf.save();
 
     final dir = await getApplicationDocumentsDirectory();
     final placaClean =
@@ -1633,19 +1763,9 @@ class PdfGeneratorService {
 
     final rawMarcaModelo =
         getFirstValid([res['marca_modelo'], res['marcamodelo']]);
-    String? fallbackMarca;
-    String? fallbackModelo;
-    if (rawMarcaModelo != null && rawMarcaModelo.contains('/')) {
-      final parts = rawMarcaModelo.split('/');
-      fallbackMarca = parts[0].trim();
-      fallbackModelo = parts.sublist(1).join('/').trim();
-    } else if (rawMarcaModelo != null && rawMarcaModelo.contains(' ')) {
-      final parts = rawMarcaModelo.split(' ');
-      fallbackMarca = parts[0].trim();
-      fallbackModelo = parts.sublist(1).join(' ').trim();
-    } else {
-      fallbackModelo = rawMarcaModelo;
-    }
+    final parsedMM = VeiculoParser.extrairMarcaModelo(rawMarcaModelo);
+    final fallbackMarca = parsedMM.marca.isNotEmpty ? parsedMM.marca : null;
+    final fallbackModelo = parsedMM.modelo.isNotEmpty ? parsedMM.modelo : null;
 
     final valMarca = getFirstValid(
                 [veiculo.marca, state?.marca, res['marca'], fallbackMarca])
@@ -3259,10 +3379,9 @@ class PdfGeneratorService {
                                       ? wizardState!.marca
                                       : (veiculo.marca?.isNotEmpty == true)
                                           ? veiculo.marca!
-                                          : (radarVeiculo
-                                                  ?.resultadoCompleto['marca']
-                                                  ?.toString() ??
-                                              '-'),
+                                          : (VeiculoParser.extrairMarcaModelo(radarVeiculo?.marcaModelo ?? radarVeiculo?.resultadoCompleto['marcamodelo']?.toString()).marca.isNotEmpty
+                                              ? VeiculoParser.extrairMarcaModelo(radarVeiculo?.marcaModelo ?? radarVeiculo?.resultadoCompleto['marcamodelo']?.toString()).marca
+                                              : (radarVeiculo?.resultadoCompleto['marca']?.toString() ?? '-')),
                                   styles),
                               _buildKvSmall(
                                   'MODELO:',
@@ -3270,10 +3389,9 @@ class PdfGeneratorService {
                                       ? wizardState!.modelo
                                       : (veiculo.modelo?.isNotEmpty == true)
                                           ? veiculo.modelo!
-                                          : (radarVeiculo
-                                                  ?.resultadoCompleto['modelo']
-                                                  ?.toString() ??
-                                              '-'),
+                                          : (VeiculoParser.extrairMarcaModelo(radarVeiculo?.marcaModelo ?? radarVeiculo?.resultadoCompleto['marcamodelo']?.toString()).modelo.isNotEmpty
+                                              ? VeiculoParser.extrairMarcaModelo(radarVeiculo?.marcaModelo ?? radarVeiculo?.resultadoCompleto['marcamodelo']?.toString()).modelo
+                                              : (radarVeiculo?.resultadoCompleto['modelo']?.toString() ?? '-')),
                                   styles),
                             ])),
                         pw.Expanded(
@@ -4642,12 +4760,18 @@ class PdfGeneratorService {
         final apontamentosOriginais = data['apontamentos_veiculo'] is List
             ? (data['apontamentos_veiculo'] as List)
             : [];
+        bool isZeroCurrency(dynamic val) {
+          if (val == null) return true;
+          final str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
+          return str.isEmpty || int.tryParse(str) == 0;
+        }
+
         final validApontamentos = apontamentosOriginais.where((item) {
           final pecaUpper =
               (item['peca_ou_problema']?.toString() ?? '').toUpperCase();
           final obsUpper =
               (item['observacao_indicada']?.toString() ?? '').toUpperCase();
-          return !(pecaUpper.contains('SEM ACESSO') ||
+          final isNoAvaria = pecaUpper.contains('SEM ACESSO') ||
               pecaUpper.contains('SEMA ACESSO') ||
               obsUpper.contains('SEM ACESSO') ||
               obsUpper.contains('SEMA ACESSO') ||
@@ -4655,7 +4779,24 @@ class PdfGeneratorService {
               obsUpper.contains('NAO E AVARIA') ||
               obsUpper.contains('NÃO REPRESENTA AVARIA') ||
               obsUpper.contains('OBSTRUÍDO') ||
-              obsUpper.contains('OBSTRUIDO'));
+              obsUpper.contains('OBSTRUIDO') ||
+              obsUpper.contains('DENTRO DOS PADRÕES') ||
+              obsUpper.contains('DENTRO DOS PADROES') ||
+              obsUpper.contains('PADRÃO DE FÁBRICA') ||
+              obsUpper.contains('PADRAO DE FABRICA') ||
+              obsUpper.contains('PADRÃO DO FABRICANTE') ||
+              obsUpper.contains('SEM AVARIA');
+
+          if (isNoAvaria) return false;
+
+          final valPecaZero = isZeroCurrency(item['valor_peca_estimado']);
+          final valMaoObraZero = isZeroCurrency(item['valor_mao_de_obra_estimado']);
+
+          if (valPecaZero && valMaoObraZero) {
+            return false;
+          }
+
+          return true;
         }).toList();
 
         return pw.Column(

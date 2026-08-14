@@ -16,6 +16,18 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
+    project.plugins.withId("com.android.library") {
+        val androidExtension = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
+        if (androidExtension != null && androidExtension.namespace == null) {
+            if (project.name == "flutter_html_to_pdf") {
+                androidExtension.namespace = "com.afur.flutter_html_to_pdf"
+            } else {
+                androidExtension.namespace = "com.example.${project.name.replace("-", "_")}"
+            }
+        }
+    }
+}
+subprojects {
     project.evaluationDependsOn(":app")
 }
 

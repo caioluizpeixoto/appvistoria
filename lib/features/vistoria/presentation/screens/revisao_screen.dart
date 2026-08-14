@@ -9,6 +9,7 @@ import '../../../../injection_container.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
+import '../../../../core/utils/veiculo_parser.dart';
 import '../../domain/vistoria_wizard_state.dart';
 
 class RevisaoScreen extends StatefulWidget {
@@ -78,9 +79,9 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
         if (nuvem.isNotEmpty) {
           try {
             final radarData = RadarVeiculo.fromJson(nuvem.first['dados_tratados']);
-            final mm = radarData.marcaModelo.split('/');
-            final marca = mm.isNotEmpty ? mm[0].trim() : '';
-            final modelo = mm.length > 1 ? mm[1].trim() : '';
+            final mm = VeiculoParser.extrairMarcaModelo(radarData.marcaModelo);
+            final marca = mm.marca;
+            final modelo = mm.modelo;
             
             await _dao.atualizarVeiculo(VeiculosCompanion(
               id: drift.Value(_veiculo!.id),

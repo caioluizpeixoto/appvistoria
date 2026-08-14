@@ -6,6 +6,7 @@ import '../../../domain/vistoria_wizard_state.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../../../../core/services/ocr_crlv_service.dart';
+import '../../../../../core/utils/veiculo_parser.dart';
 import '../placa_camera_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -532,7 +533,11 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
           if (result.combustivel.isNotEmpty) _combustivelCtrl.text = result.combustivel;
           if (result.anoFabricacao.isNotEmpty) _anoFabCtrl.text = result.anoFabricacao;
           if (result.anoModelo.isNotEmpty) _anoModCtrl.text = result.anoModelo;
-          if (result.marcaModelo.isNotEmpty) _marcaCtrl.text = result.marcaModelo;
+          if (result.marcaModelo.isNotEmpty) {
+            final mm = VeiculoParser.extrairMarcaModelo(result.marcaModelo);
+            if (mm.marca.isNotEmpty) _marcaCtrl.text = mm.marca;
+            if (mm.modelo.isNotEmpty) _modeloCtrl.text = mm.modelo;
+          }
         });
 
         if (mounted) {
