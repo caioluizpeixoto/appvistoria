@@ -3,8 +3,7 @@ import 'package:intl/intl.dart';
 import '../../../../injection_container.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../consulta_bin/data/services/radar_service.dart';
-
-import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/services/pdf_radar_generator.dart';
 
 class HistoricoRadarScreen extends StatefulWidget {
   const HistoricoRadarScreen({Key? key}) : super(key: key);
@@ -44,36 +43,38 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
 
   Future<void> _baixarEVisualizar(Map<String, dynamic> consulta) async {
     final token = consulta['token'];
+    final paramValor = consulta['parametro_valor']?.toString() ?? '';
 
-    if (token == null) return;
-
-    // Se tiver o link de visualização, abre direto
-    if (consulta['view'] != null && consulta['view']['full'] != null) {
-      final url = Uri.parse(consulta['view']['full']);
-      try {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Não foi possível abrir o link da consulta: $e')),
-          );
-        }
-      }
-    }
-
-    // Aproveita para baixar e fazer cache em background silenciosamente
+    setState(() => _isLoading = true);
     try {
-      await _radarService.consultarVeiculo(
-        produto: 'auto_bin',
-        param: 'placa',
-        value: consulta['parametro_valor'] ?? '',
+      final veiculo = await _radarService.consultarVeiculo(
+        produto: consulta['codigo_produto'] ?? 'auto_bin',
+        param: consulta['parametro'] ?? 'placa',
+        value: paramValor,
         vistoriaId: '',
-        forcarNova: true,
+        forcarNova: false,
         tokenConsulta: token,
       );
-    } catch (_) {
-      // Falha silenciosa no background
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        final urlView = consulta['view']?['full']?.toString() ??
+            consulta['arquivo_pesquisa_url']?.toString() ??
+            veiculo.arquivoPesquisaUrl;
+        await PdfRadarGenerator.visualizarPesquisaPdf(
+          context: context,
+          dadosPesquisa: veiculo.resultadoCompleto,
+          urlPesquisa: urlView,
+          placa: veiculo.placa,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao abrir relatório da pesquisa: $e')),
+        );
+      }
     }
   }
 

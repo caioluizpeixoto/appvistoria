@@ -7,6 +7,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
 import '../../data/services/radar_service.dart';
 import '../../domain/entities/radar_historico.dart';
+import '../../../../core/services/pdf_radar_generator.dart';
+import 'dart:convert';
 
 class HistoricoConsultasScreen extends StatefulWidget {
   const HistoricoConsultasScreen({super.key});
@@ -165,19 +167,31 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                 const SizedBox(height: 12),
                                 InkWell(
                                   onTap: () async {
-                                    final uri =
-                                        Uri.parse(item.arquivoPesquisaUrl!);
-                                    try {
-                                      await launchUrl(uri,
-                                          mode: LaunchMode.externalApplication);
-                                    } catch (e) {
-                                      if (mounted) {
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(const SnackBar(
-                                                content: Text(
-                                                    'Não foi possível abrir o link.')));
-                                      }
+                                    Map<String, dynamic> dados = {};
+                                    if (item.dadosTratados.isNotEmpty) {
+                                      dados = item.dadosTratados;
+                                    } else if (item.retornoBruto != null &&
+                                        item.retornoBruto!.isNotEmpty) {
+                                      try {
+                                        final dec = jsonDecode(item.retornoBruto!);
+                                        if (dec is Map<String, dynamic>) {
+                                          dados = dec;
+                                        }
+                                      } catch (_) {}
                                     }
+                                    if (dados.isEmpty) {
+                                      dados = {
+                                        'placa': item.placa ?? '',
+                                        'chassi': item.chassi ?? '',
+                                        'motor': item.motor ?? '',
+                                      };
+                                    }
+                                    await PdfRadarGenerator.visualizarPesquisaPdf(
+                                      context: context,
+                                      dadosPesquisa: dados,
+                                      urlPesquisa: item.arquivoPesquisaUrl,
+                                      placa: item.placa,
+                                    );
                                   },
                                   child: Row(
                                     children: const [

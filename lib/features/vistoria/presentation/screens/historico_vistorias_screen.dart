@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../database/app_database.dart';
 import '../../../../database/daos/autocred_dao.dart';
+import '../../../../core/services/pdf_radar_generator.dart';
+import 'dart:convert';
 
 class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
@@ -370,19 +372,41 @@ class _VistoriaCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: () async {
-                    final urlFinal =
-                        (webhookPdfUrl != null && webhookPdfUrl!.isNotEmpty)
-                            ? webhookPdfUrl
-                            : consulta?.arquivoPesquisaUrl;
-                    final uri = Uri.parse(urlFinal!);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri,
-                          mode: LaunchMode.externalApplication);
+                    Map<String, dynamic> dadosPesquisa = {};
+                    if (consulta?.dadosTratados != null && consulta!.dadosTratados.isNotEmpty) {
+                      dadosPesquisa = consulta!.dadosTratados;
+                    } else if (consulta?.retornoBruto != null && consulta!.retornoBruto.isNotEmpty) {
+                      try {
+                        final dec = jsonDecode(consulta!.retornoBruto);
+                        if (dec is Map<String, dynamic>) dadosPesquisa = dec;
+                      } catch (_) {}
                     }
+                    if (dadosPesquisa.isEmpty) {
+                      dadosPesquisa = {
+                        'placa': veiculo.placa,
+                        'chassi': veiculo.chassiVeiculo ?? '',
+                        'motor': veiculo.motorVeiculo ?? '',
+                        'marca': veiculo.marca ?? '',
+                        'modelo': veiculo.modelo ?? '',
+                        'marcamodelo': '${veiculo.marca ?? ''}/${veiculo.modelo ?? ''}',
+                        'anofabricacao': veiculo.anoFabricacao?.toString() ?? '',
+                        'anomodelo': veiculo.anoModelo?.toString() ?? '',
+                        'cor': veiculo.cor ?? '',
+                        'renavam': veiculo.renavam ?? '',
+                        'municipio': veiculo.municipio ?? '',
+                        'uf': veiculo.uf ?? '',
+                      };
+                    }
+                    await PdfRadarGenerator.visualizarPesquisaPdf(
+                      context: context,
+                      dadosPesquisa: dadosPesquisa,
+                      urlPesquisa: webhookPdfUrl ?? consulta?.arquivoPesquisaUrl,
+                      placa: veiculo.placa,
+                    );
                   },
-                  icon: const Icon(Icons.cloud_download_rounded,
+                  icon: const Icon(Icons.picture_as_pdf_rounded,
                       color: Colors.orange, size: 20),
-                  label: const Text('Baixar Pesquisa Veicular Original',
+                  label: const Text('Ver Pesquisa Veicular Original',
                       style: TextStyle(
                           color: Colors.orange, fontWeight: FontWeight.w600)),
                 ),

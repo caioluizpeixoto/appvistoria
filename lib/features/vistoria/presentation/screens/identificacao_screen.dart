@@ -15,6 +15,7 @@ import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
 import '../../../../core/utils/veiculo_parser.dart';
+import '../../../../core/services/pdf_radar_generator.dart';
 import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -61,6 +62,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   String _mensagemCarregamento = '';
   String? _arquivoPesquisaUrl;
   String? _situacaoVeiculo;
+  Map<String, dynamic>? _dadosPesquisaCarregada;
 
   // Modo de entrada da busca: 'placa', 'chassi', ou 'motor'
   String _modoEntrada = 'placa';
@@ -176,6 +178,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           : veiculo.informacoesRelevantes;
       _arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl;
       _situacaoVeiculo = veiculo.situacao;
+      _dadosPesquisaCarregada = veiculo.resultadoCompleto;
     });
   }
 
@@ -1140,7 +1143,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       ),
                       const SizedBox(width: 10),
 
-                      // Botão 2: Baixar a Pesquisa
+                      // Botão 2: Visualizar a Pesquisa
                       Expanded(
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
@@ -1151,36 +1154,34 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                             ),
                           ),
                           onPressed: () async {
-                            if (_arquivoPesquisaUrl != null &&
-                                _arquivoPesquisaUrl!.isNotEmpty) {
-                              final uri = Uri.parse(_arquivoPesquisaUrl!);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(uri,
-                                    mode: LaunchMode.externalApplication);
-                              } else {
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content:
-                                          Text('Não foi possível abrir o PDF.'),
-                                    ),
-                                  );
-                                }
-                              }
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'O relatório PDF da pesquisa está sendo processado.'),
-                                  backgroundColor: AppTheme.comObs,
-                                ),
-                              );
-                            }
+                            final dados = _dadosPesquisaCarregada ?? {
+                              'placa': _placaEditCtrl.text,
+                              'chassi': _chassiEditCtrl.text,
+                              'motor': _motorEditCtrl.text,
+                              'marca': _marcaEditCtrl.text,
+                              'modelo': _modeloEditCtrl.text,
+                              'marcamodelo': '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
+                              'anoFabricacao': _anoFabEditCtrl.text,
+                              'anoModelo': _anoModEditCtrl.text,
+                              'cor': _corEditCtrl.text,
+                              'renavam': _renavamEditCtrl.text,
+                              'municipio': _municipioEditCtrl.text,
+                              'uf': _ufEditCtrl.text,
+                              'restricoes1': _restricoesEditCtrl.text,
+                              'situacao': _situacaoVeiculo ?? '',
+                            };
+                            await PdfRadarGenerator.visualizarPesquisaPdf(
+                              context: context,
+                              dadosPesquisa: dados,
+                              urlPesquisa: _arquivoPesquisaUrl,
+                              placa: _placaEditCtrl.text,
+                            );
                           },
-                          icon: const Icon(Icons.download_rounded, size: 20),
+                          icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
                           label: const Text(
-                            'Baixar a Pesquisa',
+                            'Visualizar Pesquisa',
                             style: TextStyle(
+                              color: Colors.white,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                             ),
@@ -1316,26 +1317,39 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                       ],
                     ),
                   ),
-                  if (_arquivoPesquisaUrl != null &&
-                      _arquivoPesquisaUrl!.isNotEmpty)
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                      ),
-                      onPressed: () async {
-                        final uri = Uri.parse(_arquivoPesquisaUrl!);
-                        if (await canLaunchUrl(uri)) {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        }
-                      },
-                      icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
-                      label: const Text('Baixar Laudo',
-                          style: TextStyle(fontSize: 12)),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                     ),
+                    onPressed: () async {
+                      final dados = _dadosPesquisaCarregada ?? {
+                        'placa': _placaEditCtrl.text,
+                        'chassi': _chassiEditCtrl.text,
+                        'motor': _motorEditCtrl.text,
+                        'marca': _marcaEditCtrl.text,
+                        'modelo': _modeloEditCtrl.text,
+                        'marcamodelo': '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
+                        'anoFabricacao': _anoFabEditCtrl.text,
+                        'anoModelo': _anoModEditCtrl.text,
+                        'cor': _corEditCtrl.text,
+                        'renavam': _renavamEditCtrl.text,
+                        'municipio': _municipioEditCtrl.text,
+                        'uf': _ufEditCtrl.text,
+                      };
+                      await PdfRadarGenerator.visualizarPesquisaPdf(
+                        context: context,
+                        dadosPesquisa: dados,
+                        urlPesquisa: _arquivoPesquisaUrl,
+                        placa: _placaEditCtrl.text,
+                      );
+                    },
+                    icon: const Icon(Icons.picture_as_pdf_rounded, size: 16),
+                    label: const Text('Ver Pesquisa',
+                        style: TextStyle(fontSize: 12)),
+                  ),
                 ],
               ),
             ),

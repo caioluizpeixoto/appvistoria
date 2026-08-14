@@ -1,10 +1,15 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:dio/dio.dart';
 import 'dart:convert';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_html_to_pdf/flutter_html_to_pdf.dart';
+import '../theme/app_theme.dart';
 
 class PdfRadarGenerator {
   static const _kPrimaryHeader = PdfColor.fromInt(0xFF133B66);
@@ -289,9 +294,21 @@ class PdfRadarGenerator {
     return null;
   }
 
+  static Future<pw.ImageProvider?> _loadAssetImage(List<String> paths) async {
+    for (final path in paths) {
+      try {
+        final data = await rootBundle.load(path);
+        return pw.MemoryImage(data.buffer.asUint8List());
+      } catch (_) {}
+    }
+    return null;
+  }
+
   static Future<List<pw.Page>> buildRadarPages(
       Map<String, dynamic> dadosPesquisa,
-      {pw.Widget? footerWidget}) async {
+      {pw.Widget? footerWidget,
+      bool incluirCabecalhoEmpresa = false,
+      pw.ImageProvider? customLogo}) async {
     final List<pw.Page> pages = [];
 
     final placa = _v(dadosPesquisa, ['placa'], fallback: '');
@@ -309,7 +326,26 @@ class PdfRadarGenerator {
     final brandSlug = _extractBrandSlug(marcaStr);
     final brandLogo = await _fetchBrandLogo(brandSlug);
 
+    pw.Widget? headerEmpresaWidget;
+    if (incluirCabecalhoEmpresa) {
+      final logo = customLogo ??
+          await _loadAssetImage([
+            'assets/images/logo.pdf.PNG',
+            'assets/images/logo.pdf.png',
+            'assets/images/logo.png',
+            'assets/images/logo.PNG',
+          ]);
+      if (logo != null) {
+        headerEmpresaWidget = pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 14),
+          alignment: pw.Alignment.center,
+          child: pw.Image(logo, height: 52, fit: pw.BoxFit.contain),
+        );
+      }
+    }
+
     final List<pw.Widget> contentWidgets = [
+      if (headerEmpresaWidget != null) headerEmpresaWidget,
       _buildSectionHeader('Bin **',
           svgIcon: null, bgColor: _kPrimaryHeader, textColor: PdfColors.white),
       pw.SizedBox(height: 10),
@@ -361,6 +397,228 @@ class PdfRadarGenerator {
     );
 
     return pages;
+  }
+
+  static Future<Uint8List> generatePesquisaPdfBytes(
+      Map<String, dynamic> dadosPesquisa,
+      {pw.ImageProvider? customLogo}) async {
+    final pdf = pw.Document(
+      title: 'Relatório de Pesquisa Veicular',
+      author: 'App Vistoria',
+    );
+
+    final pages = await buildRadarPages(
+      dadosPesquisa,
+      incluirCabecalhoEmpresa: true,
+      customLogo: customLogo,
+    );
+
+    for (final page in pages) {
+      pdf.addPage(page);
+    }
+
+    return await pdf.save();
+  }
+
+  static Future<Uint8List> converterHtmlParaPdfComLogo(String htmlContent) async {
+    // Carrega a logo do app em base64
+    String base64Logo = '';
+    try {
+      final bytes = await rootBundle.load('assets/images/logo.pdf.PNG');
+      base64Logo = base64Encode(bytes.buffer.asUint8List());
+    } catch (_) {}
+
+    final logoHtml = base64Logo.isNotEmpty
+        ? '''
+<div style="width: 100%; text-align: center; padding-top: 15px; padding-bottom: 12px; margin-bottom: 10px;">
+  <img src="data:image/png;base64,$base64Logo" style="max-height: 55px; max-width: 250px; object-fit: contain;" />
+</div>
+'''
+        : '';
+
+    const cssPrintFix = '''
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    zoom: 1.0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    box-sizing: border-box !important;
+  }
+  table, .table, div, .container, .row, p, span {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+</style>
+''';
+
+    String adjustedHtml = htmlContent;
+    if (adjustedHtml.contains('</head>')) {
+      adjustedHtml = adjustedHtml.replaceFirst('</head>', '$cssPrintFix</head>');
+    } else if (adjustedHtml.contains('<body')) {
+      adjustedHtml = adjustedHtml.replaceFirst('<body', '$cssPrintFix<body');
+    } else {
+      adjustedHtml = '$cssPrintFix$adjustedHtml';
+    }
+
+    if (adjustedHtml.contains('<body')) {
+      final bodyIndex = adjustedHtml.indexOf(RegExp(r'<body[^>]*>'));
+      if (bodyIndex != -1) {
+        final match = RegExp(r'<body[^>]*>').firstMatch(adjustedHtml)!;
+        final endTag = match.end;
+        adjustedHtml = adjustedHtml.substring(0, endTag) +
+            logoHtml +
+            adjustedHtml.substring(endTag);
+      } else {
+        adjustedHtml = '$logoHtml$adjustedHtml';
+      }
+    } else {
+      adjustedHtml = '$logoHtml$adjustedHtml';
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final convertedFile = await FlutterHtmlToPdf.convertFromHtmlContent(
+      adjustedHtml,
+      tempDir.path,
+      'pesquisa_temp_${DateTime.now().millisecondsSinceEpoch}',
+    );
+    if (await convertedFile.exists()) {
+      final bytes = await convertedFile.readAsBytes();
+      try {
+        await convertedFile.delete();
+      } catch (_) {}
+      return bytes;
+    }
+    throw Exception('Falha ao converter HTML para PDF');
+  }
+
+  static Future<void> visualizarPesquisaPdf({
+    required BuildContext context,
+    required Map<String, dynamic> dadosPesquisa,
+    String? urlPesquisa,
+    String? placa,
+  }) async {
+    bool dialogAberta = false;
+    if (context.mounted) {
+      dialogAberta = true;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  const Expanded(
+                    child: Text(
+                      'Preparando relatório em PDF...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    try {
+      Uint8List? bytes;
+
+      final url = (urlPesquisa != null && urlPesquisa.trim().isNotEmpty)
+          ? urlPesquisa.trim()
+          : _v(dadosPesquisa, ['arquivoPesquisaUrl', 'arquivo_pesquisa_url', 'view_full', 'url'], fallback: '');
+
+      if (url.isNotEmpty && url.startsWith('http')) {
+        try {
+          final dio = Dio();
+          final response = await dio.get<List<int>>(
+            url,
+            options: Options(
+              responseType: ResponseType.bytes,
+              sendTimeout: const Duration(seconds: 25),
+              receiveTimeout: const Duration(seconds: 25),
+            ),
+          );
+
+          if (response.statusCode == 200 && response.data != null) {
+            final rawBytes = Uint8List.fromList(response.data!);
+            final isPdf = rawBytes.length > 4 &&
+                rawBytes[0] == 0x25 &&
+                rawBytes[1] == 0x50 &&
+                rawBytes[2] == 0x44 &&
+                rawBytes[3] == 0x46;
+
+            if (isPdf) {
+              bytes = rawBytes;
+            } else {
+              final htmlContent = utf8.decode(rawBytes, allowMalformed: true);
+              bytes = await converterHtmlParaPdfComLogo(htmlContent);
+            }
+          }
+        } catch (e) {
+          print('Aviso ao baixar/converter HTML da pesquisa: $e');
+        }
+      }
+
+      bytes ??= await generatePesquisaPdfBytes(dadosPesquisa);
+
+      final placaStr = (placa != null && placa.isNotEmpty)
+          ? placa
+          : _v(dadosPesquisa, ['placa'], fallback: 'VEICULO');
+
+      if (context.mounted && dialogAberta) {
+        Navigator.of(context, rootNavigator: true).pop();
+        dialogAberta = false;
+      }
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => bytes!,
+        name: 'Pesquisa_Veicular_$placaStr.pdf',
+      );
+    } catch (e) {
+      if (context.mounted && dialogAberta) {
+        Navigator.of(context, rootNavigator: true).pop();
+        dialogAberta = false;
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao gerar PDF da pesquisa: $e'),
+            backgroundColor: AppTheme.naoConforme,
+          ),
+        );
+      }
+    }
   }
 
   static pw.Widget _buildTopHeader(
