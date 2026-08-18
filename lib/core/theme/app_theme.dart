@@ -6,10 +6,10 @@ class AppTheme {
 
   // ── Paleta de cores ──────────────────────────────────────────────────────────
   static const Color primary =
-      Color(0xFF16A34A); // Verde Moderno (Emerald/Green)
-  static const Color primaryDark = Color(0xFF15803D); // Verde Escuro
-  static const Color primaryLight = Color(0xFF4ADE80); // Verde Claro
-  static const Color accent = Color(0xFF22C55E); // Verde Destaque
+      Color(0xFF234B32); // Verde Musgo Escuro
+  static const Color primaryDark = Color(0xFF183523); // Verde Musgo Profundo
+  static const Color primaryLight = Color(0xFF3B6E4C); // Verde Musgo Médio
+  static const Color accent = Color(0xFF2E5E3D); // Verde Musgo Destaque
 
   static const Color conforme = Color(0xFF2E7D32);
   static const Color conformeLight = Color(0xFFE8F5E9);

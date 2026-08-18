@@ -102,3 +102,7 @@ flutter_launcher_icons:
   image_path: "assets/images/app_icon.png"
   adaptive_icon_background: "#000000" # Cor de fundo preta para preencher o círculo
   adaptive_icon_foreground: "assets/images/app_icon.png"
+
+dependency_overrides:
+  sqflite_android: 2.4.1
+

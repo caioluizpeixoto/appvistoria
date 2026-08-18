@@ -117,5 +117,46 @@ void main() {
       expect(result.dividasAtivas.status, RadarModuleStatus.nada_consta);
       expect(result.dividasAtivas.hasData, false);
     });
+
+    test('Should parse Leilão and Sinistro correctly', () {
+      final json03 = '''
+      {
+        "consulta": {
+          "resultados": [
+            {
+              "title": "Ofertas de Leilão",
+              "retorno": [
+                {
+                  "leiloeiro": "SODRE SANTORO",
+                  "comitente": "PORTO SEGURO",
+                  "data_leilao": "15/03/2023",
+                  "condicao": "RECUPERADO DE SINISTRO"
+                }
+              ]
+            },
+            {
+              "title": "Sinistro - Base On-line",
+              "retorno": [
+                {
+                  "tipo": "INDENIZACAO INTEGRAL",
+                  "monta": "MEDIA MONTA",
+                  "data": "10/01/2023"
+                }
+              ]
+            }
+          ]
+        }
+      }
+      ''';
+
+      final result = RadarNormalizer.parse(json03);
+      expect(result.leiloes.hasData, true);
+      expect(result.leiloes.dados!.length, 1);
+      expect(result.leiloes.dados![0]['leiloeiro'], 'SODRE SANTORO');
+
+      expect(result.sinistros.hasData, true);
+      expect(result.sinistros.dados!.length, 1);
+      expect(result.sinistros.dados![0]['monta'], 'MEDIA MONTA');
+    });
   });
 }

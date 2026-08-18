@@ -70,10 +70,16 @@ class VistoriaWizardState extends ChangeNotifier {
   String divergenciasEncontradas = '';
   String recomendacoes = '';
 
-  // ── Checklist Opcional ────────────────────────────────────────────────────
-  bool realizarChecklistOpcional = false; bool realizarAvaliacaoPintura = true;
+  // ── Checklist Opcional e Pintura ──────────────────────────────────────────
+  bool realizarChecklistOpcional = false;
+  bool realizarAvaliacaoPintura = false;
   final Map<String, String> checklistOpcional = {};
   final Map<String, String> checklistOpcionalMotivos = {};
+
+  void setRealizarAvaliacaoPintura(bool val) {
+    realizarAvaliacaoPintura = val;
+    notifyListeners();
+  }
 
   // ── Conclusão (Step 14) ───────────────────────────────────────────────────
   String resultadoFinal = '';
@@ -144,7 +150,7 @@ class VistoriaWizardState extends ChangeNotifier {
     if (isChecklist) return 4;
     int count = 10;
     if (temCroqui) count++;
-    if (temAvarias) count++;
+    if (temCroqui && !isCaminhao) count++;
     if (isCaminhao) count++;
     return count;
   }

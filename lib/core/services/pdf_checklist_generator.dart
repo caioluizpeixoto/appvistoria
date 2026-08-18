@@ -179,9 +179,21 @@ Future<String?> generateChecklistPdf({
                   children: [
                     pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(), textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
                     pw.SizedBox(height: 2),
-                    pw.Text('11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800)),
+                    pw.Text(
+                      ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
+                          ? '24.868.718.0001-62 - RUA SETE DE ABRIL 541 CENTRO COSMOPOLIS SP - CEP 13.150.610 - TEL 19 3872-1891'
+                          : '11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604',
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
+                    ),
                     pw.SizedBox(height: 2),
-                    pw.Text('SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP', textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800)),
+                    pw.Text(
+                      ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
+                          ? 'COSMOPOLIS@ULTRAVISAO.COM.BR'
+                          : 'SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP',
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
+                    ),
                   ],
                 ),
               ),

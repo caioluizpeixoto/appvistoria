@@ -553,23 +553,51 @@ class RadarNormalizer {
   static RadarModule<List<Map<String, dynamic>>> _extractGenericList(Map<String, dynamic> modulos, String alias) {
     final mod = modulos[alias];
     if (mod == null) return _emptyModule(alias);
-    final r = _getRetorno(mod);
-    if (r == null) {
-      if (mod['retorno'] is String) {
-        return RadarModule(modulo: alias, status: _classifyValue(mod['retorno']), mensagem: mod['retorno'], fonte: mod['title']);
-      }
-      return _emptyModule(alias);
-    }
-    
-    List<Map<String, dynamic>> list = [];
-    if (r is Map && r['data'] is List) {
-      list = List<Map<String, dynamic>>.from(r['data'].whereType<Map>());
-    } else if (mod['retorno'] is List) {
-      list = List<Map<String, dynamic>>.from(mod['retorno'].whereType<Map>());
+    final retorno = mod['retorno'];
+
+    if (retorno is String) {
+      return RadarModule(
+        modulo: alias,
+        status: _classifyValue(retorno),
+        mensagem: retorno,
+        fonte: mod['title'],
+      );
     }
 
-    if (list.isEmpty) return RadarModule(modulo: alias, status: RadarModuleStatus.nada_consta, dados: [], fonte: mod['title']);
-    return RadarModule(modulo: alias, status: RadarModuleStatus.preenchido, dados: list, fonte: mod['title']);
+    List<Map<String, dynamic>> list = [];
+    if (retorno is List) {
+      list = List<Map<String, dynamic>>.from(retorno.whereType<Map>());
+    } else if (retorno is Map) {
+      if (retorno['data'] is List) {
+        list = List<Map<String, dynamic>>.from((retorno['data'] as List).whereType<Map>());
+      } else if (retorno['lista'] is List) {
+        list = List<Map<String, dynamic>>.from((retorno['lista'] as List).whereType<Map>());
+      } else {
+        // If map has nested maps/lists of entries
+        for (final val in retorno.values) {
+          if (val is Map) {
+            list.add(Map<String, dynamic>.from(val));
+          } else if (val is List) {
+            list.addAll(List<Map<String, dynamic>>.from(val.whereType<Map>()));
+          }
+        }
+      }
+    }
+
+    if (list.isEmpty) {
+      return RadarModule(
+        modulo: alias,
+        status: RadarModuleStatus.nada_consta,
+        dados: [],
+        fonte: mod['title'],
+      );
+    }
+    return RadarModule(
+      modulo: alias,
+      status: RadarModuleStatus.preenchido,
+      dados: list,
+      fonte: mod['title'],
+    );
   }
 
   static Map<String, dynamic>? _getRetorno(Map<String, dynamic>? modulo) {

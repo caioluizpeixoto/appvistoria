@@ -13,6 +13,8 @@ import 'package:drift/drift.dart' as drift;
 
 import '../../domain/vistoria_wizard_state.dart';
 import '../../../consulta_bin/data/services/radar_service.dart';
+import '../../../consulta_bin/data/repositories/radar_repository.dart';
+import '../../../consulta_bin/domain/entities/radar_veiculo.dart';
 import 'steps/step_dados_gerais.dart';
 import 'steps/step_dados_veiculo.dart';
 import 'steps/step_fotos_externas.dart';
@@ -50,6 +52,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   final _dao = sl<VistoriaDao>();
   final _autocredDao = sl<AutocredDao>();
   bool _isSaving = false;
+  bool _isPollingRadar = false;
   
   StreamSubscription? _veiculoSub;
   StreamSubscription? _consultaSub;
@@ -75,7 +78,6 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
 
     final temCroqui = _wizardState.temCroqui;
-    final temAvarias = _wizardState.temAvarias;
 
     return [
       const _StepInfo(titulo: 'Dados Gerais', icone: Icons.assignment_rounded),
@@ -88,7 +90,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           titulo: 'Etiquetas / Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui)
         const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
-      if (temAvarias)
+      if (temCroqui && !_wizardState.isCaminhao)
         const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
       if (_wizardState.isCaminhao)
         const _StepInfo(titulo: 'Pintura (Caminhão)', icone: Icons.color_lens_rounded),
@@ -246,90 +248,527 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     });
   }
 
+  Future<void> _iniciarAguardarPesquisa(String placa) async {
+    if (_isPollingRadar) return;
+    _isPollingRadar = true;
+
+    setState(() {
+      _wizardState.setStatusConsulta('andamento');
+    });
+    _wizardState.forceUpdate();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Expanded(child: Text('Aguardando conclusão da pesquisa na base de dados...')),
+          ],
+        ),
+        backgroundColor: AppTheme.primary,
+        duration: Duration(seconds: 4),
+      ),
+    );
+
+    try {
+      final service = sl<RadarService>();
+      bool concluiu = false;
+      int tentativas = 0;
+      const maxTentativas = 24; // 24 * 5s = 120 segundos
+
+      while (!concluiu && tentativas < maxTentativas && mounted) {
+        tentativas++;
+        await Future.delayed(const Duration(seconds: 5));
+        if (!mounted) break;
+
+        // 1. Checa na API da Radar se já há consultas finalizadas com token
+        try {
+          final radarConsultas = await service.listarConsultasRadar(param: 'placa', value: placa);
+          if (radarConsultas.isNotEmpty) {
+            final pronta = radarConsultas.firstWhere(
+              (c) => c['token'] != null && c['token'].toString().isNotEmpty,
+              orElse: () => null,
+            );
+            if (pronta != null) {
+              await _aplicarDadosConsulta(
+                fonte: 'radar',
+                tokenConsulta: pronta['token'],
+                produto: pronta['codigo_produto'] ?? 'auto_bin',
+                placa: placa,
+              );
+              concluiu = true;
+              break;
+            }
+          }
+        } catch (_) {}
+
+        // 2. Checa se o banco local/supabase já concluiu
+        try {
+          final consultaDb = await _autocredDao.buscarConsultaPorVistoria(widget.vistoriaId);
+          if (consultaDb != null && consultaDb.status == 'concluida') {
+            concluiu = true;
+            if (mounted) {
+              setState(() {
+                _wizardState.setStatusConsulta('concluida');
+              });
+              _wizardState.forceUpdate();
+            }
+            break;
+          }
+        } catch (_) {}
+      }
+
+      if (!concluiu && mounted && (_wizardState.statusConsulta == 'andamento' || _wizardState.statusConsulta == 'pendente')) {
+        setState(() {
+          _wizardState.setStatusConsulta('timeout');
+        });
+        _wizardState.forceUpdate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Tempo limite excedido ao aguardar pesquisa. Toque na nuvem para verificar novamente.'),
+            backgroundColor: AppTheme.comObs,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted && (_wizardState.statusConsulta == 'andamento' || _wizardState.statusConsulta == 'pendente')) {
+        setState(() {
+          _wizardState.setStatusConsulta('erro');
+        });
+        _wizardState.forceUpdate();
+      }
+    } finally {
+      _isPollingRadar = false;
+    }
+  }
+
+  Future<void> _aplicarDadosConsulta({
+    required String fonte,
+    String? tokenConsulta,
+    Map<String, dynamic>? dadosTratados,
+    required String produto,
+    required String placa,
+  }) async {
+    final service = sl<RadarService>();
+    RadarVeiculo veiculoApi;
+
+    if (fonte == 'local' && dadosTratados != null && dadosTratados.isNotEmpty) {
+      veiculoApi = RadarVeiculo.fromJson(dadosTratados);
+    } else {
+      veiculoApi = await service.consultarVeiculo(
+        produto: produto,
+        param: 'placa',
+        value: placa,
+        vistoriaId: widget.vistoriaId,
+        forcarNova: false,
+        tokenConsulta: tokenConsulta,
+      );
+    }
+
+    // Atualizar Veiculo no Banco de Dados
+    final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
+    final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
+    if (veiculoDb != null) {
+      await _dao.atualizarVeiculo(VeiculosCompanion(
+        id: drift.Value(veiculoDb.id),
+        vistoriaId: drift.Value(veiculoDb.vistoriaId),
+        placa: drift.Value(
+            veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
+        chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty
+            ? veiculoApi.chassi
+            : veiculoDb.chassiVeiculo),
+        motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
+            ? veiculoApi.motor
+            : veiculoDb.motorVeiculo),
+        marca: drift.Value(
+            mm.marca.isNotEmpty ? mm.marca : veiculoDb.marca),
+        modelo: drift.Value(
+            mm.modelo.isNotEmpty ? mm.modelo : veiculoDb.modelo),
+        anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ??
+            veiculoDb.anoFabricacao),
+        anoModelo: drift.Value(
+            int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+        cor: drift.Value(
+            veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+        renavam: drift.Value(veiculoApi.renavam.isNotEmpty
+            ? veiculoApi.renavam
+            : veiculoDb.renavam),
+        chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty
+            ? veiculoApi.chassi
+            : veiculoDb.chassiBin),
+        motorBin: drift.Value(veiculoApi.motor.isNotEmpty
+            ? veiculoApi.motor
+            : veiculoDb.motorBin),
+        municipio: drift.Value(veiculoApi.municipio.isNotEmpty
+            ? veiculoApi.municipio
+            : veiculoDb.municipio),
+        uf: drift.Value(
+            veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+        combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty
+            ? veiculoApi.combustivel
+            : veiculoDb.combustivel),
+      ));
+    }
+
+    if (mounted) {
+      // Atualiza o estado em memória para a tela reagir imediatamente
+      _wizardState.placa = veiculoApi.placa.isNotEmpty ? veiculoApi.placa : _wizardState.placa;
+      _wizardState.chassiVeiculo = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiVeiculo;
+      _wizardState.motorVeiculo = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorVeiculo;
+      _wizardState.marca = mm.marca.isNotEmpty ? mm.marca : _wizardState.marca;
+      _wizardState.modelo = mm.modelo.isNotEmpty ? mm.modelo : _wizardState.modelo;
+      _wizardState.anoFabricacao = veiculoApi.anoFabricacao.isNotEmpty ? veiculoApi.anoFabricacao : _wizardState.anoFabricacao;
+      _wizardState.anoModelo = veiculoApi.anoModelo.isNotEmpty ? veiculoApi.anoModelo : _wizardState.anoModelo;
+      _wizardState.cor = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.cor;
+      _wizardState.renavam = veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : _wizardState.renavam;
+      _wizardState.chassiBin = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiBin;
+      _wizardState.motorBin = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorBin;
+      _wizardState.municipio = veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : _wizardState.municipio;
+      _wizardState.uf = veiculoApi.estado.isNotEmpty ? veiculoApi.estado : _wizardState.uf;
+      _wizardState.combustivel = veiculoApi.combustivel.isNotEmpty ? veiculoApi.combustivel : _wizardState.combustivel;
+      if (veiculoApi.arquivoPesquisaUrl != null && veiculoApi.arquivoPesquisaUrl!.isNotEmpty) {
+        _wizardState.arquivoPesquisaUrl = veiculoApi.arquivoPesquisaUrl!;
+      }
+
+      setState(() {
+        _wizardState.setStatusConsulta('concluida');
+      });
+      _wizardState.forceUpdate();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Pesquisa vinculada e dados preenchidos com sucesso!'),
+          backgroundColor: AppTheme.conforme,
+        ),
+      );
+    }
+  }
+
   Future<void> _retryRadarConsulta({bool blockUI = false}) async {
+    final placa = _wizardState.placa.trim();
+    if (placa.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('A placa precisa estar preenchida para consultar.'),
+          backgroundColor: AppTheme.naoConforme,
+        ),
+      );
+      return;
+    }
+
+    // Se já estiver em andamento/pendente
     if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento') {
       final forcar = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Pesquisa em Andamento'),
-          content: const Text('Já existe uma pesquisa rodando para este veículo no momento. O aplicativo aguardará a conclusão.\n\nSe a consulta travou, você pode forçar uma nova pesquisa.'),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.hourglass_top_rounded, color: AppTheme.primary),
+              SizedBox(width: 8),
+              Text('Pesquisa em Andamento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Já existe uma pesquisa em andamento para este veículo no momento.\n\nO aplicativo continuará aguardando a conclusão. Se a consulta anterior travou, você pode forçar uma nova pesquisa.',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Aguardar'),
+              child: const Text('Continuar Aguardando'),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Forçar Nova'),
-            ),
-          ],
-        ),
-      );
-      if (forcar != true) return;
-    }
-
-    if (_wizardState.statusConsulta == 'timeout' || _wizardState.statusConsulta == 'erro') {
-      final querPuxar = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: Text(_wizardState.statusConsulta == 'timeout' ? 'Tempo Esgotado' : 'Erro na Pesquisa'),
-          content: const Text('A pesquisa anterior falhou ou demorou muito. Deseja verificar se ela já foi concluída na base?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Puxar Dados / Atualizar'),
-            ),
-          ],
-        ),
-      );
-      if (querPuxar != true) return;
-    }
-
-    if (_wizardState.statusConsulta == 'concluida') {
-      final querNova = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Pesquisa Concluída'),
-          content: const Text('Você já possui uma pesquisa concluída com sucesso para este veículo nesta vistoria.\n\nDeseja realizar uma NOVA consulta? (Isso consumirá mais saldo).'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.naoConforme,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () => Navigator.pop(ctx, true),
               child: const Text('Forçar Nova Consulta'),
             ),
           ],
         ),
       );
-      if (querNova != true) return;
-    }
 
-    final placa = _wizardState.placa;
-    if (placa.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('A placa precisa estar preenchida para consultar.'),
-            backgroundColor: AppTheme.naoConforme),
-      );
+      if (forcar == true) {
+        final result = await _showSelectProdutoDialog(hideForcarNova: true);
+        if (result != null) {
+          final produto = result['produto'] as String;
+          await _executarNovaConsulta(produto: produto, placa: placa, blockUI: blockUI);
+        }
+      }
       return;
     }
 
-    final isTimeoutOrError = _wizardState.statusConsulta == 'timeout' || _wizardState.statusConsulta == 'erro';
-    final result = await _showSelectProdutoDialog(hideForcarNova: isTimeoutOrError);
-    if (result == null) return;
+    // Modal de busca de pesquisas existentes
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Buscando pesquisas existentes...'),
+          ],
+        ),
+      ),
+    );
 
-    final produto = result['produto'] as String;
-    final forcarNova = result['forcarNova'] as bool;
+    List<Map<String, dynamic>> combinadas = [];
+    try {
+      final repo = sl<RadarRepository>();
+      final service = sl<RadarService>();
 
+      final consultasNuvem = await repo.buscarConsultasRecentesNuvem('placa', placa);
+      for (final c in consultasNuvem) {
+        combinadas.add({...c, 'fonte': 'local'});
+      }
+
+      final radarConsultas = await service.listarConsultasRadar(param: 'placa', value: placa);
+      for (final c in radarConsultas) {
+        combinadas.add({
+          'fonte': 'radar',
+          'tokenConsulta': c['token'],
+          'titulo': c['titulo'],
+          'created_at': c['data_hora'] ?? c['ctime'],
+          'codigo_produto': c['codigo_produto'],
+        });
+      }
+
+      // Ordenar por data mais recente
+      combinadas.sort((a, b) {
+        try {
+          final da = DateTime.parse(a['created_at'].toString());
+          final db = DateTime.parse(b['created_at'].toString());
+          return db.compareTo(da);
+        } catch (_) {
+          return 0;
+        }
+      });
+    } catch (e) {
+      print('Erro ao buscar histórico: $e');
+    } finally {
+      if (mounted) Navigator.pop(context); // fecha loading
+    }
+
+    if (!mounted) return;
+
+    if (combinadas.isNotEmpty) {
+      final total = combinadas.length;
+      final escolhida = await showDialog<Map<String, dynamic>>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.history_rounded, color: AppTheme.primary, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Pesquisas Encontradas ($total)',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Identificamos $total pesquisa(s) pronta(s) para este veículo. Deseja utilizar uma pesquisa existente ou realizar uma nova consulta?',
+                  style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary, height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: combinadas.length,
+                    itemBuilder: (context, index) {
+                      final item = combinadas[index];
+                      final isRadar = item['fonte'] == 'radar';
+                      final dataString = item['created_at'].toString();
+                      DateTime? createdAt;
+                      try {
+                        createdAt = DateTime.parse(dataString);
+                      } catch (_) {}
+
+                      final dateFormatted = createdAt != null
+                          ? '${createdAt.day.toString().padLeft(2, '0')}/${createdAt.month.toString().padLeft(2, '0')}/${createdAt.year} às ${createdAt.hour.toString().padLeft(2, '0')}:${createdAt.minute.toString().padLeft(2, '0')}'
+                          : dataString;
+
+                      final prefix = isRadar ? '[Nuvem]' : '[Local]';
+                      final title = item['titulo'] != null
+                          ? '$prefix ${item['titulo']}'
+                          : '$prefix Pesquisa';
+                      final subtitle = 'Realizada em: $dateFormatted';
+
+                      return Card(
+                        elevation: 0,
+                        color: AppTheme.surfaceVariant.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: AppTheme.border),
+                        ),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(
+                            isRadar ? Icons.cloud_sync_rounded : Icons.history_rounded,
+                            color: AppTheme.primary,
+                          ),
+                          title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          trailing: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () => Navigator.of(ctx).pop(item),
+                            icon: const Icon(Icons.check_rounded, size: 14),
+                            label: const Text('Utilizar'),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
+              onPressed: () => Navigator.of(ctx).pop({'forcarNova': true}),
+              icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+              label: const Text('Realizar Nova Consulta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+
+      if (escolhida == null) return; // Cancelou
+
+      if (escolhida['forcarNova'] == true) {
+        final result = await _showSelectProdutoDialog(hideForcarNova: true);
+        if (result != null) {
+          final produto = result['produto'] as String;
+          await _executarNovaConsulta(produto: produto, placa: placa, blockUI: blockUI);
+        }
+        return;
+      }
+
+      // Utilizar pesquisa existente sem custo
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 20),
+              Text('Puxando dados da pesquisa...'),
+            ],
+          ),
+        ),
+      );
+
+      try {
+        await _aplicarDadosConsulta(
+          fonte: escolhida['fonte'] ?? 'radar',
+          tokenConsulta: escolhida['tokenConsulta'],
+          dadosTratados: escolhida['dados_tratados'],
+          produto: escolhida['codigo_produto'] ?? 'auto_bin',
+          placa: placa,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Erro ao aplicar dados da pesquisa: $e'), backgroundColor: AppTheme.naoConforme),
+          );
+        }
+      } finally {
+        if (mounted) Navigator.pop(context); // fecha loading
+      }
+    } else {
+      // NÃO ENCONTROU PESQUISAS PRONTAS
+      final acao = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 24),
+              SizedBox(width: 10),
+              Text('Pesquisa Veicular', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Ainda não há pesquisa pronta no sistema para este veículo.\n\nDeseja aguardar a conclusão ou realizar uma nova pesquisa?',
+            style: TextStyle(fontSize: 14, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancelar'),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, 'aguardar'),
+              child: const Text('Aguardar'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.naoConforme,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, 'nova'),
+              child: const Text('Realizar Nova Pesquisa'),
+            ),
+          ],
+        ),
+      );
+
+      if (acao == 'aguardar') {
+        _iniciarAguardarPesquisa(placa);
+      } else if (acao == 'nova') {
+        final result = await _showSelectProdutoDialog(hideForcarNova: true);
+        if (result != null) {
+          final produto = result['produto'] as String;
+          await _executarNovaConsulta(produto: produto, placa: placa, blockUI: blockUI);
+        }
+      }
+    }
+  }
+
+  Future<void> _executarNovaConsulta({
+    required String produto,
+    required String placa,
+    bool blockUI = false,
+  }) async {
     setState(() {
       _wizardState.setStatusConsulta('pendente');
     });
@@ -352,109 +791,36 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     try {
       final service = sl<RadarService>();
-      final veiculoApi = await service
-          .consultarVeiculo(
+      final veiculoApi = await service.consultarVeiculo(
         produto: produto,
         param: 'placa',
         value: placa,
         vistoriaId: widget.vistoriaId,
-        forcarNova: forcarNova,
+        forcarNova: true,
       );
 
-      // Atualizar o banco de dados com os dados retornados
-      final veiculoDb = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
-      final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
-      if (veiculoDb != null) {
-        await _dao.atualizarVeiculo(VeiculosCompanion(
-          id: drift.Value(veiculoDb.id),
-          vistoriaId: drift.Value(veiculoDb.vistoriaId),
-          placa: drift.Value(
-              veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
-          chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty
-              ? veiculoApi.chassi
-              : veiculoDb.chassiVeiculo),
-          motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
-              ? veiculoApi.motor
-              : veiculoDb.motorVeiculo),
-          marca: drift.Value(mm.marca.isNotEmpty
-              ? mm.marca
-              : veiculoDb.marca),
-          modelo: drift.Value(mm.modelo.isNotEmpty
-              ? mm.modelo
-              : veiculoDb.modelo),
-          anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ??
-              veiculoDb.anoFabricacao),
-          anoModelo: drift.Value(
-              int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
-          cor: drift.Value(
-              veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
-          renavam: drift.Value(veiculoApi.renavam.isNotEmpty
-              ? veiculoApi.renavam
-              : veiculoDb.renavam),
-          chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty
-              ? veiculoApi.chassi
-              : veiculoDb.chassiBin),
-          motorBin: drift.Value(veiculoApi.motor.isNotEmpty
-              ? veiculoApi.motor
-              : veiculoDb.motorBin),
-          municipio: drift.Value(veiculoApi.municipio.isNotEmpty
-              ? veiculoApi.municipio
-              : veiculoDb.municipio),
-          uf: drift.Value(
-              veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
-          combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty
-              ? veiculoApi.combustivel
-              : veiculoDb.combustivel),
-        ));
-      }
+      if (blockUI && mounted) Navigator.pop(context);
 
-      if (mounted) {
-        if (blockUI) Navigator.pop(context); // fecha dialog
-        
-        // Atualiza o estado em memória para a tela reagir imediatamente
-        _wizardState.placa = veiculoApi.placa.isNotEmpty ? veiculoApi.placa : _wizardState.placa;
-        _wizardState.chassiVeiculo = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiVeiculo;
-        _wizardState.motorVeiculo = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorVeiculo;
-        _wizardState.marca = mm.marca.isNotEmpty ? mm.marca : _wizardState.marca;
-        _wizardState.modelo = mm.modelo.isNotEmpty ? mm.modelo : _wizardState.modelo;
-        _wizardState.anoFabricacao = veiculoApi.anoFabricacao.isNotEmpty ? veiculoApi.anoFabricacao : _wizardState.anoFabricacao;
-        _wizardState.anoModelo = veiculoApi.anoModelo.isNotEmpty ? veiculoApi.anoModelo : _wizardState.anoModelo;
-        _wizardState.cor = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.cor;
-        _wizardState.renavam = veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : _wizardState.renavam;
-        _wizardState.chassiBin = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiBin;
-        _wizardState.motorBin = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorBin;
-        _wizardState.municipio = veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : _wizardState.municipio;
-        _wizardState.uf = veiculoApi.estado.isNotEmpty ? veiculoApi.estado : _wizardState.uf;
-        _wizardState.combustivel = veiculoApi.combustivel.isNotEmpty ? veiculoApi.combustivel : _wizardState.combustivel;
-        
-        setState(() {
-          _wizardState.setStatusConsulta('concluida');
-        });
-        _wizardState.forceUpdate();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('✅ Pesquisa atualizada!'),
-              backgroundColor: AppTheme.conforme),
-        );
-      }
+      await _aplicarDadosConsulta(
+        fonte: 'radar',
+        tokenConsulta: veiculoApi.resultadoCompleto['token-consulta']?.toString(),
+        produto: produto,
+        placa: placa,
+      );
     } catch (e) {
+      if (blockUI && mounted) Navigator.pop(context);
       if (mounted) {
-        if (blockUI) Navigator.pop(context); // fecha dialog
         String cleanError = e.toString().replaceAll('Exception: ', '').trim();
-        if (cleanError.startsWith('Erro na consulta: ')) {
-          cleanError = cleanError.replaceAll('Erro na consulta: ', '');
-        }
-
         if (cleanError.contains('já está em andamento')) {
           setState(() {
             _wizardState.setStatusConsulta('andamento');
           });
+          _iniciarAguardarPesquisa(placa);
         } else {
           setState(() {
             _wizardState.setStatusConsulta('erro');
           });
         }
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(cleanError),
@@ -487,7 +853,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
                 if (hideForcarNova)
                   const Text(
-                      'Selecione a base para puxar os dados atualizados.',
+                      'Selecione a base para realizar a nova consulta.',
                       style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 16),
                 ListTile(
@@ -600,6 +966,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     // Carregar Itens
     final itens = await _dao.listarItensPorVistoria(widget.vistoriaId);
+    bool temPinturaPreenchida = false;
     for (final item in itens) {
       if (item.etapa == 'checklist_opcional') {
         _wizardState.realizarChecklistOpcional = true;
@@ -607,7 +974,13 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       } else {
         _wizardState.checklistStatus[item.nome] = item.status;
         _wizardState.checklistObs[item.nome] = item.observacao ?? '';
+        if (item.nome.startsWith('peca_') && (item.status.isNotEmpty || (item.observacao ?? '').isNotEmpty)) {
+          temPinturaPreenchida = true;
+        }
       }
+    }
+    if (temPinturaPreenchida) {
+      _wizardState.realizarAvaliacaoPintura = true;
     }
 
     // Carregar Fotos

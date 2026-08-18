@@ -78,33 +78,72 @@ class StepPintura extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // ── Resumo visual ──────────────────────────────────────────────────
-        _PinturaResumoCard(
-            originais: originais, repinturas: repinturas, total: _pecas.length),
-        const SizedBox(height: 8),
-
-        // ── Lista de itens ─────────────────────────────────────────────────
-        ..._pecas.map((id) => InspecaoItemWidget(
-              itemId: id,
-              label: _labels[id]!,
-              statusOptions: _statusOpcoes,
-              obrigatoria: false,
-            )),
-        const SizedBox(height: 24),
-
-        // ── Visualização 3D por IA ─────────────────────────────────────────
-        _AiImagePreview(
-          marca: state.marca,
-          modelo: state.modelo,
-          ano: state.anoModelo.isNotEmpty
-              ? state.anoModelo
-              : state.anoFabricacao,
-          pecas: _pecas,
-          statusFn: state.getStatus,
-          initialBase64: state.aiImage3dBase64,
-          isGenerating: state.isGeneratingAiImage,
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppTheme.border),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Realizar Avaliação de Pintura e Lataria?',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Se ativado, as informações preenchidas constarão na seção de pintura no PDF gerado.',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                activeColor: AppTheme.primary,
+                value: state.realizarAvaliacaoPintura,
+                onChanged: (val) {
+                  state.setRealizarAvaliacaoPintura(val);
+                },
+              )
+            ],
+          ),
         ),
-        const SizedBox(height: 16),
+        if (state.realizarAvaliacaoPintura) ...[
+          const SizedBox(height: 12),
+          // ── Resumo visual ──────────────────────────────────────────────────
+          _PinturaResumoCard(
+              originais: originais, repinturas: repinturas, total: _pecas.length),
+          const SizedBox(height: 8),
+
+          // ── Lista de itens ─────────────────────────────────────────────────
+          ..._pecas.map((id) => InspecaoItemWidget(
+                itemId: id,
+                label: _labels[id]!,
+                statusOptions: _statusOpcoes,
+                obrigatoria: false,
+              )),
+          const SizedBox(height: 24),
+
+          // ── Visualização 3D por IA ─────────────────────────────────────────
+          _AiImagePreview(
+            marca: state.marca,
+            modelo: state.modelo,
+            ano: state.anoModelo.isNotEmpty
+                ? state.anoModelo
+                : state.anoFabricacao,
+            pecas: _pecas,
+            statusFn: state.getStatus,
+            initialBase64: state.aiImage3dBase64,
+            isGenerating: state.isGeneratingAiImage,
+          ),
+          const SizedBox(height: 16),
+        ],
       ],
     );
   }
