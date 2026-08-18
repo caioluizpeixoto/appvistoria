@@ -558,7 +558,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         if (mounted) {
           if (vistoria.status == 'concluido') {
             final diff = DateTime.now().difference(vistoria.updatedAt);
-            if (diff.inHours > 72) {
+            const bool _enableTimeLimit = false; // Deixado falso a pedido do usuário (sem tempo)
+            
+            if (_enableTimeLimit && diff.inHours > 72) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text(
@@ -568,11 +570,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               );
               return;
             }
-            // Retificar (dentro das 72h)
+            // Retificar
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                    'Modo Retificação ativado. (${72 - diff.inHours}h restantes)'),
+                    _enableTimeLimit 
+                        ? 'Modo Retificação ativado. (${72 - diff.inHours}h restantes)'
+                        : 'Modo Retificação ativado.'),
                 backgroundColor: AppTheme.comObs,
               ),
             );
@@ -626,7 +630,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             await dao.buscarPorId(veiculoExistente.vistoriaId);
         if (vistoriaAnterior != null) {
           final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
-          if (diff.inHours <= 72) {
+          const bool _enableTimeLimit = false; // Deixado falso a pedido do usuário (sem tempo)
+          if (!_enableTimeLimit || diff.inHours <= 72) {
             reuse = true;
           }
         }

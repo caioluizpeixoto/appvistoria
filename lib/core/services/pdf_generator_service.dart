@@ -1399,11 +1399,9 @@ class PdfGeneratorService {
               pw.BarcodeWidget(
                 barcode: pw.Barcode.qrCode(),
                 data: qrData,
-                width: 40,
-                height: 40,
+                width: 50,
+                height: 50,
               ),
-              pw.SizedBox(height: 2),
-              pw.Text('VERIFICAR', style: pw.TextStyle(font: styles.bold, fontSize: 5, color: _kBlack)),
             ],
           ),
         ],
@@ -1738,7 +1736,7 @@ class PdfGeneratorService {
     final String svgLock =
         '<svg viewBox="0 0 24 24"><path fill="{color}" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>';
     final String svgChassis =
-        '<svg viewBox="0 0 24 24"><path fill="{color}" d="M6 3v2H4v2h2v10H4v2h2v2h2v-2h8v2h2v-2h2v-2h-2V7h2V5h-2V3h-2v2H8V3H6zm2 4h8v10H8V7z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="{color}" d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>';
 
     pw.Widget buildBlock(String title, String bgType, String svgRaw) {
       PdfColor blockBgColor = PdfColors.white;
@@ -5734,9 +5732,44 @@ class PdfGeneratorService {
     }
 
     // Itens de checklist padrão
+    const itensEstrutura = {
+      'painel_frontal',
+      'painel_corta_fogo',
+      'torre_amortecedor_esquerda',
+      'longarina_dianteira_esquerda',
+      'caixa_roda_dianteira_esquerda',
+      'coluna_dianteira_esquerda',
+      'caixa_ar_esquerda',
+      'assoalho_esquerdo',
+      'coluna_central_esquerda',
+      'longarina_centro_esquerda',
+      'coluna_traseira_esquerda',
+      'caixa_roda_traseira_esquerda',
+      'longarina_traseira_esquerda',
+      'painel_traseiro',
+      'caixa_estepe',
+      'longarina_traseira_direita',
+      'caixa_roda_traseira_direita',
+      'coluna_traseira_direita',
+      'longarina_centro_direita',
+      'coluna_central_direita',
+      'assoalho_direito',
+      'caixa_ar_direita',
+      'coluna_dianteira_direita',
+      'caixa_roda_dianteira_direita',
+      'longarina_dianteira_direita',
+      'torre_amortecedor_direita',
+    };
+
     wizardState.checklistStatus.forEach((id, status) {
       if (status.toUpperCase() == 'NÃO ANALISADO') return;
-      if (id.startsWith('peca_') && !avaliarPintura) return;
+      
+      // Remove itens de pintura do quadro resumo geral
+      if (id.startsWith('peca_')) return; 
+      
+      // Remove itens estruturais do quadro resumo geral
+      if (itensEstrutura.contains(id)) return; 
+
 
       final obs = wizardState.checklistObs[id] ?? '';
       final cat = getCat(status);

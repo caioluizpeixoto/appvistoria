@@ -89,7 +89,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       const _StepInfo(
           titulo: 'Etiquetas / Chassi', icone: Icons.qr_code_rounded),
       if (temCroqui)
-        const _StepInfo(titulo: 'Estrutura', icone: Icons.car_repair_rounded),
+        const _StepInfo(titulo: 'Estrutura', icone: Icons.minor_crash_rounded),
       if (temCroqui && !_wizardState.isCaminhao)
         const _StepInfo(titulo: 'Pintura', icone: Icons.format_paint_rounded),
       if (_wizardState.isCaminhao)

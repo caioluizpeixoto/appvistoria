@@ -220,7 +220,7 @@ class _Header extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            Icons.car_repair_rounded,
+            Icons.minor_crash_rounded,
             color: comAlerta > 0 ? AppTheme.naoConforme : AppTheme.conforme,
             size: 26,
           ),

@@ -164,13 +164,17 @@ class _VistoriaCard extends StatelessWidget {
     void _handleEdit() {
       if (vistoria.status == 'concluido') {
         final diff = DateTime.now().difference(vistoria.updatedAt);
-        if (diff.inHours <= 72) {
+        const bool _enableTimeLimit = false; // Deixado falso a pedido do usuário (sem tempo)
+        
+        if (!_enableTimeLimit || diff.inHours <= 72) {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('Retificar Vistoria'),
               content: Text(
-                  'Esta vistoria foi concluída. Você tem ${72 - diff.inHours}h restantes para retificá-la. Deseja reabrir a edição?'),
+                  _enableTimeLimit 
+                      ? 'Esta vistoria foi concluída. Você tem ${72 - diff.inHours}h restantes para retificá-la. Deseja reabrir a edição?'
+                      : 'Esta vistoria foi concluída. Deseja reabrir a edição para retificação?'),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),

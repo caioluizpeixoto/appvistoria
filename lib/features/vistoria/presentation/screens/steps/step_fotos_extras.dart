@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:provider/provider.dart';
@@ -62,6 +63,30 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
       titulo: result['titulo']!,
       categoria: result['categoria']!,
     );
+  }
+
+  Future<void> _adicionarFotoTeste(VistoriaWizardState state) async {
+    try {
+      final byteData = await rootBundle.load('assets/images/app_icon.png');
+      final appDir = await getApplicationDocumentsDirectory();
+      final tempFile = File(
+          '${appDir.path}/dummy_extra_${DateTime.now().millisecondsSinceEpoch}.png');
+      await tempFile.writeAsBytes(byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+
+      // Adiciona direto sem perguntar (modo teste rápido)
+      state.addFotoExtra(
+        pathLocal: tempFile.path,
+        titulo: 'Foto de Teste (Extra)',
+        categoria: 'Avaria',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erro ao adicionar foto fictícia: $e')),
+        );
+      }
+    }
   }
 
   Future<Map<String, String>?> _showFotoDialog(String path) async {
@@ -207,6 +232,20 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
               ),
             ),
           ],
+        ),
+
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton.icon(
+            onPressed: () => _adicionarFotoTeste(state),
+            icon: const Icon(Icons.bug_report_rounded, size: 18),
+            label: const Text('Preencher com foto fictícia (Teste)',
+                style: TextStyle(fontSize: 13)),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.grey[700],
+            ),
+          ),
         ),
 
         const SizedBox(height: 16),
