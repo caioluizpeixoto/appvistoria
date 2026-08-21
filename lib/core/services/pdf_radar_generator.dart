@@ -424,7 +424,7 @@ class PdfRadarGenerator {
     // Carrega a logo do app em base64
     String base64Logo = '';
     try {
-      final bytes = await rootBundle.load('assets/images/logo.pdf.PNG');
+      final bytes = await rootBundle.load('assets/images/logo.pdf.png');
       base64Logo = base64Encode(bytes.buffer.asUint8List());
     } catch (_) {}
 

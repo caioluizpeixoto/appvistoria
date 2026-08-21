@@ -94,6 +94,7 @@ flutter:
   assets:
     - assets/images/
     - assets/logos/
+    - assets/fonts/
     - .env
 
 flutter_launcher_icons:

@@ -451,8 +451,17 @@ class _WelcomeBanner extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 padding: const EdgeInsets.all(2),
                 child: Image.asset(
-                  'assets/images/logo.pdf.PNG',
+                  'assets/images/logo.png',
                   fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Image.asset(
+                    'assets/images/logo.pdf.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.verified_rounded,
+                      color: AppTheme.primary,
+                      size: 36,
+                    ),
+                  ),
                 ),
               ),
             ],

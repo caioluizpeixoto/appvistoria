@@ -79,6 +79,7 @@ class StepEstrutura extends StatelessWidget {
 
   static const List<String> _statusOpcoes = [
     'Dentro dos padrões de fábrica',
+    'Não aplicável',
     'Possui reparo',
     'Soldado',
     'Substituído',
@@ -86,7 +87,6 @@ class StepEstrutura extends StatelessWidget {
     'Alongado',
     'Obstruído',
     'Consideração sobre coluna e longarina',
-    'Não aplicável',
   ];
 
   @override

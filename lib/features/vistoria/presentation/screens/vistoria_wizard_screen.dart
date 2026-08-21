@@ -982,6 +982,18 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     if (temPinturaPreenchida) {
       _wizardState.realizarAvaliacaoPintura = true;
     }
+    if (_wizardState.checklistStatus.containsKey('consulta_leilao')) {
+      _wizardState.statusLeilao = _wizardState.checklistStatus['consulta_leilao']!;
+    }
+    if (_wizardState.checklistStatus.containsKey('consulta_sinistro')) {
+      _wizardState.statusSinistro = _wizardState.checklistStatus['consulta_sinistro']!;
+    }
+    if (_wizardState.checklistStatus.containsKey('consulta_renajud')) {
+      _wizardState.statusRenajud = _wizardState.checklistStatus['consulta_renajud']!;
+    }
+    if (_wizardState.checklistStatus.containsKey('consulta_alerta_indicio')) {
+      _wizardState.statusAlertaIndicio = _wizardState.checklistStatus['consulta_alerta_indicio']!;
+    }
 
     // Carregar Fotos
     final fotos = await _dao.listarFotosPorVistoria(widget.vistoriaId);

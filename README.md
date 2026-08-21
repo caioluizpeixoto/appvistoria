@@ -1,6 +1,6 @@
-# 🚗 App Auto Vistoria — Laudos Cautelares & Pesquisas Veiculares
+# 🚗 Ultra Prime — Laudos Cautelares & Pesquisas Veiculares
 
-O **App Auto Vistoria** é uma solução profissional mobile (desenvolvida em Flutter) voltada para peritos, vistoriadores e empresas de consultas veiculares. O aplicativo possui arquitetura **Offline-First**, integração com serviços de consulta de histórico/BIN (Radar Consultas / AutoCredCar), leitura de placas por câmera (OCR ML Kit), wizard completo de vistoria cautelar e geração/emissão de laudos em PDF com upload em nuvem (Supabase).
+O **Ultra Prime** é uma solução profissional mobile (desenvolvida em Flutter) voltada para peritos, vistoriadores e empresas de consultas veiculares. O aplicativo possui arquitetura **Offline-First**, integração com serviços de consulta de histórico/BIN (Radar Consultas / AutoCredCar), leitura de placas por câmera (OCR ML Kit), wizard completo de vistoria cautelar e geração/emissão de laudos em PDF com upload em nuvem (Supabase).
 
 ---
 

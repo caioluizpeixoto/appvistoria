@@ -9,6 +9,7 @@ import '../../../../../core/services/ocr_crlv_service.dart';
 import '../../../../../core/utils/veiculo_parser.dart';
 import '../placa_camera_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../../core/services/pdf_radar_generator.dart';
 
 /// Step 2 — Dados do Veículo
 class StepDadosVeiculo extends StatefulWidget {
@@ -230,14 +231,29 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () async {
-                  final uri = Uri.parse(state.arquivoPesquisaUrl);
-                  try {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Não foi possível abrir o link.')));
-                    }
-                  }
+                  final dados = {
+                    'placa': _placaCtrl.text.isNotEmpty ? _placaCtrl.text : state.placa,
+                    'marca': _marcaCtrl.text.isNotEmpty ? _marcaCtrl.text : state.marca,
+                    'modelo': _modeloCtrl.text.isNotEmpty ? _modeloCtrl.text : state.modelo,
+                    'chassi': _chassiVeiculoCtrl.text.isNotEmpty
+                        ? _chassiVeiculoCtrl.text
+                        : (_chassiBinCtrl.text.isNotEmpty ? _chassiBinCtrl.text : state.chassiVeiculo),
+                    'motor': _motorVeiculoCtrl.text.isNotEmpty
+                        ? _motorVeiculoCtrl.text
+                        : (_motorBinCtrl.text.isNotEmpty ? _motorBinCtrl.text : state.motorVeiculo),
+                    'anoFabricacao': _anoFabCtrl.text.isNotEmpty ? _anoFabCtrl.text : state.anoFabricacao,
+                    'anoModelo': _anoModCtrl.text.isNotEmpty ? _anoModCtrl.text : state.anoModelo,
+                    'cor': _corCtrl.text.isNotEmpty ? _corCtrl.text : state.cor,
+                    'renavam': _renavamCtrl.text.isNotEmpty ? _renavamCtrl.text : state.renavam,
+                    'municipio': _municipioCtrl.text.isNotEmpty ? _municipioCtrl.text : state.municipio,
+                    'uf': _ufCtrl.text.isNotEmpty ? _ufCtrl.text : state.uf,
+                  };
+                  await PdfRadarGenerator.visualizarPesquisaPdf(
+                    context: context,
+                    dadosPesquisa: dados,
+                    urlPesquisa: state.arquivoPesquisaUrl,
+                    placa: _placaCtrl.text.isNotEmpty ? _placaCtrl.text : state.placa,
+                  );
                 },
                 icon: const Icon(Icons.picture_as_pdf_rounded),
                 label: const Text('Ver Pesquisa'),
@@ -373,6 +389,60 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
           ),
 
           ],
+
+          const SizedBox(height: 24),
+
+          // ── Histórico e Restrições (Leilão, Sinistro, Renajud, Alerta de Indício) ──
+          _buildSection(
+            icon: Icons.history_edu_rounded,
+            title: 'Histórico e Restrições (Consulta do Veículo)',
+            children: [
+              _buildStatusSelector(
+                title: 'Leilão',
+                icon: Icons.gavel_rounded,
+                currentValue: state.checklistStatus['consulta_leilao'] ?? state.statusLeilao,
+                onChanged: (val) {
+                  setState(() {
+                    state.setStatusConsultaItem('consulta_leilao', val);
+                  });
+                },
+              ),
+              const Divider(height: 18),
+              _buildStatusSelector(
+                title: 'Sinistro',
+                icon: Icons.car_crash_rounded,
+                currentValue: state.checklistStatus['consulta_sinistro'] ?? state.statusSinistro,
+                onChanged: (val) {
+                  setState(() {
+                    state.setStatusConsultaItem('consulta_sinistro', val);
+                  });
+                },
+              ),
+              const Divider(height: 18),
+              _buildStatusSelector(
+                title: 'Renajud / Bloqueios',
+                icon: Icons.lock_rounded,
+                currentValue: state.checklistStatus['consulta_renajud'] ?? state.statusRenajud,
+                onChanged: (val) {
+                  setState(() {
+                    state.setStatusConsultaItem('consulta_renajud', val);
+                  });
+                },
+              ),
+              const Divider(height: 18),
+              _buildStatusSelector(
+                title: 'Alerta de Indício',
+                icon: Icons.warning_amber_rounded,
+                currentValue: state.checklistStatus['consulta_alerta_indicio'] ?? state.statusAlertaIndicio,
+                onChanged: (val) {
+                  setState(() {
+                    state.setStatusConsultaItem('consulta_alerta_indicio', val);
+                  });
+                },
+              ),
+            ],
+          ),
+
           const SizedBox(height: 32),
           // Botão salvar dados
           SizedBox(
@@ -498,6 +568,94 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildStatusSelector({
+    required String title,
+    required IconData icon,
+    required String currentValue,
+    required ValueChanged<String> onChanged,
+  }) {
+    final isConsta = currentValue.toUpperCase().contains('CONSTA') &&
+        !currentValue.toUpperCase().contains('NADA');
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: isConsta ? AppTheme.naoConforme : AppTheme.conforme),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => onChanged('Nada Consta'),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: !isConsta ? AppTheme.conforme.withValues(alpha: 0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: !isConsta ? AppTheme.conforme : AppTheme.border,
+                width: !isConsta ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isConsta) ...[
+                  const Icon(Icons.check_circle, size: 14, color: AppTheme.conforme),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  'Nada Consta',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: !isConsta ? FontWeight.bold : FontWeight.normal,
+                    color: !isConsta ? AppTheme.conforme : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => onChanged('Consta'),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isConsta ? AppTheme.naoConforme.withValues(alpha: 0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isConsta ? AppTheme.naoConforme : AppTheme.border,
+                width: isConsta ? 1.5 : 1.0,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isConsta) ...[
+                  const Icon(Icons.cancel, size: 14, color: AppTheme.naoConforme),
+                  const SizedBox(width: 4),
+                ],
+                Text(
+                  'Consta',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isConsta ? FontWeight.bold : FontWeight.normal,
+                    color: isConsta ? AppTheme.naoConforme : Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -64,10 +64,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Logo
                         Center(
                           child: Image.asset(
-                            'assets/images/logo.pdf.PNG',
+                            'assets/images/logo.png',
                             height: 200,
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            errorBuilder: (_, __, ___) => Image.asset(
+                              'assets/images/logo.pdf.png',
+                              height: 200,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 24),

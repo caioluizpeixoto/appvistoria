@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
+import '../../../domain/vistoria_type.dart';
 import '../../widgets/inspecao_item_widget.dart';
 
 /// Step 11 — Pintura e Lataria
@@ -75,47 +76,51 @@ class StepPintura extends StatelessWidget {
     final originais =
         _pecas.where((id) => state.getStatus(id) == 'Padrão do fabricante' || state.getStatus(id) == 'Pintura original').length;
 
+    final isOpcionalLojista = state.tipoEnum == TipoVistoria.cautelarCarro;
+    final deveExibir = state.deveAvaliarPintura;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Realizar Avaliação de Pintura e Lataria?',
-                      style: TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Se ativado, as informações preenchidas constarão na seção de pintura no PDF gerado.',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                  ],
+        if (isOpcionalLojista)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Realizar Avaliação de Pintura e Lataria?',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Se ativado, as informações preenchidas constarão na seção de pintura no PDF gerado.',
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              Switch(
-                activeColor: AppTheme.primary,
-                value: state.realizarAvaliacaoPintura,
-                onChanged: (val) {
-                  state.setRealizarAvaliacaoPintura(val);
-                },
-              )
-            ],
+                Switch(
+                  activeColor: AppTheme.primary,
+                  value: state.realizarAvaliacaoPintura,
+                  onChanged: (val) {
+                    state.setRealizarAvaliacaoPintura(val);
+                  },
+                )
+              ],
+            ),
           ),
-        ),
-        if (state.realizarAvaliacaoPintura) ...[
-          const SizedBox(height: 12),
+        if (deveExibir) ...[
+          if (isOpcionalLojista) const SizedBox(height: 12),
           // ── Resumo visual ──────────────────────────────────────────────────
           _PinturaResumoCard(
               originais: originais, repinturas: repinturas, total: _pecas.length),

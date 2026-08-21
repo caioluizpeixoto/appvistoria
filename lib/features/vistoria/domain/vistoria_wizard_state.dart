@@ -42,6 +42,21 @@ class VistoriaWizardState extends ChangeNotifier {
   String arquivoPesquisaUrl = '';
   String statusConsulta = 'nenhuma';
 
+  // ── Histórico / Consulta (Alimentado diretamente na vistoria) ──────────────
+  String statusLeilao = 'Nada Consta';
+  String statusSinistro = 'Nada Consta';
+  String statusRenajud = 'Nada Consta';
+  String statusAlertaIndicio = 'Nada Consta';
+
+  void setStatusConsultaItem(String key, String status) {
+    checklistStatus[key] = status;
+    if (key == 'consulta_leilao') statusLeilao = status;
+    if (key == 'consulta_sinistro') statusSinistro = status;
+    if (key == 'consulta_renajud') statusRenajud = status;
+    if (key == 'consulta_alerta_indicio') statusAlertaIndicio = status;
+    notifyListeners();
+  }
+
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
 
@@ -75,6 +90,8 @@ class VistoriaWizardState extends ChangeNotifier {
   bool realizarAvaliacaoPintura = false;
   final Map<String, String> checklistOpcional = {};
   final Map<String, String> checklistOpcionalMotivos = {};
+
+  bool get deveAvaliarPintura => temAvarias || realizarAvaliacaoPintura;
 
   void setRealizarAvaliacaoPintura(bool val) {
     realizarAvaliacaoPintura = val;
@@ -322,8 +339,6 @@ class VistoriaWizardState extends ChangeNotifier {
     if (!isCaminhao) {
       list.addAll([
         'compartimento_motor',
-        'etiqueta_vis_motor',
-        'etiqueta_vis_porta',
       ]);
     } else {
       list.add('plaqueta_da_cabine');

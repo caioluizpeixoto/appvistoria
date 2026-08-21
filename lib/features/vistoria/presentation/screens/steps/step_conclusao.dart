@@ -49,12 +49,22 @@ class _StepConclusaoState extends State<StepConclusao> {
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final s = context.read<VistoriaWizardState>();
-      _parecerCtrl.text = s.parecerTecnico;
       if (s.resultadoFinal.isEmpty) {
         s.resultadoFinal = s.statusSugerido;
-        // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
-        s.notifyListeners();
       }
+      if (s.parecerTecnico.trim().isEmpty) {
+        final st = (s.resultadoFinal.isNotEmpty ? s.resultadoFinal : s.statusSugerido).toUpperCase();
+        if (st.contains('REPROVADO') || st.contains('NÃO CONFORME') || st.contains('NAO CONFORME')) {
+          s.parecerTecnico = 'Veículo com apontamentos estruturais ou de identificação divergentes do padrão original do fabricante.';
+        } else if (st.contains('OBSERVA') || st.contains('APONTAMENTO')) {
+          s.parecerTecnico = 'Veículo com pequenos reparos de funilaria/pintura ou desgastes observados. Estrutura geral preservada.';
+        } else {
+          s.parecerTecnico = 'Veículo com reparo de funilaria e pintura. Estrutura preservada dentro do padrão do fabricante.';
+        }
+      }
+      _parecerCtrl.text = s.parecerTecnico;
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      s.notifyListeners();
     });
   }
 

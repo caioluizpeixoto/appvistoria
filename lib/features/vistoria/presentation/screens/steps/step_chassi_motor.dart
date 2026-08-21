@@ -79,7 +79,7 @@ class StepMotorCambio extends StatelessWidget {
         const InspecaoItemWidget(
           itemId: 'etiqueta_vis_motor',
           label: 'Etiqueta VIS — Compartimento do Motor',
-          obrigatoria: true,
+          obrigatoria: false,
           statusOptions: [
             'Original',
             'Ausente',
@@ -113,7 +113,7 @@ class StepEtiquetasChassi extends StatelessWidget {
         const InspecaoItemWidget(
           itemId: 'etiqueta_vis_porta',
           label: 'Etiqueta VIS — Porta / Coluna',
-          obrigatoria: true,
+          obrigatoria: false,
           statusOptions: [
             'Original',
             'Ausente',
