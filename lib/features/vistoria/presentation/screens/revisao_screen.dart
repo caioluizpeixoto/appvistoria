@@ -265,6 +265,38 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
                   if (_state != null && _state!.itensDivergentes.isNotEmpty)
                     _DivergenciasCard(divergentes: _state!.itensDivergentes),
 
+                  const SizedBox(height: 16),
+
+                  // ── Ficha Técnica Inteligente com IA ─────────────────────
+                  if (_state != null)
+                    _Card(
+                      title: 'Ficha Técnica com IA',
+                      icon: Icons.auto_awesome_rounded,
+                      trailing: Switch.adaptive(
+                        value: _state!.gerarFichaTecnicaComIa,
+                        activeThumbColor: AppTheme.primary,
+                        onChanged: (val) {
+                          setState(() {
+                            _state!.gerarFichaTecnicaComIa = val;
+                          });
+                        },
+                      ),
+                      children: [
+                        Text(
+                          _state!.gerarFichaTecnicaComIa
+                              ? 'A Ficha Técnica Inteligente com IA será gerada com estimativas e especificações técnicas.'
+                              : 'O Laudo será gerado sem as páginas de Ficha Técnica IA.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: _state!.gerarFichaTecnicaComIa
+                                ? AppTheme.textPrimary
+                                : AppTheme.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+
                   const SizedBox(height: 32),
                 ],
               ),
@@ -529,12 +561,15 @@ class _Card extends StatelessWidget {
   final String title;
   final IconData icon;
   final Color? color;
+  final Widget? trailing;
   final List<Widget> children;
-  const _Card(
-      {required this.title,
-      required this.icon,
-      this.color,
-      required this.children});
+  const _Card({
+    required this.title,
+    required this.icon,
+    this.color,
+    this.trailing,
+    required this.children,
+  });
   @override
   Widget build(BuildContext context) {
     final c = color ?? AppTheme.primary;
@@ -552,9 +587,17 @@ class _Card extends StatelessWidget {
             children: [
               Icon(icon, color: c, size: 18),
               const SizedBox(width: 8),
-              Text(title,
+              Expanded(
+                child: Text(
+                  title,
                   style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700, color: c)),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: c,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
             ],
           ),
           const SizedBox(height: 12),

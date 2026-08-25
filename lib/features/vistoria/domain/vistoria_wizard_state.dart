@@ -45,6 +45,7 @@ class VistoriaWizardState extends ChangeNotifier {
   // ── Histórico / Consulta (Alimentado diretamente na vistoria) ──────────────
   String statusLeilao = 'Nada Consta';
   String statusSinistro = 'Nada Consta';
+  String statusRoubo = 'Nada Consta';
   String statusRenajud = 'Nada Consta';
   String statusAlertaIndicio = 'Nada Consta';
 
@@ -52,6 +53,7 @@ class VistoriaWizardState extends ChangeNotifier {
     checklistStatus[key] = status;
     if (key == 'consulta_leilao') statusLeilao = status;
     if (key == 'consulta_sinistro') statusSinistro = status;
+    if (key == 'consulta_roubo') statusRoubo = status;
     if (key == 'consulta_renajud') statusRenajud = status;
     if (key == 'consulta_alerta_indicio') statusAlertaIndicio = status;
     notifyListeners();
@@ -59,6 +61,7 @@ class VistoriaWizardState extends ChangeNotifier {
 
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
+  bool gerarFichaTecnicaComIa = true;
 
   // ── Checklist de itens: status e observação por itemId ────────────────────
   // Todas as etapas de inspeção usam este mapa

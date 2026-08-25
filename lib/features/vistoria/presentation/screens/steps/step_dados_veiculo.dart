@@ -420,6 +420,17 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
               ),
               const Divider(height: 18),
               _buildStatusSelector(
+                title: 'Roubo e Furto',
+                icon: Icons.shield_rounded,
+                currentValue: state.checklistStatus['consulta_roubo'] ?? state.statusRoubo,
+                onChanged: (val) {
+                  setState(() {
+                    state.setStatusConsultaItem('consulta_roubo', val);
+                  });
+                },
+              ),
+              const Divider(height: 18),
+              _buildStatusSelector(
                 title: 'Renajud / Bloqueios',
                 icon: Icons.lock_rounded,
                 currentValue: state.checklistStatus['consulta_renajud'] ?? state.statusRenajud,

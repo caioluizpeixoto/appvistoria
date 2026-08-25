@@ -52,16 +52,6 @@ class _StepConclusaoState extends State<StepConclusao> {
       if (s.resultadoFinal.isEmpty) {
         s.resultadoFinal = s.statusSugerido;
       }
-      if (s.parecerTecnico.trim().isEmpty) {
-        final st = (s.resultadoFinal.isNotEmpty ? s.resultadoFinal : s.statusSugerido).toUpperCase();
-        if (st.contains('REPROVADO') || st.contains('NÃO CONFORME') || st.contains('NAO CONFORME')) {
-          s.parecerTecnico = 'Veículo com apontamentos estruturais ou de identificação divergentes do padrão original do fabricante.';
-        } else if (st.contains('OBSERVA') || st.contains('APONTAMENTO')) {
-          s.parecerTecnico = 'Veículo com pequenos reparos de funilaria/pintura ou desgastes observados. Estrutura geral preservada.';
-        } else {
-          s.parecerTecnico = 'Veículo com reparo de funilaria e pintura. Estrutura preservada dentro do padrão do fabricante.';
-        }
-      }
       _parecerCtrl.text = s.parecerTecnico;
       // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
       s.notifyListeners();
@@ -334,6 +324,96 @@ class _StepConclusaoState extends State<StepConclusao> {
                     ),
                     onChanged: (v) => state.parecerTecnico = v,
                   ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Ficha Técnica Inteligente com IA ─────────────────────────────
+          Container(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: state.gerarFichaTecnicaComIa
+                    ? AppTheme.primary
+                    : AppTheme.border,
+                width: state.gerarFichaTecnicaComIa ? 2 : 1,
+              ),
+              boxShadow: state.gerarFichaTecnicaComIa
+                  ? [
+                      BoxShadow(
+                        color: AppTheme.primary.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      )
+                    ]
+                  : [],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (state.gerarFichaTecnicaComIa
+                                ? AppTheme.primary
+                                : Colors.grey)
+                            .withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        Icons.auto_awesome_rounded,
+                        color: state.gerarFichaTecnicaComIa
+                            ? AppTheme.primary
+                            : Colors.grey,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Ficha Técnica com IA',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            state.gerarFichaTecnicaComIa
+                                ? 'Sim, incluir no Laudo com valores e dados de IA'
+                                : 'Não incluir páginas de Ficha Técnica com IA',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: state.gerarFichaTecnicaComIa
+                                  ? AppTheme.primary
+                                  : AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: state.gerarFichaTecnicaComIa,
+                      activeThumbColor: AppTheme.primary,
+                      onChanged: (val) {
+                        state.gerarFichaTecnicaComIa = val;
+                        // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+                        state.notifyListeners();
+                      },
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -76,17 +76,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Se não existir, chamar Gemini
-    const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
-    if (!geminiApiKey) {
-      return new Response(JSON.stringify({ error: 'Chave da API Gemini não configurada.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`
-
     let extraPrompt = '';
     let extraJsonSchema = '';
     const estadoLocal = uf ? `Considere o mercado do estado de(a) ${uf}, NO BRASIL, para estimativa de preços.` : 'Considere o mercado médio brasileiro para estimativa de preços.';
@@ -95,16 +84,27 @@ Deno.serve(async (req) => {
       extraPrompt = `\nIMPORTANTE: O vistoriador registrou os seguintes apontamentos neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}
 
 REGRAS CRÍTICAS DE TRATAMENTO DOS APONTAMENTOS:
-1. ITENS MARCADOS COMO "SEM ACESSO", "SEMA ACESSO", "NÃO LOCALIZADO" OU "NÃO FOI POSSÍVEL VERIFICAR":
-   - Estes itens NÃO SÃO AVARIAS OU DEFEITOS DO VEÍCULO. Indicam apenas impossibilidade física de visualização/acesso no momento da vistoria (ex: gravação de câmbio oculta, longarina coberta/sem visibilidade).
-   - Para estes itens de "SEM ACESSO", você DEVE OBRIGATORIAMENTE preencher:
+1. ITENS MARCADOS COMO "SEM ACESSO", "SEMA ACESSO", "NÃO LOCALIZADO", "PLAQUETA AUSENTE", "AUSENTE" OU "NÃO FOI POSSÍVEL VERIFICAR":
+   - Estes itens NÃO SÃO AVARIAS, DEFEITOS NEM SERVIÇOS A FAZER. Indicam apenas impossibilidade física de visualização/acesso ou ausência da plaqueta de identificação (ex: plaqueta de câmbio ausente, gravação oculta, longarina coberta/sem visibilidade).
+   - Estar com "plaqueta ausente" NÃO significa câmbio quebrado, irregular ou com defeito mecânico. NUNCA gere troca, reparo ou manutenção por conta de plaqueta ausente.
+   - Para estes itens de "SEM ACESSO" ou "PLAQUETA AUSENTE", você DEVE OBRIGATORIAMENTE preencher:
      * "valor_peca_estimado": "R$ 0,00"
      * "valor_mao_de_obra_estimado": "R$ 0,00"
-     * "observacao_indicada": "Item sem acesso físico para verificação na vistoria (não representa avaria nem gera custo de reparo)".
-   - NUNCA atribua valor de mão de obra ou valor de peça a um item que está apenas "SEM ACESSO".
-   - NUNCA inclua o custo de itens "SEM ACESSO" no cálculo do "desconto_total_avarias".
+     * "observacao_indicada": "Item sem avaria mecânica/funcional nem defeito pendente (não gera custo de reparo nem serviço a fazer)".
+   - NUNCA atribua valor de mão de obra ou valor de peça a um item que está apenas "SEM ACESSO" ou "PLAQUETA AUSENTE".
+   - NUNCA inclua o custo destes itens no cálculo do "desconto_total_avarias" nem trate como problema no resumo do estado do veículo.
 
-2. ITENS COM AVARIAS REAIS OU DEFEITOS (ex: amassado, trincado, corroído, adulterado, repintura):
+2. ITENS DE REPINTURA, RETOQUE OU PINTURA JÁ EXECUTADA (ex: repintura, repintado, retoque, micropintura, pintura não original):
+   - A repintura é um SERVIÇO DE MANUTENÇÃO ESTÉTICA JÁ REALIZADO no veículo, e NÃO um defeito ou avaria pendente de conserto.
+   - Apenas seria uma avaria/problema se o apontamento descrever expressamente danos físicos abertos (ex: risco profundo, amassado, trinca, peça quebrada, massa plástica descascando/trincada, oxidação/ferrugem).
+   - Se for apenas a indicação de peça repintada/retoque sem dano aberto relatado:
+     * "valor_peca_estimado": "R$ 0,00"
+     * "valor_mao_de_obra_estimado": "R$ 0,00"
+     * "observacao_indicada": "Serviço estético de repintura já realizado / estética conservada (não é defeito pendente e não gera custo de reparo)".
+   - NUNCA atribua valor de peça/mão de obra e NUNCA deduza do "desconto_total_avarias" para peças que apenas foram repintadas no passado.
+   - No "resumo_estado_veiculo", trate a repintura apenas como histórico de manutenção estética/conservação, NUNCA como defeito, avaria ou problema depreciativo.
+
+3. ITENS COM AVARIAS REAIS OU DEFEITOS PENDENTES (ex: amassado, risco profundo, trincado, quebrado, corroído/ferrugem, rasgado, vazamento, peça com avaria):
    - Estime o valor da peça de reposição (nova ou paralela) e o custo de mão de obra para reparar ou substituir.
    - REGRA PARA AVARIAS ESTRUTURAIS: Assuma sempre que o reparo é uma troca simples de componente ou serviço pontual. Nunca orce reconstruções ou reparos estruturais complexos de alto custo se for item simples.
 
@@ -113,10 +113,14 @@ Inclua as estimativas no JSON de retorno sob a chave "apontamentos_veiculo". ${e
     }
     
     // Sempre adicionar a análise final
-    extraPrompt += `\nAlém disso, faça uma análise final da vistoria: se está tudo certo ou se há avarias reais, apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado APENAS nas avarias reais informadas (desconsiderando itens sem acesso) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
+    extraPrompt += `\nAlém disso, faça uma análise final da vistoria com ALTO NÍVEL DE DETALHAMENTO (nível laudo premium):
+- "resumo_estado_veiculo": Forneça um parágrafo robusto e extremamente profissional resumindo o impacto geral dos apontamentos no veículo (seja positivo ou negativo).
+- "justificativa": Escreva pelo menos dois parágrafos detalhando a composição do preço sugerido, a depreciação calculada e a atratividade do modelo no mercado de usados.
+Apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado APENAS nas avarias reais informadas (desconsiderando itens sem acesso) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
+    
     extraJsonSchema += `,\n"analise_final": {\n"resumo_estado_veiculo": "",\n"valor_venda_mercado_local": "",\n"desconto_total_avarias": "",\n"valor_venda_sugerido_final": "",\n"justificativa": ""\n}`;
 
-    const prompt = `Você é um especialista técnico automotivo brasileiro. Crie uma ficha técnica detalhada para o veículo informado. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Use dados aproximados quando necessário e marque valores incertos como estimados. OBRIGATÓRIO: TODOS OS PREÇOS E AVALIAÇÕES DEVEM SER EM MOEDA BRASILEIRA (BRL) FORMATADOS COMO "R$ X.XXX,XX". NUNCA USE USD NEM REALIZE AVALIAÇÕES DO MERCADO AMERICANO.${extraPrompt}
+    const prompt = `Você é um Perito Automotivo MASTER e Avaliador de Mercado Sênior no Brasil. Seu objetivo é criar um relatório/ficha técnica EXTREMAMENTE RICO EM DETALHES, com dados técnicos avançados, problemas crônicos reais bem descritos e valores de peças/mão de obra realistas. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Evite textos genéricos, aprofunde-se nos defeitos conhecidos do motor/câmbio desta versão. OBRIGATÓRIO: TODOS OS PREÇOS E AVALIAÇÕES DEVEM SER EM MOEDA BRASILEIRA (BRL) FORMATADOS COMO "R$ X.XXX,XX". NUNCA USE USD NEM REALIZE AVALIAÇÕES DO MERCADO AMERICANO.${extraPrompt}
 
 Veículo:
 Marca: ${brand}
@@ -188,51 +192,98 @@ O JSON retornado deve seguir rigorosamente esta estrutura:
 "aviso": "Informações geradas por IA com valores estimados. Confirmar dados técnicos, valores e recalls em fontes oficiais antes de uso comercial ou jurídico."
 }`
 
-    const geminiResponse = await fetch(geminiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }]
-      })
-    })
+    let parsedJson: any = null
+    let sourceUsed = ''
 
-    if (!geminiResponse.ok) {
-      const errorText = await geminiResponse.text()
-      console.error('Erro na API Gemini:', errorText)
-      return new Response(JSON.stringify({ error: 'Erro ao gerar ficha com Gemini.', details: errorText }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    // ── 1. Tentar gerar com OpenAI (gpt-4o-mini ou gpt-4o) ────────────────────
+    // @ts-ignore
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
+    if (openAiApiKey) {
+      console.log('Gerando ficha técnica com OpenAI gpt-4o-mini para:', brand, model, year)
+      try {
+        const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openAiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'system',
+                content: 'Você é um especialista técnico automotivo e perito veicular brasileiro. Retorne exclusivamente JSON válido de acordo com o esquema solicitado.'
+              },
+              {
+                role: 'user',
+                content: prompt
+              }
+            ],
+            temperature: 0.2,
+          })
+        })
+
+        if (openAiResponse.ok) {
+          const openAiData = await openAiResponse.json()
+          const rawContent = openAiData.choices?.[0]?.message?.content
+          if (rawContent) {
+            parsedJson = JSON.parse(rawContent)
+            sourceUsed = 'openai-gpt-4o-mini'
+            console.log('Ficha técnica gerada com sucesso via OpenAI!')
+          }
+        } else {
+          const errText = await openAiResponse.text()
+          console.error('Erro na chamada OpenAI:', errText)
+        }
+      } catch (openAiErr: any) {
+        console.error('Exceção ao chamar OpenAI:', openAiErr.message)
+      }
     }
 
-    const geminiData = await geminiResponse.json()
-    let textResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
+    // ── 2. Fallback para Gemini se OpenAI não gerou ────────────────────────────
+    if (!parsedJson) {
+      // @ts-ignore
+      const geminiApiKey = Deno.env.get('GEMINI_API_KEY')
+      if (geminiApiKey) {
+        console.log('Tentando fallback com Gemini para:', brand, model, year)
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`
 
-    if (!textResult) {
-      return new Response(JSON.stringify({ error: 'Resposta vazia da IA.' }), {
-        status: 502,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+        const geminiResponse = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: prompt }]
+            }]
+          })
+        })
+
+        if (geminiResponse.ok) {
+          const geminiData = await geminiResponse.json()
+          let textResult = geminiData.candidates?.[0]?.content?.parts?.[0]?.text
+          if (textResult) {
+            textResult = textResult.trim()
+            if (textResult.startsWith('```json')) {
+              textResult = textResult.replace(/^```json/, '').replace(/```$/, '').trim()
+            } else if (textResult.startsWith('```')) {
+              textResult = textResult.replace(/^```/, '').replace(/```$/, '').trim()
+            }
+            parsedJson = JSON.parse(textResult)
+            sourceUsed = 'gemini-1.5-flash'
+            console.log('Ficha técnica gerada com sucesso via Gemini!')
+          }
+        } else {
+          const errorText = await geminiResponse.text()
+          console.error('Erro na API Gemini:', errorText)
+        }
+      }
     }
 
-    // Limpar possíveis formatações markdown (ex: ```json ... ```)
-    textResult = textResult.trim()
-    if (textResult.startsWith('```json')) {
-      textResult = textResult.replace(/^```json/, '').replace(/```$/, '').trim()
-    } else if (textResult.startsWith('```')) {
-      textResult = textResult.replace(/^```/, '').replace(/```$/, '').trim()
-    }
-
-    let parsedJson
-    try {
-      parsedJson = JSON.parse(textResult)
-    } catch (e) {
-      console.error('Erro ao fazer parse do JSON da Gemini:', textResult)
-      return new Response(JSON.stringify({ error: 'A IA retornou um formato inválido.' }), {
+    if (!parsedJson) {
+      return new Response(JSON.stringify({ error: 'Falha ao gerar relatório inteligente nas APIs de IA.' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -257,7 +308,7 @@ O JSON retornado deve seguir rigorosamente esta estrutura:
       }
     }
 
-    return new Response(JSON.stringify({ source: 'gemini', data: parsedJson }), {
+    return new Response(JSON.stringify({ source: sourceUsed, data: parsedJson }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
 

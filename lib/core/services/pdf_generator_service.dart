@@ -784,18 +784,12 @@ class PdfGeneratorService {
 
                 final parecerStr = (() {
                   if (wizardState?.parecerTecnico != null && wizardState!.parecerTecnico.trim().isNotEmpty) {
-                    return wizardState!.parecerTecnico.trim();
+                    return wizardState.parecerTecnico.trim();
                   }
                   if (vistoria.parecerTecnico != null && vistoria.parecerTecnico!.trim().isNotEmpty) {
                     return vistoria.parecerTecnico!.trim();
                   }
-                  final st = (vistoria.statusFinal ?? wizardState?.resultadoFinal ?? 'CONFORME').toUpperCase();
-                  if (st.contains('NÃO CONFORME') || st.contains('REPROVADO') || st.contains('NAO CONFORME')) {
-                    return 'Veículo com apontamentos estruturais ou de identificação divergentes do padrão original do fabricante.';
-                  } else if (st.contains('OBSERVA') || st.contains('APONTAMENTO')) {
-                    return 'Veículo com pequenos reparos de funilaria/pintura ou desgastes observados. Estrutura geral preservada.';
-                  }
-                  return 'Veículo com reparo de funilaria e pintura. Estrutura preservada dentro do padrão do fabricante.';
+                  return '';
                 })();
 
                 if (parecerStr.isNotEmpty) {
@@ -1011,9 +1005,11 @@ class PdfGeneratorService {
     }
 
     // ── Ficha Técnica Inteligente (Gemini) ──────────────────────────────────
-    try {
-      List<String> apontamentosList = [];
-      final wState = wizardState;
+    final deveGerarFichaIa = wizardState?.gerarFichaTecnicaComIa ?? true;
+    if (deveGerarFichaIa) {
+      try {
+        List<String> apontamentosList = [];
+        final wState = wizardState;
       if (wState != null) {
         apontamentosList = wState.checklistStatus.entries
             .where((e) {
@@ -1025,6 +1021,34 @@ class PdfGeneratorService {
                 final obsUpper = obs.trim().toUpperCase();
                 if (_isStatusConformeOuOk(obsUpper)) return false;
               }
+
+              final valUpper = status.trim().toUpperCase();
+              final obsUpper = obs.trim().toUpperCase();
+
+              final hasDanoAberto = obsUpper.contains('RISC') ||
+                  obsUpper.contains('AMASS') ||
+                  obsUpper.contains('TRINC') ||
+                  obsUpper.contains('QUEBR') ||
+                  obsUpper.contains('FERRUG') ||
+                  obsUpper.contains('CORRO') ||
+                  obsUpper.contains('DESCASC') ||
+                  obsUpper.contains('DEFEIT');
+
+              final isRepinturaServico = (valUpper.contains('REPINTURA') ||
+                      valUpper.contains('REPINTADO') ||
+                      valUpper.contains('RETOQUE') ||
+                      valUpper.contains('MICROPINTURA') ||
+                      valUpper.contains('MICRO PINTURA')) &&
+                  !hasDanoAberto;
+
+              // Se for apenas repintura/serviço estético já feito (sem avaria/dano aberto), NÃO deve aparecer nem ser enviado para a IA
+              if (isRepinturaServico) return false;
+
+              // Se for plaqueta ausente no câmbio (sem dano físico aberto), NÃO é avaria mecânica nem defeito e não deve ser enviado para a IA como serviço a fazer
+              final isPlaquetaAusente = valUpper.contains('PLAQUETA AUSENTE') ||
+                  (e.key == 'cambio_gravacao' && (valUpper.contains('AUSENTE') || valUpper.contains('SEM ACESSO')));
+              if (isPlaquetaAusente && !hasDanoAberto) return false;
+
               return true;
             })
             .map((e) {
@@ -1053,6 +1077,14 @@ class PdfGeneratorService {
       if (brandStr.isEmpty) brandStr = 'NÃO INFORMADA';
       if (modelStr.isEmpty) modelStr = 'NÃO INFORMADO';
 
+      String locationUf = veiculo.uf ?? '';
+      try {
+        final gpsUf = await _obterUfPorGps();
+        if (gpsUf != null && gpsUf.isNotEmpty) {
+          locationUf = gpsUf;
+        }
+      } catch (_) {}
+
       final resFicha = await Supabase.instance.client.functions.invoke(
         'gerar-ficha-veiculo',
         body: {
@@ -1064,7 +1096,7 @@ class PdfGeneratorService {
           'fuel': veiculo.combustivel ?? '',
           'engine': veiculo.motorVeiculo ?? '',
           if (apontamentosList.isNotEmpty) 'apontamentos': apontamentosList,
-          'uf': veiculo.uf ?? '',
+          'uf': locationUf,
         },
       ).timeout(const Duration(seconds: 45));
 
@@ -1076,11 +1108,12 @@ class PdfGeneratorService {
               logoImage, assinaturaImage, wizardState);
         }
       } else {
-        print('Erro Gemini (Status ${resFicha.status}): ${resFicha.data}');
+        print('Erro IA (Status ${resFicha.status}): ${resFicha.data}');
       }
     } catch (e) {
       print('Erro ao gerar ficha técnica inteligente: $e');
       // Continua gerando o PDF normalmente
+    }
     }
 
     // ── Página de Disclaimer ─────────────────────────────────────────────────
@@ -1737,24 +1770,26 @@ class PdfGeneratorService {
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           pw.Container(
-            width: 48,
-            height: 48,
+            width: 60,
+            height: 77,
             child: pw.Stack(
               alignment: pw.Alignment.center,
               children: [
                 pw.Container(
-                  width: 46,
-                  height: 46,
+                  width: 53,
+                  height: 74,
                   decoration: pw.BoxDecoration(
                     color: PdfColors.white,
-                    shape: pw.BoxShape.circle,
-                    border: pw.Border.all(color: borderColor, width: 1.8),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.elliptical(26.5, 37),
+                    ),
+                    border: pw.Border.all(color: borderColor, width: 4.8),
                   ),
                   child: pw.Center(
                     child: pw.SvgImage(
                       svg: svgIcon,
-                      width: 23,
-                      height: 23,
+                      width: 30,
+                      height: 30,
                     ),
                   ),
                 ),
@@ -1762,16 +1797,16 @@ class PdfGeneratorService {
                   bottom: 0,
                   right: 0,
                   child: pw.Container(
-                    width: 15,
-                    height: 15,
+                    width: 20,
+                    height: 20,
                     decoration: const pw.BoxDecoration(
                       color: PdfColors.white,
                       shape: pw.BoxShape.circle,
                     ),
                     child: pw.SvgImage(
                       svg: miniBadgeSvg,
-                      width: 14,
-                      height: 14,
+                      width: 19,
+                      height: 19,
                     ),
                   ),
                 ),
@@ -1784,7 +1819,7 @@ class PdfGeneratorService {
             textAlign: pw.TextAlign.center,
             style: pw.TextStyle(
               font: styles.bold,
-              fontSize: 7.0,
+              fontSize: 7.8,
               color: PdfColors.black,
             ),
           ),
@@ -1807,30 +1842,34 @@ class PdfGeneratorService {
 
     pw.Widget buildItemRow(Map<String, dynamic> e) {
       final statusVal = e['status'] as int;
-      final dotColor = statusVal == 2
-          ? dangerRed
-          : (statusVal == 1 ? warningYellow : limeGreen);
+      String statusSvg;
+      if (statusVal == 1) {
+        statusSvg =
+            '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+      } else if (statusVal == 2) {
+        statusSvg =
+            '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+      } else {
+        statusSvg =
+            '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+      }
 
       return pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 3.5),
+        padding: const pw.EdgeInsets.only(bottom: 2.0),
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
-            pw.Container(
-              width: 5.0,
-              height: 5.0,
-              decoration: pw.BoxDecoration(
-                color: dotColor,
-                shape: pw.BoxShape.circle,
-              ),
-            ),
-            pw.SizedBox(width: 4.5),
+            pw.SvgImage(
+                svg: statusSvg,
+                width: 7.0,
+                height: 7.0),
+            pw.SizedBox(width: 3.5),
             pw.Expanded(
               child: pw.Text(
                 e['nome'] as String,
                 style: pw.TextStyle(
                   font: styles.bold,
-                  fontSize: 7.2,
+                  fontSize: 6.7,
                   color: statusVal != 0 ? PdfColors.black : PdfColor.fromHex('2D3136'),
                 ),
                 maxLines: 1,
@@ -1845,7 +1884,7 @@ class PdfGeneratorService {
     return pw.Expanded(
       flex: flex,
       child: pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 4),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 3),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
@@ -1854,27 +1893,27 @@ class PdfGeneratorService {
               crossAxisAlignment: pw.CrossAxisAlignment.center,
               children: [
                 pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2.0),
                   decoration: pw.BoxDecoration(
                     color: limeGreen,
-                    borderRadius: pw.BorderRadius.circular(3.5),
+                    borderRadius: pw.BorderRadius.circular(3.0),
                   ),
                   child: pw.Text(
                     '$total',
                     style: pw.TextStyle(
                       color: PdfColors.white,
                       font: styles.bold,
-                      fontSize: 8.5,
+                      fontSize: 8.0,
                     ),
                   ),
                 ),
-                pw.SizedBox(width: 5),
+                pw.SizedBox(width: 4),
                 pw.Expanded(
                   child: pw.Text(
                     title,
                     style: pw.TextStyle(
                       font: styles.bold,
-                      fontSize: 8.5,
+                      fontSize: 8.0,
                       color: PdfColors.black,
                     ),
                     maxLines: 1,
@@ -1883,7 +1922,7 @@ class PdfGeneratorService {
                 ),
               ],
             ),
-            pw.SizedBox(height: 6),
+            pw.SizedBox(height: 4),
             // Items List
             if (numColumns == 1)
               pw.Column(
@@ -1900,7 +1939,7 @@ class PdfGeneratorService {
                       children: itens.sublist(0, (itens.length / 2).ceil()).map(buildItemRow).toList(),
                     ),
                   ),
-                  pw.SizedBox(width: 8),
+                  pw.SizedBox(width: 5),
                   pw.Expanded(
                     child: pw.Column(
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -1927,7 +1966,6 @@ class PdfGeneratorService {
     RadarVeiculo? radarVeiculo,
     Map<String, dynamic>? dadosConsultaJson,
   }) async {
-    final darkHeaderBg = PdfColor.fromHex('2D3136');
     final limeGreen = PdfColor.fromHex('8CC63F');
     final warningYellow = PdfColor.fromHex('FBB03B');
     final dangerRed = PdfColor.fromHex('EE4036');
@@ -2056,9 +2094,9 @@ class PdfGeneratorService {
     final String svgCarIcon =
         '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>';
     final String svgHammer =
-        '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M1 21h12v2H1zM5.245 8.07l2.83-2.827 8.99 8.99-2.83 2.828zM12.317 1l4.243 4.243-2.829 2.828-4.242-4.242zM16.56 5.243l2.829-2.829 4.243 4.243-2.829 2.828z"/></svg>';
+        '<svg viewBox="0 0 32 32"><path fill="#2D3136" d="M11.623 7.603l6.062 3.5c0.479 0.276 1.090 0.112 1.365-0.366 0.277-0.478 0.113-1.090-0.365-1.365l-6.062-3.5c-0.479-0.276-1.090-0.112-1.366 0.365s-0.112 1.089 0.366 1.366zM17.186 11.969l-6.062-3.5-3.5 6.062 6.062 3.5 3.5-6.062zM6.123 17.129l6.062 3.5c0.478 0.276 1.090 0.112 1.365-0.366s0.112-1.090-0.365-1.365l-6.062-3.5c-0.479-0.276-1.090-0.112-1.366 0.365-0.277 0.478-0.112 1.090 0.366 1.366zM27.012 19.951l-11.076-5.817-1 1.732 10.576 6.683c0.717 0.414 1.635 0.169 2.049-0.549s0.168-1.635-0.549-2.049zM16.033 25c0-0.553-0.448-1-1-1h-9c-0.553 0-1 0.447-1 1 0 0.552 0 1 0 1l-1.033-0.021 0.033 1.021h13l0.047-0.958-0.984-0.042c0 0-0.063-0.448-0.063-1z"/></svg>';
     final String svgSinistro =
-        '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/><path fill="#2D3136" d="M11 1h2v3h-2zm-5.66 2.34l1.41-1.41 2.12 2.12-1.41 1.41zm11.32 0l2.12-2.12 1.41 1.41-2.12 2.12z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M15.73 3H8.27L3 8.27v7.46L8.27 21h7.46L21 15.73V8.27L15.73 3zM12 17.3c-.72 0-1.3-.58-1.3-1.3 0-.72.58-1.3 1.3-1.3.72 0 1.3.58 1.3 1.3 0 .72-.58 1.3-1.3 1.3zm1-4.3h-2V7h2v6z"/></svg>';
     final String svgLock =
         '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>';
     final String svgWarningTriangle =
@@ -2068,14 +2106,14 @@ class PdfGeneratorService {
     
     // Ícone de Estrutura: chassi / frame
     final String svgChassis =
-        '<svg viewBox="0 0 24 24"><path fill="#2D3136" d="M21 7V5h-2V3h-2v2H7V3H5v2H3v2h2v10H3v2h2v2h2v-2h10v2h2v-2h2v-2h-2V7h2zm-4 10H7V7h10v10z"/></svg>';
+        '<svg viewBox="0 0 480.016 480.016"><path fill="#2D3136" d="M385.895,292.612c-15.111,0-27.694,11.014-29.872,25.906H272.81c-2.577-8.819-10.827-15.087-20.102-15.087h-55.461c-9.275,0-17.509,6.267-20.102,15.087h-69.743c-1.618-15.493-14.64-27.426-30.344-27.426c-16.883,0-30.62,13.745-30.62,30.653c0,16.891,13.729,30.628,30.62,30.628c14.607,0,26.938-10.161,29.889-24.394h69.727c1.699,10.047,10.291,17.436,20.573,17.436h55.461c10.291,0,18.866-7.381,20.565-17.436h82.822c2.43,14.566,14.965,25.337,29.791,25.337c16.753,0,30.352-13.599,30.352-30.32C416.255,306.227,402.648,292.612,385.895,292.612z M385.895,344.041c-11.632,0-21.077-9.454-21.077-21.061c0-11.656,9.445-21.102,21.077-21.102c11.624,0,21.086,9.445,21.086,21.102C406.98,334.588,397.519,344.041,385.895,344.041z M187.208,318.51c2.057-3.552,5.828-5.804,10.039-5.804h55.461c4.186,0,7.966,2.252,10.031,5.804H187.208z M252.716,336.116h-55.461c-5.105,0-9.551-3.39-11.079-8.153h77.628C262.276,332.726,257.813,336.116,252.716,336.116z M77.058,300.375c11.77,0,21.362,9.584,21.362,21.362c0,11.77-9.592,21.337-21.362,21.337s-21.338-9.567-21.338-21.337C55.72,309.95,65.288,300.375,77.058,300.375z"/><path fill="#2D3136" d="M427.822,272.047l52.194-5.373l-0.821-4.877c-5.771-34.4-0.496-47.642-0.285-48.137l0.878-1.91l-0.862-1.926c-0.707-1.569-18.509-38.627-123.644-38.627l-4.373,0.016c-9.307-8.502-53.51-44.512-135.601-44.512c-60.257,0-126.221,19.761-196.061,58.745l-2.934,1.674l0.667,3.308c0.545,2.715,1.333,11.486-2.122,15.704c-1.447,1.772-3.536,2.585-6.584,2.585H4.502l-0.772,3.69c-4.641,22.321-7.129,44.797,6.007,57.932l1.357,1.374h37.326l-1.244-5.633c-0.61-2.796-0.91-5.373-0.91-7.934c0-19.663,16.013-35.668,35.684-35.668c19.663,0,35.676,16.005,35.676,35.668c0,2.609-0.309,5.267-0.91,7.893l-1.292,5.674h239.858l-1.301-5.674c-0.593-2.617-0.902-5.275-0.902-7.893c0-19.013,17.688-35.668,37.847-35.668c13.9,0,22.882,7.145,27.97,13.152c7.503,8.876,11.502,21.086,9.941,30.401L427.822,272.047z M172.91,186.03H51.274l18.85-8.836c0.415-0.179,41.464-19.135,97.283-29.881l5.511-1.065v39.781H172.91z M184.501,186.03v-41.651l3.975-0.545c9.12-1.349,18.484-2.008,27.865-2.008c68.069,0,118.864,35.432,119.376,35.782l11.933,8.429H184.501V186.03z"/></svg>';
 
     final String miniCheckSvg =
-        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     final String miniWarningSvg =
-        '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     final String miniCrossSvg =
-        '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
 
     final qrCodeUrl = Supabase.instance.client.storage
         .from('laudos-pdf')
@@ -2390,11 +2428,13 @@ class PdfGeneratorService {
 
     bool normalizerHasLeilao = false;
     bool normalizerHasSinistro = false;
+    bool normalizerHasRoubo = false;
     try {
       final jsonStr = jsonEncode(res);
       final norm = RadarNormalizer.parse(jsonStr);
       normalizerHasLeilao = norm.leiloes.hasData || (norm.leiloes.dados != null && norm.leiloes.dados!.isNotEmpty);
       normalizerHasSinistro = norm.sinistros.hasData || (norm.sinistros.dados != null && norm.sinistros.dados!.isNotEmpty);
+      normalizerHasRoubo = norm.rouboFurto.hasData && (norm.rouboFurto.dados?.possuiOcorrencia ?? false);
     } catch (_) {}
 
     // ── Badges da Página 1: alimentados diretamente da vistoria ─────────────
@@ -2414,6 +2454,16 @@ class PdfGeneratorService {
     final bool hasSinistro = valSinistroStatus.contains('CONSTA') &&
         !valSinistroStatus.contains('NADA');
 
+    final String valRouboStatus = (state?.checklistStatus['consulta_roubo'] ??
+            state?.statusRoubo ??
+            '')
+        .trim()
+        .toUpperCase();
+    final bool hasRoubo = (valRouboStatus.contains('CONSTA') ||
+            valRouboStatus.contains('SIM')) &&
+        !valRouboStatus.contains('NADA') &&
+        !valRouboStatus.contains('NÃO');
+
     final String valRenajudStatus = (state?.checklistStatus['consulta_renajud'] ??
             state?.statusRenajud ??
             '')
@@ -2429,8 +2479,6 @@ class PdfGeneratorService {
         .toUpperCase();
     final bool hasAlertaIndicio = valAlertaStatus.contains('CONSTA') &&
         !valAlertaStatus.contains('NADA');
-
-    final bool hasRoubo = false;
 
     // Busca a foto frontal / lateral do veículo capturada na vistoria
     pw.ImageProvider? fotoVeiculoDestaque;
@@ -2517,13 +2565,7 @@ class PdfGeneratorService {
       if (vistoria.parecerTecnico != null && vistoria.parecerTecnico!.trim().isNotEmpty) {
         return vistoria.parecerTecnico!.trim();
       }
-      final st = computedStatus.toUpperCase();
-      if (st.contains('NÃO CONFORME') || st.contains('REPROVADO') || st.contains('NAO CONFORME')) {
-        return 'Veículo com apontamentos estruturais ou de identificação divergentes do padrão original do fabricante.';
-      } else if (st.contains('OBSERVA') || st.contains('APONTAMENTO')) {
-        return 'Veículo com pequenos reparos de funilaria/pintura ou desgastes observados. Estrutura geral preservada.';
-      }
-      return 'Veículo com reparo de funilaria e pintura. Estrutura preservada dentro do padrão do fabricante.';
+      return '';
     })();
 
     return pw.Page(
@@ -2543,189 +2585,203 @@ class PdfGeneratorService {
               ),
             pw.Column(
               children: [
-                // ── 1. CABEÇALHO GRAFITE GRANDE ─────────────────────────────────
+                // ── 1. CABEÇALHO CURVO GRAFITE CLARO COM DESTAQUE DOURADO ─────
                 pw.Container(
-                  color: darkHeaderBg,
-                  padding: const pw.EdgeInsets.only(top: 14, left: 16, right: 16, bottom: 12),
-                  child: pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  width: 595.28,
+                  height: 108,
+                  child: pw.Stack(
                     children: [
-                      // Card Esquerdo: QR Code + Dados da Unidade
-                      pw.Container(
-                        width: 170,
-                        height: 80,
-                        padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-                        decoration: pw.BoxDecoration(
-                          color: PdfColors.white,
-                          borderRadius: pw.BorderRadius.circular(6),
-                        ),
-                        child: pw.Row(
-                          crossAxisAlignment: pw.CrossAxisAlignment.center,
-                          children: [
-                            pw.BarcodeWidget(
-                              barcode: pw.Barcode.qrCode(),
-                              data: qrCodeUrl,
-                              width: 48,
-                              height: 48,
-                            ),
-                            pw.SizedBox(width: 5),
-                            pw.Expanded(
-                              child: pw.Column(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                mainAxisAlignment: pw.MainAxisAlignment.center,
-                                children: [
-                                  pw.Text(
-                                    empresaNome,
-                                    style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 7.8,
-                                      color: PdfColors.black,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: pw.TextOverflow.clip,
-                                  ),
-                                  pw.SizedBox(height: 1.5),
-                                  pw.Text(
-                                    'CLIENTE: ${clienteNomeStr.toUpperCase()}',
-                                    style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
-                                    maxLines: 1,
-                                    overflow: pw.TextOverflow.clip,
-                                  ),
-                                  pw.SizedBox(height: 1.0),
-                                  pw.Text(
-                                    'CÓDIGO: ${vistoria.numeroLaudo}',
-                                    style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
-                                  ),
-                                  pw.SizedBox(height: 1.0),
-                                  pw.Text(
-                                    'KM: $kmStr | DATA: $dataVistoriaStr',
-                                    style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
-                                  ),
-                                  pw.SizedBox(height: 1.0),
-                                  pw.Text(
-                                    'PERITO: $peritoNome',
-                                    style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                      // Fundo Vetorial com Curva Fluida Suave e Faixa Dourada
+                      pw.Positioned.fill(
+                        child: pw.SvgImage(
+                          svg: '''<svg viewBox="0 0 595.28 108" width="595.28" height="108" xmlns="http://www.w3.org/2000/svg">
+  <path d="M 0,0 L 595.28,0 L 595.28,106 C 460,103 320,95 180,90 C 90,88 0,86 0,86 Z" fill="#F5A623"/>
+  <path d="M 0,0 L 595.28,0 L 595.28,101 C 460,98 320,90 180,85 C 90,83 0,81 0,81 Z" fill="#61646B"/>
+</svg>''',
+                          fit: pw.BoxFit.fill,
                         ),
                       ),
-
-                      // Card Central: Parecer Final (Amplo para não quebrar texto)
-                      pw.Expanded(
-                        child: pw.Container(
-                          height: 80,
-                          margin: const pw.EdgeInsets.symmetric(horizontal: 6),
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: pw.BoxDecoration(
-                            color: PdfColors.white,
-                            borderRadius: pw.BorderRadius.circular(6),
-                          ),
+                      // Conteúdo dos Cards e Logo sobrepostos
+                      pw.Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: pw.Padding(
+                          padding: const pw.EdgeInsets.only(top: 6, left: 14, right: 14),
                           child: pw.Row(
                             crossAxisAlignment: pw.CrossAxisAlignment.center,
+                            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                             children: [
+                              // Card Esquerdo: QR Code + Dados da Unidade
                               pw.Container(
-                                width: 42,
-                                height: 42,
+                                width: 170,
+                                height: 66,
+                                padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                                 decoration: pw.BoxDecoration(
-                                  color: statusColor,
-                                  shape: pw.BoxShape.circle,
+                                  color: PdfColors.white,
+                                  borderRadius: pw.BorderRadius.circular(6),
                                 ),
-                                child: pw.Center(
-                                  child: pw.SvgImage(
-                                    svg: statusIcon,
-                                    width: 24,
-                                    height: 24,
-                                  ),
-                                ),
-                              ),
-                              pw.SizedBox(width: 6),
-                              pw.Expanded(
-                                child: pw.Column(
-                                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                  mainAxisAlignment: pw.MainAxisAlignment.center,
+                                child: pw.Row(
+                                  crossAxisAlignment: pw.CrossAxisAlignment.center,
                                   children: [
-                                    pw.Text(
-                                      'PARECER FINAL DA VISTORIA',
-                                      style: pw.TextStyle(
-                                        font: styles.bold,
-                                        fontSize: 7.8,
-                                        color: PdfColors.grey700,
-                                      ),
-                                      maxLines: 1,
+                                    pw.BarcodeWidget(
+                                      barcode: pw.Barcode.qrCode(),
+                                      data: qrCodeUrl,
+                                      width: 42,
+                                      height: 42,
                                     ),
-                                    pw.SizedBox(height: 1.5),
-                                    pw.Text(
-                                      computedStatus.toUpperCase(),
-                                      style: pw.TextStyle(
-                                        font: styles.bold,
-                                        fontSize: 14.0,
-                                        color: PdfColors.black,
+                                    pw.SizedBox(width: 5),
+                                    pw.Expanded(
+                                      child: pw.Column(
+                                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                                        children: [
+                                          pw.Text(
+                                            empresaNome,
+                                            style: pw.TextStyle(
+                                              font: styles.bold,
+                                              fontSize: 7.2,
+                                              color: PdfColors.black,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: pw.TextOverflow.clip,
+                                          ),
+                                          pw.SizedBox(height: 0.8),
+                                          pw.Text(
+                                            'CLIENTE: ${clienteNomeStr.toUpperCase()}',
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                            maxLines: 1,
+                                            overflow: pw.TextOverflow.clip,
+                                          ),
+                                          pw.SizedBox(height: 0.6),
+                                          pw.Text(
+                                            'CÓDIGO: ${vistoria.numeroLaudo}',
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                          ),
+                                          pw.SizedBox(height: 0.6),
+                                          pw.Text(
+                                            'KM: $kmStr | DATA: $dataVistoriaStr',
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                          ),
+                                          pw.SizedBox(height: 0.6),
+                                          pw.Text(
+                                            'PERITO: $peritoNome',
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                    pw.SizedBox(height: 1.5),
-                                    pw.Text(
-                                      parecerDescricao,
-                                      style: pw.TextStyle(
-                                        font: styles.regular,
-                                        fontSize: 6.8,
-                                        color: PdfColor.fromHex('2D3136'),
-                                      ),
-                                      maxLines: 2,
-                                      overflow: pw.TextOverflow.clip,
                                     ),
                                   ],
                                 ),
+                              ),
+
+                              // Card Central: Parecer Final
+                              pw.Expanded(
+                                child: pw.Container(
+                                  height: 66,
+                                  margin: const pw.EdgeInsets.symmetric(horizontal: 6),
+                                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: pw.BoxDecoration(
+                                    color: PdfColors.white,
+                                    borderRadius: pw.BorderRadius.circular(6),
+                                  ),
+                                  child: pw.Row(
+                                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                                    children: [
+                                      pw.Container(
+                                        width: 34,
+                                        height: 34,
+                                        decoration: pw.BoxDecoration(
+                                          color: statusColor,
+                                          shape: pw.BoxShape.circle,
+                                        ),
+                                        child: pw.Center(
+                                          child: pw.SvgImage(
+                                            svg: statusIcon,
+                                            width: 19,
+                                            height: 19,
+                                          ),
+                                        ),
+                                      ),
+                                      pw.SizedBox(width: 6),
+                                      pw.Expanded(
+                                        child: pw.Column(
+                                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                          mainAxisAlignment: pw.MainAxisAlignment.center,
+                                          children: [
+                                            pw.Text(
+                                              'PARECER FINAL DA VISTORIA',
+                                              style: pw.TextStyle(
+                                                font: styles.bold,
+                                                fontSize: 7.0,
+                                                color: PdfColors.grey700,
+                                              ),
+                                              maxLines: 1,
+                                            ),
+                                            pw.SizedBox(height: 0.8),
+                                            pw.Text(
+                                              computedStatus.toUpperCase(),
+                                              style: pw.TextStyle(
+                                                font: styles.bold,
+                                                fontSize: 12.5,
+                                                color: PdfColors.black,
+                                              ),
+                                            ),
+                                            if (parecerDescricao.isNotEmpty) ...[
+                                              pw.SizedBox(height: 0.6),
+                                              pw.Text(
+                                                parecerDescricao,
+                                                style: pw.TextStyle(
+                                                  font: styles.regular,
+                                                  fontSize: 6.0,
+                                                  color: PdfColor.fromHex('2D3136'),
+                                                ),
+                                                maxLines: 2,
+                                                overflow: pw.TextOverflow.clip,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
+                              // Logo Direito
+                              pw.Container(
+                                width: 185,
+                                height: 84,
+                                alignment: pw.Alignment.centerRight,
+                                child: logo != null
+                                    ? pw.Image(logo, height: 83, width: 182, fit: pw.BoxFit.contain)
+                                    : pw.Column(
+                                        mainAxisAlignment: pw.MainAxisAlignment.center,
+                                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                                        children: [
+                                          pw.Text(
+                                            'Ultra Visão',
+                                            style: pw.TextStyle(
+                                              color: PdfColors.white,
+                                              font: styles.bold,
+                                              fontSize: 22,
+                                            ),
+                                          ),
+                                          pw.Text(
+                                            'Perícias e Vistorias',
+                                            style: pw.TextStyle(
+                                              color: PdfColors.grey300,
+                                              font: styles.regular,
+                                              fontSize: 10.4,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                               ),
                             ],
                           ),
                         ),
                       ),
-
-                      // Logo Direito (GRANDE E DESTACADO)
-                      pw.Container(
-                        width: 145,
-                        height: 80,
-                        alignment: pw.Alignment.centerRight,
-                        child: logo != null
-                            ? pw.Image(logo, height: 76, width: 140, fit: pw.BoxFit.contain)
-                            : pw.Column(
-                                mainAxisAlignment: pw.MainAxisAlignment.center,
-                                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                                children: [
-                                  pw.Text(
-                                    'Ultra Visão',
-                                    style: pw.TextStyle(
-                                      color: PdfColors.white,
-                                      font: styles.bold,
-                                      fontSize: 18,
-                                    ),
-                                  ),
-                                  pw.Text(
-                                    'Perícias e Vistorias',
-                                    style: pw.TextStyle(
-                                      color: PdfColors.grey300,
-                                      font: styles.regular,
-                                      fontSize: 8.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Linha de Destaque Colorida sob o cabeçalho
-                pw.Container(
-                  height: 4,
-                  child: pw.Row(
-                    children: [
-                      pw.Expanded(flex: 3, child: pw.Container(color: PdfColor.fromHex('FBB03B'))),
-                      pw.Expanded(flex: 7, child: pw.Container(color: PdfColor.fromHex('8CC63F'))),
                     ],
                   ),
                 ),
@@ -2745,16 +2801,16 @@ class PdfGeneratorService {
                             pw.Expanded(
                               flex: 1,
                               child: pw.Container(
-                                height: 114,
+                                height: 104,
                                 child: _buildPlacaMercosul(valPlaca, styles),
                               ),
                             ),
-                            pw.SizedBox(width: 12),
+                            pw.SizedBox(width: 10),
                             // Foto Principal do Veículo
                             pw.Expanded(
                               flex: 1,
                               child: pw.Container(
-                                height: 114,
+                                height: 104,
                                 decoration: pw.BoxDecoration(
                                   color: PdfColors.grey100,
                                   borderRadius: pw.BorderRadius.circular(6),
@@ -2773,11 +2829,11 @@ class PdfGeneratorService {
                                           child: pw.Column(
                                             mainAxisAlignment: pw.MainAxisAlignment.center,
                                             children: [
-                                              pw.SvgImage(svg: svgCarIcon, width: 36, height: 36),
-                                              pw.SizedBox(height: 6),
+                                              pw.SvgImage(svg: svgCarIcon, width: 34, height: 34),
+                                              pw.SizedBox(height: 5),
                                               pw.Text('FOTO DO VEÍCULO',
                                                   style: pw.TextStyle(
-                                                      font: styles.bold, fontSize: 9.5, color: PdfColors.grey600)),
+                                                      font: styles.bold, fontSize: 9.0, color: PdfColors.grey600)),
                                             ],
                                           ),
                                         ),
@@ -2787,7 +2843,7 @@ class PdfGeneratorService {
                           ],
                         ),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
                         // ── LINHA 2: CARD INFORMAÇÕES DO VEÍCULO ─────────────────
                         pw.Container(
@@ -2796,25 +2852,25 @@ class PdfGeneratorService {
                             border: pw.Border.all(color: PdfColors.grey400, width: 1.0),
                             borderRadius: pw.BorderRadius.circular(6),
                           ),
-                          padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                           child: pw.Column(
                             crossAxisAlignment: pw.CrossAxisAlignment.start,
                             children: [
                               pw.Row(
                                 children: [
-                                  pw.SvgImage(svg: svgCarIcon, width: 14, height: 14),
-                                  pw.SizedBox(width: 6),
+                                  pw.SvgImage(svg: svgCarIcon, width: 13, height: 13),
+                                  pw.SizedBox(width: 5),
                                   pw.Text(
                                     'INFORMAÇÕES DO VEÍCULO',
                                     style: pw.TextStyle(
                                       font: styles.bold,
-                                      fontSize: 9.5,
+                                      fontSize: 9.0,
                                       color: PdfColors.black,
                                     ),
                                   ),
                                 ],
                               ),
-                              pw.SizedBox(height: 6),
+                              pw.SizedBox(height: 4),
                               pw.Row(
                                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                                 children: [
@@ -2829,7 +2885,7 @@ class PdfGeneratorService {
                                       ],
                                     ),
                                   ),
-                                  pw.SizedBox(width: 10),
+                                  pw.SizedBox(width: 8),
                                   // Coluna 2
                                   pw.Expanded(
                                     child: pw.Column(
@@ -2841,7 +2897,7 @@ class PdfGeneratorService {
                                       ],
                                     ),
                                   ),
-                                  pw.SizedBox(width: 10),
+                                  pw.SizedBox(width: 8),
                                   // Coluna 3
                                   pw.Expanded(
                                     child: pw.Column(
@@ -2859,14 +2915,14 @@ class PdfGeneratorService {
                           ),
                         ),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
                         // ── LINHA 3: INFORMAÇÕES BASEADAS NA CONSULTA AO VEÍCULO ─
                         _buildSectionHeaderWithLines('INFORMAÇÕES BASEADAS NA CONSULTA AO VEÍCULO', styles),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
-                        // 5 Badges Circulares Grandes e Bem Distribuídos
+                        // 6 Badges Circulares Grandes e Bem Distribuídos
                         pw.Row(
                           mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
                           children: [
@@ -2881,6 +2937,13 @@ class PdfGeneratorService {
                               title: 'SINISTRO',
                               svgIcon: svgSinistro,
                               isAlert: hasSinistro,
+                              isWarning: false,
+                              styles: styles,
+                            ),
+                            _buildCircularStatusBadge(
+                              title: 'ROUBO E\nFURTO',
+                              svgIcon: svgShieldSearch,
+                              isAlert: hasRoubo,
                               isWarning: false,
                               styles: styles,
                             ),
@@ -2908,11 +2971,11 @@ class PdfGeneratorService {
                           ],
                         ),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
                         // ── LINHA 4: SITUAÇÃO GERAL ──────────────────────────────
                         pw.Container(
-                          height: 68,
+                          height: 72,
                           decoration: pw.BoxDecoration(
                             border: pw.Border.all(color: PdfColors.grey400, width: 1.0),
                             borderRadius: pw.BorderRadius.circular(6),
@@ -2925,10 +2988,10 @@ class PdfGeneratorService {
                                 width: 75,
                                 child: pw.Text(
                                   'SITUAÇÃO\nGERAL',
-                                  style: pw.TextStyle(font: styles.bold, fontSize: 12, color: PdfColors.black),
+                                  style: pw.TextStyle(font: styles.bold, fontSize: 13.0, color: PdfColors.black),
                                 ),
                               ),
-                              pw.Container(width: 1.0, height: 46, color: PdfColors.grey300),
+                              pw.Container(width: 1.0, height: 50, color: PdfColors.grey300),
                               pw.SizedBox(width: 8),
 
                               // CONFORME
@@ -2939,20 +3002,20 @@ class PdfGeneratorService {
                                     pw.Row(
                                       mainAxisAlignment: pw.MainAxisAlignment.center,
                                       children: [
-                                        pw.SvgImage(svg: miniCheckSvg, width: 12, height: 12),
+                                        pw.SvgImage(svg: miniCheckSvg, width: 13, height: 13),
                                         pw.SizedBox(width: 4),
-                                        pw.Text('CONFORME', style: pw.TextStyle(font: styles.bold, fontSize: 8.0)),
+                                        pw.Text('CONFORME', style: pw.TextStyle(font: styles.bold, fontSize: 8.2)),
                                       ],
                                     ),
                                     pw.SizedBox(height: 2),
                                     pw.Text('$countConforme',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 19)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 21)),
                                     pw.Text('ITENS',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.0, color: PdfColors.grey700)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.2, color: PdfColors.grey700)),
                                   ],
                                 ),
                               ),
-                              pw.Container(width: 1.0, height: 46, color: PdfColors.grey300),
+                              pw.Container(width: 1.0, height: 50, color: PdfColors.grey300),
                               pw.SizedBox(width: 8),
 
                               // CONFORME (COM OBSERVAÇÃO)
@@ -2963,24 +3026,24 @@ class PdfGeneratorService {
                                     pw.Row(
                                       mainAxisAlignment: pw.MainAxisAlignment.center,
                                       children: [
-                                        pw.SvgImage(svg: miniWarningSvg, width: 12, height: 12),
+                                        pw.SvgImage(svg: miniWarningSvg, width: 13, height: 13),
                                         pw.SizedBox(width: 4),
                                         pw.Text(
                                           'CONFORME\n(COM OBSERVAÇÃO)',
                                           textAlign: pw.TextAlign.center,
-                                          style: pw.TextStyle(font: styles.bold, fontSize: 6.5),
+                                          style: pw.TextStyle(font: styles.bold, fontSize: 6.8),
                                         ),
                                       ],
                                     ),
                                     pw.SizedBox(height: 2),
                                     pw.Text('$countObs',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 19)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 21)),
                                     pw.Text('ITENS',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.0, color: PdfColors.grey700)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.2, color: PdfColors.grey700)),
                                   ],
                                 ),
                               ),
-                              pw.Container(width: 1.0, height: 46, color: PdfColors.grey300),
+                              pw.Container(width: 1.0, height: 50, color: PdfColors.grey300),
                               pw.SizedBox(width: 8),
 
                               // NÃO CONFORME
@@ -2991,21 +3054,21 @@ class PdfGeneratorService {
                                     pw.Row(
                                       mainAxisAlignment: pw.MainAxisAlignment.center,
                                       children: [
-                                        pw.SvgImage(svg: miniCrossSvg, width: 12, height: 12),
+                                        pw.SvgImage(svg: miniCrossSvg, width: 13, height: 13),
                                         pw.SizedBox(width: 4),
                                         pw.Text('NÃO CONFORME',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 8.0)),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 8.2)),
                                       ],
                                     ),
                                     pw.SizedBox(height: 2),
                                     pw.Text('$countNaoConforme',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 19)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 21)),
                                     pw.Text('ITENS',
-                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.0, color: PdfColors.grey700)),
+                                        style: pw.TextStyle(font: styles.bold, fontSize: 7.2, color: PdfColors.grey700)),
                                   ],
                                 ),
                               ),
-                              pw.Container(width: 1.0, height: 46, color: PdfColors.grey300),
+                              pw.Container(width: 1.0, height: 50, color: PdfColors.grey300),
                               pw.SizedBox(width: 8),
 
                               // Donut Chart + Legenda
@@ -3021,46 +3084,34 @@ class PdfGeneratorService {
                                     limeGreen,
                                     warningYellow,
                                     dangerRed,
-                                    size: 52.0,
+                                    size: 54.0,
                                   ),
-                                  pw.SizedBox(width: 5),
+                                  pw.SizedBox(width: 6),
                                   pw.Column(
                                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                                     mainAxisAlignment: pw.MainAxisAlignment.center,
                                     children: [
                                       pw.Row(children: [
-                                        pw.Container(
-                                            width: 6.5,
-                                            height: 6.5,
-                                            decoration: pw.BoxDecoration(
-                                                color: limeGreen, shape: pw.BoxShape.circle)),
+                                        pw.SvgImage(svg: miniCheckSvg, width: 6.5, height: 6.5),
                                         pw.SizedBox(width: 3.5),
                                         pw.Text('CONFORME: $countConforme',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.0)),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.2)),
                                       ]),
                                       pw.SizedBox(height: 2),
                                       pw.Row(children: [
-                                        pw.Container(
-                                            width: 6.5,
-                                            height: 6.5,
-                                            decoration: pw.BoxDecoration(
-                                                color: warningYellow, shape: pw.BoxShape.circle)),
+                                        pw.SvgImage(svg: miniWarningSvg, width: 6.5, height: 6.5),
                                         pw.SizedBox(width: 3.5),
                                         pw.Text('OBSERVAÇÃO: $countObs',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.0)),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.2)),
                                       ]),
                                       pw.SizedBox(height: 2),
                                       pw.Row(children: [
-                                        pw.Container(
-                                            width: 6.5,
-                                            height: 6.5,
-                                            decoration: pw.BoxDecoration(
-                                                color: dangerRed, shape: pw.BoxShape.circle)),
+                                        pw.SvgImage(svg: miniCrossSvg, width: 6.5, height: 6.5),
                                         pw.SizedBox(width: 3.5),
                                         pw.Text('NÃO CONFORME: $countNaoConforme',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.0)),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 7.2)),
                                       ]),
-                                      pw.SizedBox(height: 3),
+                                      pw.SizedBox(height: 2.5),
                                       pw.Text('TOTAL: $totalItens ITENS',
                                           style: pw.TextStyle(font: styles.bold, fontSize: 8.0)),
                                     ],
@@ -3071,12 +3122,12 @@ class PdfGeneratorService {
                           ),
                         ),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
                         // ── LINHA 5: ITENS ANALISADOS (GRANDE E CLARO) ───────────
                         _buildSectionHeaderWithLines('ITENS ANALISADOS', styles),
 
-                        pw.SizedBox(height: 4),
+                        pw.SizedBox(height: 3),
 
                         // 3 Colunas de Categorias Grandes
                         pw.Expanded(
@@ -3101,7 +3152,7 @@ class PdfGeneratorService {
                                     if (grupos['IDENTIFICAÇÃO']!.isNotEmpty &&
                                         (grupos['ESTRUTURA']!.isNotEmpty ||
                                             grupos['PINTURA E LATARIA']!.isNotEmpty))
-                                      pw.Container(width: 1.0, height: 140, color: PdfColors.grey200),
+                                      pw.Container(width: 1.0, height: 110, color: PdfColors.grey200),
                                     if (grupos['ESTRUTURA']!.isNotEmpty)
                                       _buildCategoryColumnNew(
                                         'ESTRUTURA',
@@ -3115,7 +3166,7 @@ class PdfGeneratorService {
                                       ),
                                     if (grupos['ESTRUTURA']!.isNotEmpty &&
                                         grupos['PINTURA E LATARIA']!.isNotEmpty)
-                                      pw.Container(width: 1.0, height: 140, color: PdfColors.grey200),
+                                      pw.Container(width: 1.0, height: 110, color: PdfColors.grey200),
                                     if (grupos['PINTURA E LATARIA']!.isNotEmpty)
                                       _buildCategoryColumnNew(
                                         'PINTURA E LATARIA',
@@ -3124,8 +3175,8 @@ class PdfGeneratorService {
                                         limeGreen,
                                         warningYellow,
                                         dangerRed,
-                                        numColumns: 1,
-                                        flex: 1,
+                                        numColumns: grupos['PINTURA E LATARIA']!.length > 8 ? 2 : 1,
+                                        flex: grupos['PINTURA E LATARIA']!.length > 8 ? 2 : 1,
                                       ),
                                   ],
                                 ),
@@ -3540,26 +3591,20 @@ class PdfGeneratorService {
     String svgIcon;
     if (isCheck) {
       svgIcon =
-          '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     } else if (isWarning) {
       svgIcon =
-          '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     } else {
       svgIcon =
-          '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
     }
 
     return pw.Row(
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Row(children: [
-            pw.Container(
-                width: 16,
-                height: 16,
-                decoration:
-                    pw.BoxDecoration(color: color, shape: pw.BoxShape.circle),
-                child: pw.Center(
-                    child: pw.SvgImage(svg: svgIcon, width: 10, height: 10))),
+            pw.SvgImage(svg: svgIcon, width: 12, height: 12),
             pw.SizedBox(width: 8),
             pw.Text(title,
                 style: pw.TextStyle(
@@ -4652,15 +4697,15 @@ class PdfGeneratorService {
     final globalStatus = getGlobalStatus();
     PdfColor globalStatusColor = PdfColors.green;
     String globalIcon =
-        '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     if (globalStatus.contains('NÃO CONFORME')) {
       globalStatusColor = PdfColor.fromHex('EE4036'); // Red
       globalIcon =
-          '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
     } else if (globalStatus.contains('APONTAMENTOS')) {
       globalStatusColor = PdfColor.fromHex('FBB03B'); // Yellow
       globalIcon =
-          '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     }
 
     return pw.MultiPage(
@@ -4688,15 +4733,8 @@ class PdfGeneratorService {
                           right: pw.BorderSide(color: PdfColors.grey300)),
                     ),
                     child: pw.Row(children: [
-                      pw.Container(
-                          width: 14,
-                          height: 14,
-                          decoration: pw.BoxDecoration(
-                              color: globalStatusColor,
-                              shape: pw.BoxShape.circle),
-                          child: pw.Center(
-                              child: pw.SvgImage(
-                                  svg: globalIcon, width: 8, height: 8))),
+                      pw.SvgImage(
+                                  svg: globalIcon, width: 8, height: 8),
                       pw.SizedBox(width: 8),
                       pw.Text('ESTRUTURA',
                           style: pw.TextStyle(font: styles.bold, fontSize: 8)),
@@ -4744,7 +4782,7 @@ class PdfGeneratorService {
 
                   PdfColor itemStatusColor = PdfColors.green;
                   String itemIcon =
-                      '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                      '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
 
                   if (status.contains('COLISÃO') ||
                       status.contains('SOLDADO') ||
@@ -4754,14 +4792,14 @@ class PdfGeneratorService {
                       status.contains('NÃO CONFORME')) {
                     itemStatusColor = PdfColor.fromHex('EE4036'); // Red
                     itemIcon =
-                        '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+                        '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
                   } else if (status.contains('REPARO') ||
                       status.contains('OBSERVAÇÃO') ||
                       status.contains('ALONGADO') ||
                       status.contains('CONSIDERAÇÃO')) {
                     itemStatusColor = PdfColor.fromHex('FBB03B'); // Yellow
                     itemIcon =
-                        '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+                        '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
                   }
 
                   return pw.Container(
@@ -4783,15 +4821,8 @@ class PdfGeneratorService {
                                       fontSize: 7,
                                       color: itemStatusColor)),
                               pw.SizedBox(width: 4),
-                              pw.Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: pw.BoxDecoration(
-                                      color: itemStatusColor,
-                                      shape: pw.BoxShape.circle),
-                                  child: pw.Center(
-                                      child: pw.SvgImage(
-                                          svg: itemIcon, width: 6, height: 6))),
+                              pw.SvgImage(
+                                  svg: itemIcon, width: 9, height: 9),
                             ]),
                           ]));
                 }).toList())));
@@ -5622,9 +5653,20 @@ class PdfGeneratorService {
               pecaUpper.contains('SEMA ACESSO') ||
               obsUpper.contains('SEM ACESSO') ||
               obsUpper.contains('SEMA ACESSO') ||
+              pecaUpper.contains('PLAQUETA AUSENTE') ||
+              obsUpper.contains('PLAQUETA AUSENTE') ||
+              ((pecaUpper.contains('CAMBIO') || pecaUpper.contains('CÂMBIO')) &&
+                  (pecaUpper.contains('AUSENTE') || obsUpper.contains('AUSENTE'))) ||
               obsUpper.contains('NÃO É AVARIA') ||
               obsUpper.contains('NAO E AVARIA') ||
               obsUpper.contains('NÃO REPRESENTA AVARIA') ||
+              pecaUpper.contains('REPINT') ||
+              pecaUpper.contains('RETOQUE') ||
+              obsUpper.contains('SERVIÇO DE REPINTURA') ||
+              obsUpper.contains('REPINTURA JÁ REALIZADA') ||
+              obsUpper.contains('REPINTURA JÁ REALIZADO') ||
+              obsUpper.contains('REPINT') ||
+              obsUpper.contains('RETOQUE') ||
               obsUpper.contains('OBSTRUÍDO') ||
               obsUpper.contains('OBSTRUIDO') ||
               obsUpper.contains('DENTRO DOS PADRÕES') ||
@@ -5650,52 +5692,7 @@ class PdfGeneratorService {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
             _buildHeader(vistoria, styles, logo, state: state),
-            buildRedBar('PONTOS DE ATENÇÃO (HISTÓRICO DO MODELO)'),
-            if (data['problemas_comuns'] != null &&
-                data['problemas_comuns'] is List)
-              ...((data['problemas_comuns'] as List).map((item) {
-                return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 6),
-                  padding: const pw.EdgeInsets.all(8),
-                  decoration: pw.BoxDecoration(
-                      color: PdfColors.white,
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(4)),
-                      border: pw.Border.all(color: borderRed, width: 1)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Row(children: [
-                        pw.SvgImage(
-                            svg:
-                                '<svg viewBox="0 0 24 24"><path fill="#0288d1" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
-                            width: 10,
-                            height: 10),
-                        pw.SizedBox(width: 4),
-                        pw.Text('${item['item']}',
-                            style: pw.TextStyle(
-                                font: styles.bold,
-                                fontSize: 9,
-                                color: themeRed)),
-                      ]),
-                      pw.SizedBox(height: 4),
-                      pw.Text('${item['sintomas']}',
-                          style: pw.TextStyle(
-                              font: styles.regular,
-                              fontSize: 8,
-                              color: textDark)),
-                      pw.SizedBox(height: 2),
-                      pw.Text(
-                          'Ponto de Atenção: ${item['observacao_vistoria']}',
-                          style: pw.TextStyle(
-                              font: styles.bold,
-                              fontSize: 8,
-                              color: textMuted)),
-                    ],
-                  ),
-                );
-              }).toList()),
-            pw.SizedBox(height: 8),
+            // Removido Histórico do Modelo (Pontos de Atenção)
             buildRedBar('PEÇAS DE DESGASTE'),
             if (data['pecas_desgaste'] != null &&
                 data['pecas_desgaste'] is List)
@@ -5834,9 +5831,8 @@ class PdfGeneratorService {
       },
     ));
 
-    // Dicas
-    if (data['dicas_vistoria'] != null &&
-        (data['dicas_vistoria'] as List).isNotEmpty) {
+    // Análise Final e Observações
+    if (data['analise_final'] != null || (data['observacoes'] != null && (data['observacoes'] as List).isNotEmpty)) {
       pdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(16),
@@ -5845,39 +5841,6 @@ class PdfGeneratorService {
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               _buildHeader(vistoria, styles, logo, state: state),
-              buildRedBar('RECOMENDAÇÕES DE REVISÃO (HISTÓRICO DO MODELO)'),
-              ...((data['dicas_vistoria'] as List).map((item) {
-                return pw.Container(
-                  margin: const pw.EdgeInsets.only(bottom: 6),
-                  padding: const pw.EdgeInsets.all(8),
-                  decoration: pw.BoxDecoration(
-                      color: PdfColors.white,
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(4)),
-                      border: pw.Border.all(color: borderRed, width: 1)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('Área: ${item['area']}',
-                          style: pw.TextStyle(
-                              font: styles.bold, fontSize: 9, color: themeRed)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('Verificar: ${item['o_que_verificar']}',
-                          style: pw.TextStyle(
-                              font: styles.regular,
-                              fontSize: 8,
-                              color: textDark)),
-                      pw.SizedBox(height: 2),
-                      pw.Text('Recomendação: ${item['sinal_de_alerta']}',
-                          style: pw.TextStyle(
-                              font: styles.bold,
-                              fontSize: 8,
-                              color: textMuted)),
-                    ],
-                  ),
-                );
-              }).toList()),
-              pw.SizedBox(height: 8),
               if (data['observacoes'] != null &&
                   data['observacoes'] is List &&
                   (data['observacoes'] as List).isNotEmpty) ...[
@@ -6067,6 +6030,13 @@ class PdfGeneratorService {
                                         font: styles.regular,
                                         fontSize: 8,
                                         color: textDark)),
+                                pw.SizedBox(height: 10),
+                                pw.Text(
+                                    '* OBS: As estimativas de valores (mercado, peças, mão de obra e descontos) e o relatório técnico complementar desta ficha são gerados por Inteligência Artificial com base em médias de mercado. Estes valores servem apenas como referência comercial e não constituem promessa, garantia de preço de compra/venda ou orçamento exato.',
+                                    style: pw.TextStyle(
+                                        font: styles.bold,
+                                        fontSize: 7,
+                                        color: PdfColors.grey700)),
                               ]))
                     ]);
               })(),
@@ -6117,15 +6087,9 @@ class PdfGeneratorService {
                   pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
-                        pw.Container(
-                            width: 14,
-                            height: 14,
-                            decoration: pw.BoxDecoration(
-                                color: limeGreen, shape: pw.BoxShape.circle),
-                            child: pw.Center(
-                                child: pw.SvgImage(
+                        pw.SvgImage(
                                     svg:
-                                        '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'))),
+                                        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'),
                         pw.SizedBox(width: 4),
                         pw.Text('CONFORME',
                             style:
@@ -6150,16 +6114,9 @@ class PdfGeneratorService {
                   pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
-                        pw.Container(
-                            width: 14,
-                            height: 14,
-                            decoration: pw.BoxDecoration(
-                                color: warningYellow,
-                                shape: pw.BoxShape.circle),
-                            child: pw.Center(
-                                child: pw.SvgImage(
+                        pw.SvgImage(
                                     svg:
-                                        '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'))),
+                                        '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'),
                         pw.SizedBox(width: 4),
                         pw.Text('CONFORME\n(COM OBSERVAÇÃO)',
                             style: pw.TextStyle(font: styles.bold, fontSize: 6),
@@ -6184,15 +6141,9 @@ class PdfGeneratorService {
                   pw.Row(
                       mainAxisAlignment: pw.MainAxisAlignment.center,
                       children: [
-                        pw.Container(
-                            width: 14,
-                            height: 14,
-                            decoration: pw.BoxDecoration(
-                                color: dangerRed, shape: pw.BoxShape.circle),
-                            child: pw.Center(
-                                child: pw.SvgImage(
+                        pw.SvgImage(
                                     svg:
-                                        '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>'))),
+                                        '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>'),
                         pw.SizedBox(width: 4),
                         pw.Text('NÃO CONFORME',
                             style:

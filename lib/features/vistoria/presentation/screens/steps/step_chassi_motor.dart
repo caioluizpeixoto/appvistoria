@@ -72,6 +72,7 @@ class StepMotorCambio extends StatelessWidget {
             'Divergente',
             'Remarcado',
             'Sem acesso',
+            'Plaqueta ausente',
             'Ilegível',
             'Com indício de adulteração',
           ],

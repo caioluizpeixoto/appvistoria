@@ -988,6 +988,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     if (_wizardState.checklistStatus.containsKey('consulta_sinistro')) {
       _wizardState.statusSinistro = _wizardState.checklistStatus['consulta_sinistro']!;
     }
+    if (_wizardState.checklistStatus.containsKey('consulta_roubo')) {
+      _wizardState.statusRoubo = _wizardState.checklistStatus['consulta_roubo']!;
+    }
     if (_wizardState.checklistStatus.containsKey('consulta_renajud')) {
       _wizardState.statusRenajud = _wizardState.checklistStatus['consulta_renajud']!;
     }
@@ -1398,6 +1401,52 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       if (querPesquisar == true) {
         await _retryRadarConsulta(blockUI: true);
       }
+    }
+
+    // Pergunta sobre a Ficha Técnica com IA antes de gerar o laudo
+    final desejaFichaIa = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 24),
+            SizedBox(width: 10),
+            Text('Ficha Técnica com IA',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: const Text(
+          'Deseja realizar a Ficha Técnica Inteligente com IA (especificações e estimativa de valores) para este veículo?',
+          style: TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: AppTheme.textSecondary),
+            ),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Não',
+                style: TextStyle(
+                    color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            icon: const Icon(Icons.check_rounded, size: 18),
+            label: const Text('Sim, Gerar com IA',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (desejaFichaIa != null) {
+      _wizardState.gerarFichaTecnicaComIa = desejaFichaIa;
     }
 
     if (!mounted) return;
