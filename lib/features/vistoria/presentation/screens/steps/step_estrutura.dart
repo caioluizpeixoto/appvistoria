@@ -106,12 +106,28 @@ class StepEstrutura extends StatelessWidget {
           _Header(comAlerta: comAlerta),
           const SizedBox(height: 16),
         ],
-        ..._itens.map((id) => InspecaoItemWidget(
-              itemId: id,
-              label: _labels[id]!,
-              statusOptions: _statusOpcoes,
-              obrigatoria: false,
-            )),
+        ..._itens.map((id) {
+          final isLongarinaCentro = id == 'longarina_centro_esquerda' ||
+              id == 'longarina_centro_direita';
+          return InspecaoItemWidget(
+            itemId: id,
+            label: _labels[id]!,
+            statusOptions: _statusOpcoes,
+            obrigatoria: false,
+            sugestoesObs: isLongarinaCentro
+                ? const [
+                    'Não aplicável',
+                    'Dentro dos padrões de fábrica',
+                    'Veículo tipo monobloco (sem longarina central)',
+                    'Sem vestígios de reparo ou deformação',
+                  ]
+                : const [
+                    'Dentro dos padrões de fábrica',
+                    'Não aplicável',
+                    'Sem vestígios de reparo ou deformação',
+                  ],
+          );
+        }),
         const SizedBox(height: 24),
         const Divider(),
         const SizedBox(height: 16),

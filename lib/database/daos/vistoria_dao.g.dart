@@ -11,6 +11,8 @@ mixin _$VistoriaDaoMixin on DatabaseAccessor<AppDatabase> {
   $ItensPinturaTable get itensPintura => attachedDatabase.itensPintura;
   $ItensEstruturaTable get itensEstrutura => attachedDatabase.itensEstrutura;
   $VidrosVistoriaTable get vidrosVistoria => attachedDatabase.vidrosVistoria;
+  $ClientesTable get clientes => attachedDatabase.clientes;
+  $VistoriadoresTable get vistoriadores => attachedDatabase.vistoriadores;
   VistoriaDaoManager get managers => VistoriaDaoManager(this);
 }
 
@@ -33,4 +35,8 @@ class VistoriaDaoManager {
   $$VidrosVistoriaTableTableManager get vidrosVistoria =>
       $$VidrosVistoriaTableTableManager(
           _db.attachedDatabase, _db.vidrosVistoria);
+  $$ClientesTableTableManager get clientes =>
+      $$ClientesTableTableManager(_db.attachedDatabase, _db.clientes);
+  $$VistoriadoresTableTableManager get vistoriadores =>
+      $$VistoriadoresTableTableManager(_db.attachedDatabase, _db.vistoriadores);
 }

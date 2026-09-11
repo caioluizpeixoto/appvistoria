@@ -102,7 +102,7 @@ class _StepObservacoesState extends State<StepObservacoes> {
             controller: _vistoriadorCtrl,
             label: 'Observações do Vistoriador',
             hint: 'Observações técnicas do responsável pela inspeção...',
-            icon: Icons.engineering_rounded,
+            icon: Icons.person_search_rounded,
             onChanged: (v) => state.observacoesVistoriador = v,
           ),
           const SizedBox(height: 14),

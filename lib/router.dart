@@ -17,6 +17,11 @@ import 'features/pdf/presentation/screens/pdf_preview_screen.dart';
 import 'features/consulta_bin/presentation/screens/historico_consultas_screen.dart';
 import 'features/vistoria/presentation/screens/historico_vistorias_screen.dart';
 import 'features/vistoria/presentation/screens/historico_radar_screen.dart';
+import 'features/vistoria/presentation/screens/vistoriadores_screen.dart';
+import 'features/vistoria/presentation/screens/clientes_screen.dart';
+import 'features/wallet/presentation/screens/carteira_screen.dart';
+import 'features/wallet/presentation/screens/adicionar_saldo_screen.dart';
+import 'features/wallet/presentation/screens/minhas_recargas_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -76,6 +81,27 @@ GoRouter buildRouter(AuthBloc authBloc) {
         path: '/historico-radar',
         builder: (ctx, state) => const HistoricoRadarScreen(),
       ),
+      GoRoute(
+        path: '/vistoriadores',
+        builder: (ctx, state) => const VistoriadoresScreen(),
+      ),
+      GoRoute(
+        path: '/clientes',
+        builder: (ctx, state) => const ClientesScreen(),
+      ),
+      // Carteira Financeira Pré-paga
+      GoRoute(
+        path: '/carteira',
+        builder: (ctx, state) => const CarteiraScreen(),
+      ),
+      GoRoute(
+        path: '/carteira/adicionar-saldo',
+        builder: (ctx, state) => const AdicionarSaldoScreen(),
+      ),
+      GoRoute(
+        path: '/carteira/recargas',
+        builder: (ctx, state) => const MinhasRecargasScreen(),
+      ),
       // Etapas da vistoria
       GoRoute(
         path: '/inspecao/:vistoriaId',
@@ -117,6 +143,7 @@ GoRouter buildRouter(AuthBloc authBloc) {
         builder: (ctx, state) => PdfPreviewScreen(
           vistoriaId: state.pathParameters['vistoriaId']!,
           pdfPath: state.uri.queryParameters['path'],
+          placa: state.uri.queryParameters['placa'],
         ),
       ),
     ],

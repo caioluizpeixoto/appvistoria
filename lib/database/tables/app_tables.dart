@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 // ── Tabela: vistoriadores (cache local do perfil) ────────────────────────────
 class Vistoriadores extends Table {
   TextColumn get id => text()();
+  TextColumn get userId => text().nullable()(); // multi-tenant
   TextColumn get nome => text()();
   TextColumn get cpf => text()();
   TextColumn get unidadeNome => text()();
@@ -15,9 +16,24 @@ class Vistoriadores extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+// ── Tabela: clientes ────────────────────────────────────────────────────────
+class Clientes extends Table {
+  TextColumn get id => text()();
+  TextColumn get userId => text().nullable()(); // multi-tenant
+  TextColumn get nome => text()();
+  TextColumn get cpfCnpj => text().nullable()();
+  TextColumn get email => text().nullable()();
+  TextColumn get telefone => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 // ── Tabela: vistorias ────────────────────────────────────────────────────────
 class Vistorias extends Table {
   TextColumn get id => text()();
+  TextColumn get userId => text().nullable()(); // multi-tenant
   TextColumn get numeroLaudo => text().unique()();
   TextColumn get status => text().withDefault(const Constant('em_andamento'))();
   // Novo: tipo de vistoria, cliente, unidade

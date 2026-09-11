@@ -14,6 +14,11 @@ class $VistoriadoresTable extends Vistoriadores
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _nomeMeta = const VerificationMeta('nome');
   @override
   late final GeneratedColumn<String> nome = GeneratedColumn<String>(
@@ -61,8 +66,17 @@ class $VistoriadoresTable extends Vistoriadores
       requiredDuringInsert: false,
       defaultValue: currentDateAndTime);
   @override
-  List<GeneratedColumn> get $columns =>
-      [id, nome, cpf, unidadeNome, unidadeCnpj, cargo, ativo, createdAt];
+  List<GeneratedColumn> get $columns => [
+        id,
+        userId,
+        nome,
+        cpf,
+        unidadeNome,
+        unidadeCnpj,
+        cargo,
+        ativo,
+        createdAt
+      ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -77,6 +91,10 @@ class $VistoriadoresTable extends Vistoriadores
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
     }
     if (data.containsKey('nome')) {
       context.handle(
@@ -127,6 +145,8 @@ class $VistoriadoresTable extends Vistoriadores
     return Vistoriadore(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id']),
       nome: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}nome'])!,
       cpf: attachedDatabase.typeMapping
@@ -152,6 +172,7 @@ class $VistoriadoresTable extends Vistoriadores
 
 class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   final String id;
+  final String? userId;
   final String nome;
   final String cpf;
   final String unidadeNome;
@@ -161,6 +182,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   final DateTime createdAt;
   const Vistoriadore(
       {required this.id,
+      this.userId,
       required this.nome,
       required this.cpf,
       required this.unidadeNome,
@@ -172,6 +194,9 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
+    }
     map['nome'] = Variable<String>(nome);
     map['cpf'] = Variable<String>(cpf);
     map['unidade_nome'] = Variable<String>(unidadeNome);
@@ -187,6 +212,8 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   VistoriadoresCompanion toCompanion(bool nullToAbsent) {
     return VistoriadoresCompanion(
       id: Value(id),
+      userId:
+          userId == null && nullToAbsent ? const Value.absent() : Value(userId),
       nome: Value(nome),
       cpf: Value(cpf),
       unidadeNome: Value(unidadeNome),
@@ -204,6 +231,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Vistoriadore(
       id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String?>(json['userId']),
       nome: serializer.fromJson<String>(json['nome']),
       cpf: serializer.fromJson<String>(json['cpf']),
       unidadeNome: serializer.fromJson<String>(json['unidadeNome']),
@@ -218,6 +246,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String?>(userId),
       'nome': serializer.toJson<String>(nome),
       'cpf': serializer.toJson<String>(cpf),
       'unidadeNome': serializer.toJson<String>(unidadeNome),
@@ -230,6 +259,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
 
   Vistoriadore copyWith(
           {String? id,
+          Value<String?> userId = const Value.absent(),
           String? nome,
           String? cpf,
           String? unidadeNome,
@@ -239,6 +269,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
           DateTime? createdAt}) =>
       Vistoriadore(
         id: id ?? this.id,
+        userId: userId.present ? userId.value : this.userId,
         nome: nome ?? this.nome,
         cpf: cpf ?? this.cpf,
         unidadeNome: unidadeNome ?? this.unidadeNome,
@@ -250,6 +281,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   Vistoriadore copyWithCompanion(VistoriadoresCompanion data) {
     return Vistoriadore(
       id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
       nome: data.nome.present ? data.nome.value : this.nome,
       cpf: data.cpf.present ? data.cpf.value : this.cpf,
       unidadeNome:
@@ -266,6 +298,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
   String toString() {
     return (StringBuffer('Vistoriadore(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('nome: $nome, ')
           ..write('cpf: $cpf, ')
           ..write('unidadeNome: $unidadeNome, ')
@@ -279,12 +312,13 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
 
   @override
   int get hashCode => Object.hash(
-      id, nome, cpf, unidadeNome, unidadeCnpj, cargo, ativo, createdAt);
+      id, userId, nome, cpf, unidadeNome, unidadeCnpj, cargo, ativo, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Vistoriadore &&
           other.id == this.id &&
+          other.userId == this.userId &&
           other.nome == this.nome &&
           other.cpf == this.cpf &&
           other.unidadeNome == this.unidadeNome &&
@@ -296,6 +330,7 @@ class Vistoriadore extends DataClass implements Insertable<Vistoriadore> {
 
 class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
   final Value<String> id;
+  final Value<String?> userId;
   final Value<String> nome;
   final Value<String> cpf;
   final Value<String> unidadeNome;
@@ -306,6 +341,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
   final Value<int> rowid;
   const VistoriadoresCompanion({
     this.id = const Value.absent(),
+    this.userId = const Value.absent(),
     this.nome = const Value.absent(),
     this.cpf = const Value.absent(),
     this.unidadeNome = const Value.absent(),
@@ -317,6 +353,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
   });
   VistoriadoresCompanion.insert({
     required String id,
+    this.userId = const Value.absent(),
     required String nome,
     required String cpf,
     required String unidadeNome,
@@ -331,6 +368,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
         unidadeNome = Value(unidadeNome);
   static Insertable<Vistoriadore> custom({
     Expression<String>? id,
+    Expression<String>? userId,
     Expression<String>? nome,
     Expression<String>? cpf,
     Expression<String>? unidadeNome,
@@ -342,6 +380,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
       if (nome != null) 'nome': nome,
       if (cpf != null) 'cpf': cpf,
       if (unidadeNome != null) 'unidade_nome': unidadeNome,
@@ -355,6 +394,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
 
   VistoriadoresCompanion copyWith(
       {Value<String>? id,
+      Value<String?>? userId,
       Value<String>? nome,
       Value<String>? cpf,
       Value<String>? unidadeNome,
@@ -365,6 +405,7 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
       Value<int>? rowid}) {
     return VistoriadoresCompanion(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       nome: nome ?? this.nome,
       cpf: cpf ?? this.cpf,
       unidadeNome: unidadeNome ?? this.unidadeNome,
@@ -381,6 +422,9 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
     }
     if (nome.present) {
       map['nome'] = Variable<String>(nome.value);
@@ -413,12 +457,394 @@ class VistoriadoresCompanion extends UpdateCompanion<Vistoriadore> {
   String toString() {
     return (StringBuffer('VistoriadoresCompanion(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('nome: $nome, ')
           ..write('cpf: $cpf, ')
           ..write('unidadeNome: $unidadeNome, ')
           ..write('unidadeCnpj: $unidadeCnpj, ')
           ..write('cargo: $cargo, ')
           ..write('ativo: $ativo, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $ClientesTable extends Clientes with TableInfo<$ClientesTable, Cliente> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ClientesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+      'id', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _nomeMeta = const VerificationMeta('nome');
+  @override
+  late final GeneratedColumn<String> nome = GeneratedColumn<String>(
+      'nome', aliasedName, false,
+      type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _cpfCnpjMeta =
+      const VerificationMeta('cpfCnpj');
+  @override
+  late final GeneratedColumn<String> cpfCnpj = GeneratedColumn<String>(
+      'cpf_cnpj', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _emailMeta = const VerificationMeta('email');
+  @override
+  late final GeneratedColumn<String> email = GeneratedColumn<String>(
+      'email', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _telefoneMeta =
+      const VerificationMeta('telefone');
+  @override
+  late final GeneratedColumn<String> telefone = GeneratedColumn<String>(
+      'telefone', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _createdAtMeta =
+      const VerificationMeta('createdAt');
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+      'created_at', aliasedName, false,
+      type: DriftSqlType.dateTime,
+      requiredDuringInsert: false,
+      defaultValue: currentDateAndTime);
+  @override
+  List<GeneratedColumn> get $columns =>
+      [id, userId, nome, cpfCnpj, email, telefone, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'clientes';
+  @override
+  VerificationContext validateIntegrity(Insertable<Cliente> instance,
+      {bool isInserting = false}) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
+    }
+    if (data.containsKey('nome')) {
+      context.handle(
+          _nomeMeta, nome.isAcceptableOrUnknown(data['nome']!, _nomeMeta));
+    } else if (isInserting) {
+      context.missing(_nomeMeta);
+    }
+    if (data.containsKey('cpf_cnpj')) {
+      context.handle(_cpfCnpjMeta,
+          cpfCnpj.isAcceptableOrUnknown(data['cpf_cnpj']!, _cpfCnpjMeta));
+    }
+    if (data.containsKey('email')) {
+      context.handle(
+          _emailMeta, email.isAcceptableOrUnknown(data['email']!, _emailMeta));
+    }
+    if (data.containsKey('telefone')) {
+      context.handle(_telefoneMeta,
+          telefone.isAcceptableOrUnknown(data['telefone']!, _telefoneMeta));
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(_createdAtMeta,
+          createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta));
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  Cliente map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return Cliente(
+      id: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id']),
+      nome: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}nome'])!,
+      cpfCnpj: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}cpf_cnpj']),
+      email: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}email']),
+      telefone: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}telefone']),
+      createdAt: attachedDatabase.typeMapping
+          .read(DriftSqlType.dateTime, data['${effectivePrefix}created_at'])!,
+    );
+  }
+
+  @override
+  $ClientesTable createAlias(String alias) {
+    return $ClientesTable(attachedDatabase, alias);
+  }
+}
+
+class Cliente extends DataClass implements Insertable<Cliente> {
+  final String id;
+  final String? userId;
+  final String nome;
+  final String? cpfCnpj;
+  final String? email;
+  final String? telefone;
+  final DateTime createdAt;
+  const Cliente(
+      {required this.id,
+      this.userId,
+      required this.nome,
+      this.cpfCnpj,
+      this.email,
+      this.telefone,
+      required this.createdAt});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
+    }
+    map['nome'] = Variable<String>(nome);
+    if (!nullToAbsent || cpfCnpj != null) {
+      map['cpf_cnpj'] = Variable<String>(cpfCnpj);
+    }
+    if (!nullToAbsent || email != null) {
+      map['email'] = Variable<String>(email);
+    }
+    if (!nullToAbsent || telefone != null) {
+      map['telefone'] = Variable<String>(telefone);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  ClientesCompanion toCompanion(bool nullToAbsent) {
+    return ClientesCompanion(
+      id: Value(id),
+      userId:
+          userId == null && nullToAbsent ? const Value.absent() : Value(userId),
+      nome: Value(nome),
+      cpfCnpj: cpfCnpj == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cpfCnpj),
+      email:
+          email == null && nullToAbsent ? const Value.absent() : Value(email),
+      telefone: telefone == null && nullToAbsent
+          ? const Value.absent()
+          : Value(telefone),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory Cliente.fromJson(Map<String, dynamic> json,
+      {ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return Cliente(
+      id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String?>(json['userId']),
+      nome: serializer.fromJson<String>(json['nome']),
+      cpfCnpj: serializer.fromJson<String?>(json['cpfCnpj']),
+      email: serializer.fromJson<String?>(json['email']),
+      telefone: serializer.fromJson<String?>(json['telefone']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String?>(userId),
+      'nome': serializer.toJson<String>(nome),
+      'cpfCnpj': serializer.toJson<String?>(cpfCnpj),
+      'email': serializer.toJson<String?>(email),
+      'telefone': serializer.toJson<String?>(telefone),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  Cliente copyWith(
+          {String? id,
+          Value<String?> userId = const Value.absent(),
+          String? nome,
+          Value<String?> cpfCnpj = const Value.absent(),
+          Value<String?> email = const Value.absent(),
+          Value<String?> telefone = const Value.absent(),
+          DateTime? createdAt}) =>
+      Cliente(
+        id: id ?? this.id,
+        userId: userId.present ? userId.value : this.userId,
+        nome: nome ?? this.nome,
+        cpfCnpj: cpfCnpj.present ? cpfCnpj.value : this.cpfCnpj,
+        email: email.present ? email.value : this.email,
+        telefone: telefone.present ? telefone.value : this.telefone,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  Cliente copyWithCompanion(ClientesCompanion data) {
+    return Cliente(
+      id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
+      nome: data.nome.present ? data.nome.value : this.nome,
+      cpfCnpj: data.cpfCnpj.present ? data.cpfCnpj.value : this.cpfCnpj,
+      email: data.email.present ? data.email.value : this.email,
+      telefone: data.telefone.present ? data.telefone.value : this.telefone,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('Cliente(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('nome: $nome, ')
+          ..write('cpfCnpj: $cpfCnpj, ')
+          ..write('email: $email, ')
+          ..write('telefone: $telefone, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, userId, nome, cpfCnpj, email, telefone, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is Cliente &&
+          other.id == this.id &&
+          other.userId == this.userId &&
+          other.nome == this.nome &&
+          other.cpfCnpj == this.cpfCnpj &&
+          other.email == this.email &&
+          other.telefone == this.telefone &&
+          other.createdAt == this.createdAt);
+}
+
+class ClientesCompanion extends UpdateCompanion<Cliente> {
+  final Value<String> id;
+  final Value<String?> userId;
+  final Value<String> nome;
+  final Value<String?> cpfCnpj;
+  final Value<String?> email;
+  final Value<String?> telefone;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const ClientesCompanion({
+    this.id = const Value.absent(),
+    this.userId = const Value.absent(),
+    this.nome = const Value.absent(),
+    this.cpfCnpj = const Value.absent(),
+    this.email = const Value.absent(),
+    this.telefone = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ClientesCompanion.insert({
+    required String id,
+    this.userId = const Value.absent(),
+    required String nome,
+    this.cpfCnpj = const Value.absent(),
+    this.email = const Value.absent(),
+    this.telefone = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  })  : id = Value(id),
+        nome = Value(nome);
+  static Insertable<Cliente> custom({
+    Expression<String>? id,
+    Expression<String>? userId,
+    Expression<String>? nome,
+    Expression<String>? cpfCnpj,
+    Expression<String>? email,
+    Expression<String>? telefone,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
+      if (nome != null) 'nome': nome,
+      if (cpfCnpj != null) 'cpf_cnpj': cpfCnpj,
+      if (email != null) 'email': email,
+      if (telefone != null) 'telefone': telefone,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ClientesCompanion copyWith(
+      {Value<String>? id,
+      Value<String?>? userId,
+      Value<String>? nome,
+      Value<String?>? cpfCnpj,
+      Value<String?>? email,
+      Value<String?>? telefone,
+      Value<DateTime>? createdAt,
+      Value<int>? rowid}) {
+    return ClientesCompanion(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      nome: nome ?? this.nome,
+      cpfCnpj: cpfCnpj ?? this.cpfCnpj,
+      email: email ?? this.email,
+      telefone: telefone ?? this.telefone,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
+    }
+    if (nome.present) {
+      map['nome'] = Variable<String>(nome.value);
+    }
+    if (cpfCnpj.present) {
+      map['cpf_cnpj'] = Variable<String>(cpfCnpj.value);
+    }
+    if (email.present) {
+      map['email'] = Variable<String>(email.value);
+    }
+    if (telefone.present) {
+      map['telefone'] = Variable<String>(telefone.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ClientesCompanion(')
+          ..write('id: $id, ')
+          ..write('userId: $userId, ')
+          ..write('nome: $nome, ')
+          ..write('cpfCnpj: $cpfCnpj, ')
+          ..write('email: $email, ')
+          ..write('telefone: $telefone, ')
           ..write('createdAt: $createdAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -437,6 +863,11 @@ class $VistoriasTable extends Vistorias
   late final GeneratedColumn<String> id = GeneratedColumn<String>(
       'id', aliasedName, false,
       type: DriftSqlType.string, requiredDuringInsert: true);
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
+  @override
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+      'user_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _numeroLaudoMeta =
       const VerificationMeta('numeroLaudo');
   @override
@@ -588,6 +1019,7 @@ class $VistoriasTable extends Vistorias
   @override
   List<GeneratedColumn> get $columns => [
         id,
+        userId,
         numeroLaudo,
         status,
         tipoVistoria,
@@ -625,6 +1057,10 @@ class $VistoriasTable extends Vistorias
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('user_id')) {
+      context.handle(_userIdMeta,
+          userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta));
     }
     if (data.containsKey('numero_laudo')) {
       context.handle(
@@ -761,6 +1197,8 @@ class $VistoriasTable extends Vistorias
     return Vistoria(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}id'])!,
+      userId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}user_id']),
       numeroLaudo: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}numero_laudo'])!,
       status: attachedDatabase.typeMapping
@@ -817,6 +1255,7 @@ class $VistoriasTable extends Vistorias
 
 class Vistoria extends DataClass implements Insertable<Vistoria> {
   final String id;
+  final String? userId;
   final String numeroLaudo;
   final String status;
   final String tipoVistoria;
@@ -841,6 +1280,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   final DateTime updatedAt;
   const Vistoria(
       {required this.id,
+      this.userId,
       required this.numeroLaudo,
       required this.status,
       required this.tipoVistoria,
@@ -867,6 +1307,9 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    if (!nullToAbsent || userId != null) {
+      map['user_id'] = Variable<String>(userId);
+    }
     map['numero_laudo'] = Variable<String>(numeroLaudo);
     map['status'] = Variable<String>(status);
     map['tipo_vistoria'] = Variable<String>(tipoVistoria);
@@ -921,6 +1364,8 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   VistoriasCompanion toCompanion(bool nullToAbsent) {
     return VistoriasCompanion(
       id: Value(id),
+      userId:
+          userId == null && nullToAbsent ? const Value.absent() : Value(userId),
       numeroLaudo: Value(numeroLaudo),
       status: Value(status),
       tipoVistoria: Value(tipoVistoria),
@@ -976,6 +1421,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Vistoria(
       id: serializer.fromJson<String>(json['id']),
+      userId: serializer.fromJson<String?>(json['userId']),
       numeroLaudo: serializer.fromJson<String>(json['numeroLaudo']),
       status: serializer.fromJson<String>(json['status']),
       tipoVistoria: serializer.fromJson<String>(json['tipoVistoria']),
@@ -1007,6 +1453,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'userId': serializer.toJson<String?>(userId),
       'numeroLaudo': serializer.toJson<String>(numeroLaudo),
       'status': serializer.toJson<String>(status),
       'tipoVistoria': serializer.toJson<String>(tipoVistoria),
@@ -1035,6 +1482,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
 
   Vistoria copyWith(
           {String? id,
+          Value<String?> userId = const Value.absent(),
           String? numeroLaudo,
           String? status,
           String? tipoVistoria,
@@ -1059,6 +1507,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
           DateTime? updatedAt}) =>
       Vistoria(
         id: id ?? this.id,
+        userId: userId.present ? userId.value : this.userId,
         numeroLaudo: numeroLaudo ?? this.numeroLaudo,
         status: status ?? this.status,
         tipoVistoria: tipoVistoria ?? this.tipoVistoria,
@@ -1097,6 +1546,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   Vistoria copyWithCompanion(VistoriasCompanion data) {
     return Vistoria(
       id: data.id.present ? data.id.value : this.id,
+      userId: data.userId.present ? data.userId.value : this.userId,
       numeroLaudo:
           data.numeroLaudo.present ? data.numeroLaudo.value : this.numeroLaudo,
       status: data.status.present ? data.status.value : this.status,
@@ -1153,6 +1603,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   String toString() {
     return (StringBuffer('Vistoria(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('numeroLaudo: $numeroLaudo, ')
           ..write('status: $status, ')
           ..write('tipoVistoria: $tipoVistoria, ')
@@ -1182,6 +1633,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
   @override
   int get hashCode => Object.hashAll([
         id,
+        userId,
         numeroLaudo,
         status,
         tipoVistoria,
@@ -1210,6 +1662,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
       identical(this, other) ||
       (other is Vistoria &&
           other.id == this.id &&
+          other.userId == this.userId &&
           other.numeroLaudo == this.numeroLaudo &&
           other.status == this.status &&
           other.tipoVistoria == this.tipoVistoria &&
@@ -1236,6 +1689,7 @@ class Vistoria extends DataClass implements Insertable<Vistoria> {
 
 class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   final Value<String> id;
+  final Value<String?> userId;
   final Value<String> numeroLaudo;
   final Value<String> status;
   final Value<String> tipoVistoria;
@@ -1261,6 +1715,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   final Value<int> rowid;
   const VistoriasCompanion({
     this.id = const Value.absent(),
+    this.userId = const Value.absent(),
     this.numeroLaudo = const Value.absent(),
     this.status = const Value.absent(),
     this.tipoVistoria = const Value.absent(),
@@ -1287,6 +1742,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   });
   VistoriasCompanion.insert({
     required String id,
+    this.userId = const Value.absent(),
     required String numeroLaudo,
     this.status = const Value.absent(),
     this.tipoVistoria = const Value.absent(),
@@ -1315,6 +1771,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
         vistoriadorId = Value(vistoriadorId);
   static Insertable<Vistoria> custom({
     Expression<String>? id,
+    Expression<String>? userId,
     Expression<String>? numeroLaudo,
     Expression<String>? status,
     Expression<String>? tipoVistoria,
@@ -1341,6 +1798,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (userId != null) 'user_id': userId,
       if (numeroLaudo != null) 'numero_laudo': numeroLaudo,
       if (status != null) 'status': status,
       if (tipoVistoria != null) 'tipo_vistoria': tipoVistoria,
@@ -1370,6 +1828,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
 
   VistoriasCompanion copyWith(
       {Value<String>? id,
+      Value<String?>? userId,
       Value<String>? numeroLaudo,
       Value<String>? status,
       Value<String>? tipoVistoria,
@@ -1395,6 +1854,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
       Value<int>? rowid}) {
     return VistoriasCompanion(
       id: id ?? this.id,
+      userId: userId ?? this.userId,
       numeroLaudo: numeroLaudo ?? this.numeroLaudo,
       status: status ?? this.status,
       tipoVistoria: tipoVistoria ?? this.tipoVistoria,
@@ -1427,6 +1887,9 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
     }
     if (numeroLaudo.present) {
       map['numero_laudo'] = Variable<String>(numeroLaudo.value);
@@ -1505,6 +1968,7 @@ class VistoriasCompanion extends UpdateCompanion<Vistoria> {
   String toString() {
     return (StringBuffer('VistoriasCompanion(')
           ..write('id: $id, ')
+          ..write('userId: $userId, ')
           ..write('numeroLaudo: $numeroLaudo, ')
           ..write('status: $status, ')
           ..write('tipoVistoria: $tipoVistoria, ')
@@ -6513,6 +6977,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $VistoriadoresTable vistoriadores = $VistoriadoresTable(this);
+  late final $ClientesTable clientes = $ClientesTable(this);
   late final $VistoriasTable vistorias = $VistoriasTable(this);
   late final $VeiculosTable veiculos = $VeiculosTable(this);
   late final $ItensVistoriaTable itensVistoria = $ItensVistoriaTable(this);
@@ -6532,6 +6997,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
         vistoriadores,
+        clientes,
         vistorias,
         veiculos,
         itensVistoria,
@@ -6547,6 +7013,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$VistoriadoresTableCreateCompanionBuilder = VistoriadoresCompanion
     Function({
   required String id,
+  Value<String?> userId,
   required String nome,
   required String cpf,
   required String unidadeNome,
@@ -6559,6 +7026,7 @@ typedef $$VistoriadoresTableCreateCompanionBuilder = VistoriadoresCompanion
 typedef $$VistoriadoresTableUpdateCompanionBuilder = VistoriadoresCompanion
     Function({
   Value<String> id,
+  Value<String?> userId,
   Value<String> nome,
   Value<String> cpf,
   Value<String> unidadeNome,
@@ -6580,6 +7048,9 @@ class $$VistoriadoresTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get nome => $composableBuilder(
       column: $table.nome, builder: (column) => ColumnFilters(column));
@@ -6615,6 +7086,9 @@ class $$VistoriadoresTableOrderingComposer
   ColumnOrderings<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get nome => $composableBuilder(
       column: $table.nome, builder: (column) => ColumnOrderings(column));
 
@@ -6648,6 +7122,9 @@ class $$VistoriadoresTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
 
   GeneratedColumn<String> get nome =>
       $composableBuilder(column: $table.nome, builder: (column) => column);
@@ -6698,6 +7175,7 @@ class $$VistoriadoresTableTableManager extends RootTableManager<
               $$VistoriadoresTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
+            Value<String?> userId = const Value.absent(),
             Value<String> nome = const Value.absent(),
             Value<String> cpf = const Value.absent(),
             Value<String> unidadeNome = const Value.absent(),
@@ -6709,6 +7187,7 @@ class $$VistoriadoresTableTableManager extends RootTableManager<
           }) =>
               VistoriadoresCompanion(
             id: id,
+            userId: userId,
             nome: nome,
             cpf: cpf,
             unidadeNome: unidadeNome,
@@ -6720,6 +7199,7 @@ class $$VistoriadoresTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             required String id,
+            Value<String?> userId = const Value.absent(),
             required String nome,
             required String cpf,
             required String unidadeNome,
@@ -6731,6 +7211,7 @@ class $$VistoriadoresTableTableManager extends RootTableManager<
           }) =>
               VistoriadoresCompanion.insert(
             id: id,
+            userId: userId,
             nome: nome,
             cpf: cpf,
             unidadeNome: unidadeNome,
@@ -6762,8 +7243,204 @@ typedef $$VistoriadoresTableProcessedTableManager = ProcessedTableManager<
     ),
     Vistoriadore,
     PrefetchHooks Function()>;
+typedef $$ClientesTableCreateCompanionBuilder = ClientesCompanion Function({
+  required String id,
+  Value<String?> userId,
+  required String nome,
+  Value<String?> cpfCnpj,
+  Value<String?> email,
+  Value<String?> telefone,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+typedef $$ClientesTableUpdateCompanionBuilder = ClientesCompanion Function({
+  Value<String> id,
+  Value<String?> userId,
+  Value<String> nome,
+  Value<String?> cpfCnpj,
+  Value<String?> email,
+  Value<String?> telefone,
+  Value<DateTime> createdAt,
+  Value<int> rowid,
+});
+
+class $$ClientesTableFilterComposer
+    extends Composer<_$AppDatabase, $ClientesTable> {
+  $$ClientesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get nome => $composableBuilder(
+      column: $table.nome, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get cpfCnpj => $composableBuilder(
+      column: $table.cpfCnpj, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get telefone => $composableBuilder(
+      column: $table.telefone, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnFilters(column));
+}
+
+class $$ClientesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ClientesTable> {
+  $$ClientesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+      column: $table.id, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get nome => $composableBuilder(
+      column: $table.nome, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get cpfCnpj => $composableBuilder(
+      column: $table.cpfCnpj, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get email => $composableBuilder(
+      column: $table.email, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get telefone => $composableBuilder(
+      column: $table.telefone, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+      column: $table.createdAt, builder: (column) => ColumnOrderings(column));
+}
+
+class $$ClientesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ClientesTable> {
+  $$ClientesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
+
+  GeneratedColumn<String> get nome =>
+      $composableBuilder(column: $table.nome, builder: (column) => column);
+
+  GeneratedColumn<String> get cpfCnpj =>
+      $composableBuilder(column: $table.cpfCnpj, builder: (column) => column);
+
+  GeneratedColumn<String> get email =>
+      $composableBuilder(column: $table.email, builder: (column) => column);
+
+  GeneratedColumn<String> get telefone =>
+      $composableBuilder(column: $table.telefone, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$ClientesTableTableManager extends RootTableManager<
+    _$AppDatabase,
+    $ClientesTable,
+    Cliente,
+    $$ClientesTableFilterComposer,
+    $$ClientesTableOrderingComposer,
+    $$ClientesTableAnnotationComposer,
+    $$ClientesTableCreateCompanionBuilder,
+    $$ClientesTableUpdateCompanionBuilder,
+    (Cliente, BaseReferences<_$AppDatabase, $ClientesTable, Cliente>),
+    Cliente,
+    PrefetchHooks Function()> {
+  $$ClientesTableTableManager(_$AppDatabase db, $ClientesTable table)
+      : super(TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ClientesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ClientesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ClientesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback: ({
+            Value<String> id = const Value.absent(),
+            Value<String?> userId = const Value.absent(),
+            Value<String> nome = const Value.absent(),
+            Value<String?> cpfCnpj = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> telefone = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ClientesCompanion(
+            id: id,
+            userId: userId,
+            nome: nome,
+            cpfCnpj: cpfCnpj,
+            email: email,
+            telefone: telefone,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          createCompanionCallback: ({
+            required String id,
+            Value<String?> userId = const Value.absent(),
+            required String nome,
+            Value<String?> cpfCnpj = const Value.absent(),
+            Value<String?> email = const Value.absent(),
+            Value<String?> telefone = const Value.absent(),
+            Value<DateTime> createdAt = const Value.absent(),
+            Value<int> rowid = const Value.absent(),
+          }) =>
+              ClientesCompanion.insert(
+            id: id,
+            userId: userId,
+            nome: nome,
+            cpfCnpj: cpfCnpj,
+            email: email,
+            telefone: telefone,
+            createdAt: createdAt,
+            rowid: rowid,
+          ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ));
+}
+
+typedef $$ClientesTableProcessedTableManager = ProcessedTableManager<
+    _$AppDatabase,
+    $ClientesTable,
+    Cliente,
+    $$ClientesTableFilterComposer,
+    $$ClientesTableOrderingComposer,
+    $$ClientesTableAnnotationComposer,
+    $$ClientesTableCreateCompanionBuilder,
+    $$ClientesTableUpdateCompanionBuilder,
+    (Cliente, BaseReferences<_$AppDatabase, $ClientesTable, Cliente>),
+    Cliente,
+    PrefetchHooks Function()>;
 typedef $$VistoriasTableCreateCompanionBuilder = VistoriasCompanion Function({
   required String id,
+  Value<String?> userId,
   required String numeroLaudo,
   Value<String> status,
   Value<String> tipoVistoria,
@@ -6790,6 +7467,7 @@ typedef $$VistoriasTableCreateCompanionBuilder = VistoriasCompanion Function({
 });
 typedef $$VistoriasTableUpdateCompanionBuilder = VistoriasCompanion Function({
   Value<String> id,
+  Value<String?> userId,
   Value<String> numeroLaudo,
   Value<String> status,
   Value<String> tipoVistoria,
@@ -6932,6 +7610,9 @@ class $$VistoriasTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get numeroLaudo => $composableBuilder(
       column: $table.numeroLaudo, builder: (column) => ColumnFilters(column));
@@ -7166,6 +7847,9 @@ class $$VistoriasTableOrderingComposer
   ColumnOrderings<String> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<String> get userId => $composableBuilder(
+      column: $table.userId, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get numeroLaudo => $composableBuilder(
       column: $table.numeroLaudo, builder: (column) => ColumnOrderings(column));
 
@@ -7255,6 +7939,9 @@ class $$VistoriasTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get userId =>
+      $composableBuilder(column: $table.userId, builder: (column) => column);
 
   GeneratedColumn<String> get numeroLaudo => $composableBuilder(
       column: $table.numeroLaudo, builder: (column) => column);
@@ -7502,6 +8189,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
               $$VistoriasTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<String> id = const Value.absent(),
+            Value<String?> userId = const Value.absent(),
             Value<String> numeroLaudo = const Value.absent(),
             Value<String> status = const Value.absent(),
             Value<String> tipoVistoria = const Value.absent(),
@@ -7528,6 +8216,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
           }) =>
               VistoriasCompanion(
             id: id,
+            userId: userId,
             numeroLaudo: numeroLaudo,
             status: status,
             tipoVistoria: tipoVistoria,
@@ -7554,6 +8243,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             required String id,
+            Value<String?> userId = const Value.absent(),
             required String numeroLaudo,
             Value<String> status = const Value.absent(),
             Value<String> tipoVistoria = const Value.absent(),
@@ -7580,6 +8270,7 @@ class $$VistoriasTableTableManager extends RootTableManager<
           }) =>
               VistoriasCompanion.insert(
             id: id,
+            userId: userId,
             numeroLaudo: numeroLaudo,
             status: status,
             tipoVistoria: tipoVistoria,
@@ -10755,6 +11446,8 @@ class $AppDatabaseManager {
   $AppDatabaseManager(this._db);
   $$VistoriadoresTableTableManager get vistoriadores =>
       $$VistoriadoresTableTableManager(_db, _db.vistoriadores);
+  $$ClientesTableTableManager get clientes =>
+      $$ClientesTableTableManager(_db, _db.clientes);
   $$VistoriasTableTableManager get vistorias =>
       $$VistoriasTableTableManager(_db, _db.vistorias);
   $$VeiculosTableTableManager get veiculos =>

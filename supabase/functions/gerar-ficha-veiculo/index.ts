@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Buscar no banco se já existe ficha (só busca cache se não houver apontamentos dinâmicos do vistoriador)
+    // Buscar no banco se já existe ficha técnica geral (só busca cache se não houver apontamentos dinâmicos do laudo)
     const hasApontamentos = apontamentos && Array.isArray(apontamentos) && apontamentos.length > 0;
     
     if (!hasApontamentos) {
@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
       }
 
       if (cachedData && cachedData.data) {
-        console.log('Retornando dados do cache para:', brand, model, year)
+        console.log('Retornando dados técnicos do cache para:', brand, model, year)
         return new Response(JSON.stringify({ source: 'cache', data: cachedData.data }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
@@ -77,119 +77,107 @@ Deno.serve(async (req) => {
     }
 
     let extraPrompt = '';
-    let extraJsonSchema = '';
-    const estadoLocal = uf ? `Considere o mercado do estado de(a) ${uf}, NO BRASIL, para estimativa de preços.` : 'Considere o mercado médio brasileiro para estimativa de preços.';
+    let extraJsonSchema = ',\n"apontamentos_veiculo": []';
+    const estadoLocal = uf ? `Considere o mercado do estado de(a) ${uf}, NO BRASIL, para estimativa de preços de peças e serviços.` : 'Considere o mercado médio brasileiro para estimativa de preços de peças e serviços.';
     
     if (hasApontamentos) {
-      extraPrompt = `\nIMPORTANTE: O vistoriador registrou os seguintes apontamentos neste veículo durante a vistoria:\n${apontamentos.map((a: string) => '- ' + a).join('\n')}
+      const apontamentosFormatados = apontamentos.map((a: any, idx: number) => {
+        if (typeof a === 'object' && a !== null) {
+          const id = a.apontamentoId || a.id || `apt_${idx}`;
+          const peca = a.nomePeca || a.peca || a.item || 'Item apontado';
+          const desc = a.descricaoProblema || a.motivoAvaria || a.observacao || '';
+          return { apontamentoId: String(id), nomePeca: String(peca), descricaoProblema: String(desc) };
+        }
+        return { apontamentoId: `apt_${idx}`, nomePeca: String(a), descricaoProblema: String(a) };
+      });
 
-REGRAS CRÍTICAS DE TRATAMENTO DOS APONTAMENTOS:
-1. ITENS MARCADOS COMO "SEM ACESSO", "SEMA ACESSO", "NÃO LOCALIZADO", "PLAQUETA AUSENTE", "AUSENTE" OU "NÃO FOI POSSÍVEL VERIFICAR":
-   - Estes itens NÃO SÃO AVARIAS, DEFEITOS NEM SERVIÇOS A FAZER. Indicam apenas impossibilidade física de visualização/acesso ou ausência da plaqueta de identificação (ex: plaqueta de câmbio ausente, gravação oculta, longarina coberta/sem visibilidade).
-   - Estar com "plaqueta ausente" NÃO significa câmbio quebrado, irregular ou com defeito mecânico. NUNCA gere troca, reparo ou manutenção por conta de plaqueta ausente.
-   - Para estes itens de "SEM ACESSO" ou "PLAQUETA AUSENTE", você DEVE OBRIGATORIAMENTE preencher:
-     * "valor_peca_estimado": "R$ 0,00"
-     * "valor_mao_de_obra_estimado": "R$ 0,00"
-     * "observacao_indicada": "Item sem avaria mecânica/funcional nem defeito pendente (não gera custo de reparo nem serviço a fazer)".
-   - NUNCA atribua valor de mão de obra ou valor de peça a um item que está apenas "SEM ACESSO" ou "PLAQUETA AUSENTE".
-   - NUNCA inclua o custo destes itens no cálculo do "desconto_total_avarias" nem trate como problema no resumo do estado do veículo.
+      extraPrompt = `\nAPONTAMENTOS DA VISTORIA REGISTRADOS PELO VISTORIADOR:
+${apontamentosFormatados.map((it: any) => `- [ID: "${it.apontamentoId}"] Peça: "${it.nomePeca}" | Problema: "${it.descricaoProblema}"`).join('\n')}
 
-2. ITENS DE REPINTURA, RETOQUE OU PINTURA JÁ EXECUTADA (ex: repintura, repintado, retoque, micropintura, pintura não original):
-   - A repintura é um SERVIÇO DE MANUTENÇÃO ESTÉTICA JÁ REALIZADO no veículo, e NÃO um defeito ou avaria pendente de conserto.
-   - Apenas seria uma avaria/problema se o apontamento descrever expressamente danos físicos abertos (ex: risco profundo, amassado, trinca, peça quebrada, massa plástica descascando/trincada, oxidação/ferrugem).
-   - Se for apenas a indicação de peça repintada/retoque sem dano aberto relatado:
-     * "valor_peca_estimado": "R$ 0,00"
-     * "valor_mao_de_obra_estimado": "R$ 0,00"
-     * "observacao_indicada": "Serviço estético de repintura já realizado / estética conservada (não é defeito pendente e não gera custo de reparo)".
-   - NUNCA atribua valor de peça/mão de obra e NUNCA deduza do "desconto_total_avarias" para peças que apenas foram repintadas no passado.
-   - No "resumo_estado_veiculo", trate a repintura apenas como histórico de manutenção estética/conservação, NUNCA como defeito, avaria ou problema depreciativo.
+REGRAS OBRIGATÓRIAS DE ORÇAMENTO DOS APONTAMENTOS (${estadoLocal}):
+1. Para CADA apontamento listado acima, você deve retornar um objeto na lista "apontamentos_veiculo" com:
+   - "apontamentoId": O mesmo ID recebido correspondente.
+   - "nomePeca": Nome da peça danificada.
+   - "descricaoProblema": Descrição do dano/defeito.
+   - "valorEstimadoPeca": Número numérico (double) estimado para a peça de reposição (ex: 1200.00). Caso não requeira peça nova (ex: apenas repintura/martelinho), coloque 0.0.
+   - "valorEstimadoMaoDeObra": Número numérico (double) estimado para a mão de obra/instalação/serviço (ex: 400.00).
+2. ITENS SEM ACESSO / NÃO LOCALIZADO / NÃO VERIFICADO / PLAQUETA AUSENTE / DENTRO DO PADRÃO:
+   - "valorEstimadoPeca": 0.0
+   - "valorEstimadoMaoDeObra": 0.0
+3. ITENS DE RETOQUE OU REPINTURA JÁ REALIZADOS ANTERIORMENTE NO VEÍCULO:
+   - "valorEstimadoPeca": 0.0
+   - "valorEstimadoMaoDeObra": 0.0
+4. PROIBIÇÃO ABSOLUTA:
+   - A IA NÃO deve calcular valor do veículo, valor FIPE nem sugerir valor de mercado.
+   - A IA NÃO deve calcular depreciação nem percentual de depreciação nem valor final.
+   - NÃO inclua campos como "valorVeiculo", "valorMercado", "valorFipe", "depreciacao", "percentualDepreciacao", "valorVeiculoDepreciado" ou "valorFinal".`;
 
-3. ITENS COM AVARIAS REAIS OU DEFEITOS PENDENTES (ex: amassado, risco profundo, trincado, quebrado, corroído/ferrugem, rasgado, vazamento, peça com avaria):
-   - Estime o valor da peça de reposição (nova ou paralela) e o custo de mão de obra para reparar ou substituir.
-   - REGRA PARA AVARIAS ESTRUTURAIS: Assuma sempre que o reparo é uma troca simples de componente ou serviço pontual. Nunca orce reconstruções ou reparos estruturais complexos de alto custo se for item simples.
-
-Inclua as estimativas no JSON de retorno sob a chave "apontamentos_veiculo". ${estadoLocal} TODOS OS VALORES DEVERÃO SER EM REAIS (R$).`;
-      extraJsonSchema = `,\n"apontamentos_veiculo": [\n{\n"peca_ou_problema": "",\n"local_no_veiculo": "",\n"observacao_indicada": "",\n"valor_peca_estimado": "",\n"valor_mao_de_obra_estimado": ""\n}\n]`;
+      extraJsonSchema = `,\n"apontamentos_veiculo": [\n  {\n    "apontamentoId": "${apontamentosFormatados[0]?.apontamentoId || '123'}",\n    "nomePeca": "${apontamentosFormatados[0]?.nomePeca || 'Para-choque'}",\n    "descricaoProblema": "Descrição do dano",\n    "valorEstimadoPeca": 1200.00,\n    "valorEstimadoMaoDeObra": 400.00\n  }\n]`;
     }
-    
-    // Sempre adicionar a análise final
-    extraPrompt += `\nAlém disso, faça uma análise final da vistoria com ALTO NÍVEL DE DETALHAMENTO (nível laudo premium):
-- "resumo_estado_veiculo": Forneça um parágrafo robusto e extremamente profissional resumindo o impacto geral dos apontamentos no veículo (seja positivo ou negativo).
-- "justificativa": Escreva pelo menos dois parágrafos detalhando a composição do preço sugerido, a depreciação calculada e a atratividade do modelo no mercado de usados.
-Apresente o valor médio de venda desse carro no mercado local (${estadoLocal}), calcule um desconto baseado APENAS nas avarias reais informadas (desconsiderando itens sem acesso) e sugira o valor de venda final. ATENÇÃO: TODOS OS VALORES FINANCEIROS NO JSON PRECISAM ESTAR EXCLUSIVAMENTE EM REAIS (R$). É PROIBIDO USAR DÓLARES OU FAZER REFERÊNCIA AOS ESTADOS UNIDOS.`;
-    
-    extraJsonSchema += `,\n"analise_final": {\n"resumo_estado_veiculo": "",\n"valor_venda_mercado_local": "",\n"desconto_total_avarias": "",\n"valor_venda_sugerido_final": "",\n"justificativa": ""\n}`;
 
-    const prompt = `Você é um Perito Automotivo MASTER e Avaliador de Mercado Sênior no Brasil. Seu objetivo é criar um relatório/ficha técnica EXTREMAMENTE RICO EM DETALHES, com dados técnicos avançados, problemas crônicos reais bem descritos e valores de peças/mão de obra realistas. Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON. Evite textos genéricos, aprofunde-se nos defeitos conhecidos do motor/câmbio desta versão. OBRIGATÓRIO: TODOS OS PREÇOS E AVALIAÇÕES DEVEM SER EM MOEDA BRASILEIRA (BRL) FORMATADOS COMO "R$ X.XXX,XX". NUNCA USE USD NEM REALIZE AVALIAÇÕES DO MERCADO AMERICANO.${extraPrompt}
+    const prompt = `Você é um Perito Automotivo e Avaliador Técnico Sênior no Brasil.
+Seu objetivo é gerar uma FICHA TÉCNICA INTELIGENTE DO VEÍCULO profissional, elegante, estritamente neutra e puramente informativa (sem juízo de valor "caro/barato", "bom/ruim").
+Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON.${extraPrompt}
 
 Veículo:
 Marca: ${brand}
 Modelo: ${model}
 Ano: ${year}
-Versão: ${version || 'Não informada'}
-Combustível: ${fuel || 'Não informado'}
-Motor: ${engine || 'Não informado'}
+Versão: ${version || 'Padrão'}
+Combustível: ${fuel || 'Flex'}
+Motor: ${engine || 'Padrão'}
 
-O JSON retornado deve seguir rigorosamente esta estrutura:
+O JSON retornado deve seguir RIGOROSAMENTE esta estrutura:
 {
 "identificacao": {
-"marca": "",
-"modelo": "",
-"ano": "",
-"versao": "",
-"combustivel": "",
-"motor": ""
+  "marca": "${brand}",
+  "modelo": "${model}",
+  "ano": "${year}",
+  "versao": "${version || ''}",
+  "combustivel": "${fuel || ''}",
+  "motor": "${engine || ''}"
 },
-"especificacoes_tecnicas": {
-"potencia": "",
-"torque": "",
-"cambio": "",
-"tracao": "",
-"direcao": "",
-"suspensao_dianteira": "",
-"suspensao_traseira": "",
-"freios": "",
-"pneus_originais": "",
-"tanque": "",
-"porta_malas": ""
+"resumo_inteligente": "Texto conciso, neutro e institucional (1 parágrafo de 3 a 5 linhas). Exemplo: O [Marca Modelo Versão] reúne características voltadas ao uso cotidiano, com conjunto mecânico amplamente conhecido no mercado nacional. Nesta ficha estão reunidas suas principais especificações técnicas, insumos recomendados e componentes de manutenção, proporcionando uma visão rápida e organizada das principais informações do modelo.",
+"informacoes_uteis": {
+  "combustivel": "Flex",
+  "categoria": "Hatch compacto (ou Sedan, SUV, etc)",
+  "ocupantes": "5 lugares",
+  "tracao": "Dianteira",
+  "cambio": "Manual de 5 marchas (ou Automático)",
+  "capacidade_porta_malas": "285 litros",
+  "capacidade_tanque": "50 litros"
 },
-"manutencao": {
-"oleo_recomendado": "",
-"capacidade_oleo": "",
-"fluido_arrefecimento": "",
-"fluido_freio": "",
-"velas": "",
-"correia_ou_corrente": ""
-},
-"problemas_comuns": [
-{
-"item": "",
-"descricao": "",
-"sintomas": "",
-"gravidade": "",
-"observacao_vistoria": ""
-}
+"especificacoes_tecnicas": [
+  {"item": "Potência", "informacao": "75 cv"},
+  {"item": "Torque", "informacao": "9,7 kgfm"},
+  {"item": "Câmbio", "informacao": "Manual de 5 marchas"},
+  {"item": "Tração", "informacao": "Dianteira"},
+  {"item": "Direção", "informacao": "Hidráulica"},
+  {"item": "Suspensão dianteira", "informacao": "Independente tipo McPherson"},
+  {"item": "Suspensão traseira", "informacao": "Eixo de torção"},
+  {"item": "Freios", "informacao": "Disco ventilado dianteiro / tambor traseiro"},
+  {"item": "Pneus originais", "informacao": "175/70 R14"},
+  {"item": "Tanque", "informacao": "50 litros"},
+  {"item": "Porta-malas", "informacao": "285 litros"}
 ],
-"pecas_desgaste": [
-{
-"peca": "",
-"vida_util_media": "",
-"valor_peca_estimado": "",
-"valor_mao_de_obra_estimado": "",
-"tempo_mao_de_obra_estimado": ""
-}
+"manutencao_recomendada": [
+  {"item": "Óleo recomendado", "especificacao": "5W30 (conforme manual)"},
+  {"item": "Capacidade de óleo", "especificacao": "3,5 litros com filtro"},
+  {"item": "Fluido de arrefecimento", "especificacao": "Aditivo orgânico + água desmineralizada"},
+  {"item": "Fluido de freio", "especificacao": "DOT 4"},
+  {"item": "Velas", "especificacao": "NGK BKR6E ou equivalente"},
+  {"item": "Sistema de distribuição", "especificacao": "Correia dentada (ou Corrente)"},
+  {"item": "Bateria", "especificacao": "12V — especificação compatível com o modelo"}
 ],
-"dicas_vistoria": [
-{
-"area": "",
-"o_que_verificar": "",
-"sinal_de_alerta": ""
-}
-],
-"observacoes": [
-""
+"principais_pecas_manutencao": [
+  {"componente": "Pastilhas de freio", "valor_peca": "R$ 150,00", "valor_mao_de_obra": "R$ 100,00", "estimativa_total": "R$ 250,00"},
+  {"componente": "Filtro de ar", "valor_peca": "R$ 50,00", "valor_mao_de_obra": "R$ 50,00", "estimativa_total": "R$ 100,00"},
+  {"componente": "Jogo de velas", "valor_peca": "R$ 140,00", "valor_mao_de_obra": "R$ 100,00", "estimativa_total": "R$ 240,00"},
+  {"componente": "Kit correia dentada", "valor_peca": "R$ 180,00", "valor_mao_de_obra": "R$ 250,00", "estimativa_total": "R$ 430,00"},
+  {"componente": "Disco de freio", "valor_peca": "R$ 280,00", "valor_mao_de_obra": "R$ 150,00", "estimativa_total": "R$ 430,00"},
+  {"componente": "Kit embreagem", "valor_peca": "R$ 650,00", "valor_mao_de_obra": "R$ 450,00", "estimativa_total": "R$ 1.100,00"}
 ]${extraJsonSchema},
-"aviso": "Informações geradas por IA com valores estimados. Confirmar dados técnicos, valores e recalls em fontes oficiais antes de uso comercial ou jurídico."
+"observacao_importante": "Ficha Inteligente: As informações técnicas, especificações e insumos apresentados possuem caráter informativo e complementar ao laudo cautelar. Valores podem variar conforme região, fornecedor e condições de mercado. As informações não indicam, por si só, necessidade de manutenção ou substituição dos componentes do veículo vistoriado."
 }`
 
     let parsedJson: any = null

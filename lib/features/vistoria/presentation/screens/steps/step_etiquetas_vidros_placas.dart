@@ -26,6 +26,7 @@ class StepVidros extends StatelessWidget {
     'Gravação ausente',
     'Divergente',
     'Vestígios de adulteração nos vidros',
+    'Não aplicável',
   ];
 
   @override

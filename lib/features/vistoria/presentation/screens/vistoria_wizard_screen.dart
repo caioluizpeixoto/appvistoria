@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../core/services/image_service.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
@@ -24,6 +29,8 @@ import 'steps/step_etiquetas_vidros_placas.dart';
 import 'steps/step_estrutura.dart';
 import 'steps/step_pintura.dart';
 import 'steps/step_fotos_extras.dart';
+import 'steps/step_apontamentos.dart';
+import '../../domain/entities/apontamento_avaria.dart';
 import 'steps/step_checklist_opcional.dart';
 import 'steps/step_checklist_medidas.dart';
 import 'steps/step_pintura_caminhao.dart';
@@ -96,6 +103,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         const _StepInfo(titulo: 'Pintura (Caminhão)', icone: Icons.color_lens_rounded),
       const _StepInfo(
           titulo: 'Fotos Extras', icone: Icons.add_photo_alternate_rounded),
+      const _StepInfo(
+          titulo: 'Apontamentos', icone: Icons.report_problem_rounded),
       const _StepInfo(
           titulo: 'Dados do Veículo', icone: Icons.directions_car_rounded),
       const _StepInfo(
@@ -426,6 +435,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       _wizardState.anoFabricacao = veiculoApi.anoFabricacao.isNotEmpty ? veiculoApi.anoFabricacao : _wizardState.anoFabricacao;
       _wizardState.anoModelo = veiculoApi.anoModelo.isNotEmpty ? veiculoApi.anoModelo : _wizardState.anoModelo;
       _wizardState.cor = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.cor;
+      _wizardState.corBin = veiculoApi.cor.isNotEmpty ? veiculoApi.cor : _wizardState.corBin;
       _wizardState.renavam = veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : _wizardState.renavam;
       _wizardState.chassiBin = veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : _wizardState.chassiBin;
       _wizardState.motorBin = veiculoApi.motor.isNotEmpty ? veiculoApi.motor : _wizardState.motorBin;
@@ -581,6 +591,12 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                   'Pesquisas Encontradas ($total)',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () => Navigator.of(ctx).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -841,8 +857,19 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       builder: (ctx) {
         return StatefulBuilder(builder: (context, setStateBuilder) {
           return AlertDialog(
-            title: const Text('Consultar Base',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Consultar Base',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.grey),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1001,25 +1028,63 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     // Carregar Fotos
     final fotos = await _dao.listarFotosPorVistoria(widget.vistoriaId);
     for (final foto in fotos) {
+      final validPathOrUrl = (foto.pathLocal != null && File(foto.pathLocal!).existsSync())
+          ? foto.pathLocal!
+          : (foto.urlSupabase ?? foto.pathLocal ?? '');
+
       if (foto.etapa == 'extra') {
         _wizardState.fotosExtras.add({
           'pathLocal': foto.pathLocal ?? '',
           'url': foto.urlSupabase,
           'obs': foto.observacao ?? '',
-          'titulo': 'Foto Extra',
+          'titulo': foto.legenda.isNotEmpty ? foto.legenda : 'Foto Extra',
           'categoria': 'Outro',
         });
       } else if (foto.etapa == 'video_estrutural') {
         _wizardState.videoEstruturalPath = foto.pathLocal;
         _wizardState.videoEstruturalUrl = foto.urlSupabase;
+      } else if (foto.etapa == 'apontamento') {
+        // As fotos de apontamento são vinculadas ao carregar os itens abaixo
       } else {
-        if (foto.pathLocal != null) {
+        if (validPathOrUrl.isNotEmpty) {
           final itemId = foto.itemId ?? 'desconhecido';
           _wizardState.fotosLocais
               .putIfAbsent(itemId, () => [])
-              .add(foto.pathLocal!);
+              .add(validPathOrUrl);
+          if (foto.urlSupabase != null && foto.urlSupabase!.isNotEmpty) {
+            _wizardState.fotosUrls
+                .putIfAbsent(itemId, () => [])
+                .add(foto.urlSupabase!);
+          }
         }
       }
+    }
+
+    // Carregar Apontamentos
+    final itensApontamento = itens.where((i) => i.etapa == 'apontamento').toList()
+      ..sort((a, b) => a.ordem.compareTo(b.ordem));
+    _wizardState.apontamentos.clear();
+    for (final item in itensApontamento) {
+      final fotosDoItem = fotos
+          .where((f) => f.etapa == 'apontamento' && f.itemId == item.id)
+          .map((f) => f.pathLocal ?? '')
+          .where((p) => p.isNotEmpty)
+          .toList();
+      final fotosUrlsDoItem = fotos
+          .where((f) => f.etapa == 'apontamento' && f.itemId == item.id)
+          .map((f) => f.urlSupabase ?? '')
+          .where((u) => u.isNotEmpty)
+          .toList();
+
+      _wizardState.apontamentos.add(ApontamentoAvaria(
+        id: item.id,
+        categoria: item.categoria,
+        peca: item.nome,
+        motivoAvaria: item.status,
+        observacao: item.observacao ?? '',
+        fotosLocais: fotosDoItem,
+        fotosUrls: fotosUrlsDoItem,
+      ));
     }
     // Refresh UI
     // To update listeners, we should call a method on the state, or wait for next build since setState is called somewhere.
@@ -1131,19 +1196,60 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         }
       }
 
-      // Salvar Fotos
-      await _dao.deletarFotosPorVistoria(widget.vistoriaId);
+      // -- LIMPEZA DE FOTOS ÓRFÃS NA NUVEM E NO BANCO LOCAL --
+      final fotosNoDb = await _dao.listarFotosPorVistoria(widget.vistoriaId);
+      final urlsAtuaisNaNuvem = fotosNoDb.map((f) => f.urlSupabase).whereType<String>().toList();
+      
+      final urlsParaManter = <String>{};
       for (final entry in s.fotosLocais.entries) {
         final itemId = entry.key;
         for (int i = 0; i < entry.value.length; i++) {
-          final path = entry.value[i];
-          await _dao.inserirFoto(FotosVistoriaCompanion.insert(
-            id: '${widget.vistoriaId}_${itemId}_$i',
-            vistoriaId: widget.vistoriaId,
-            legenda: itemId.replaceAll('_', ' ').toUpperCase(),
-            etapa: drift.Value('wizard'),
+           final isHttp = entry.value[i].startsWith('http');
+           final cloudUrl = isHttp ? entry.value[i] : (s.fotosUrls[itemId] != null && i < s.fotosUrls[itemId]!.length ? s.fotosUrls[itemId]![i] : null);
+           if (cloudUrl != null) urlsParaManter.add(cloudUrl);
+        }
+      }
+      for (final extra in s.fotosExtras) {
+        final pathOrUrl = extra['pathLocal'] as String? ?? '';
+        final isHttp = pathOrUrl.startsWith('http');
+        final cloudUrl = (extra['url'] as String?) ?? (isHttp ? pathOrUrl : null);
+        if (cloudUrl != null) urlsParaManter.add(cloudUrl);
+      }
+      for (final a in s.apontamentos) {
+         for (final u in a.fotosUrls) {
+             urlsParaManter.add(u);
+         }
+      }
+      
+      final urlsParaDeletar = urlsAtuaisNaNuvem.where((u) => !urlsParaManter.contains(u)).toList();
+      if (urlsParaDeletar.isNotEmpty) {
+          final imgService = sl<ImageService>();
+          final paths = urlsParaDeletar.map((u) => imgService.extractStoragePath(u)).whereType<String>().toList();
+          if (paths.isNotEmpty) {
+             await imgService.deleteImages(paths);
+          }
+      }
+
+      // Exclui todas as fotos atuais do banco local para evitar duplicação antes de reinserir
+      await _dao.deletarFotosPorVistoria(widget.vistoriaId);
+
+      // Salvar Fotos (Preservando URLs da nuvem e caminhos locais)
+      for (final entry in s.fotosLocais.entries) {
+        final itemId = entry.key;
+        for (int i = 0; i < entry.value.length; i++) {
+          final pathOrUrl = entry.value[i];
+          final isHttp = pathOrUrl.startsWith('http');
+          final pathLocal = isHttp ? null : pathOrUrl;
+          final cloudUrl = isHttp ? pathOrUrl : (s.fotosUrls[itemId] != null && i < s.fotosUrls[itemId]!.length ? s.fotosUrls[itemId]![i] : null);
+
+          await _dao.inserirOuAtualizarFoto(FotosVistoriaCompanion(
+            id: drift.Value('${widget.vistoriaId}_${itemId}_$i'),
+            vistoriaId: drift.Value(widget.vistoriaId),
+            legenda: drift.Value(itemId.replaceAll('_', ' ').toUpperCase()),
+            etapa: const drift.Value('wizard'),
             itemId: drift.Value(itemId),
-            pathLocal: drift.Value(path),
+            pathLocal: drift.Value(pathLocal),
+            urlSupabase: drift.Value(cloudUrl),
             ordem: drift.Value(i),
             obrigatoria: drift.Value(s.fotosObrigatorias.contains(itemId)),
           ));
@@ -1153,18 +1259,58 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       // Fotos Extras
       for (int i = 0; i < s.fotosExtras.length; i++) {
         final extra = s.fotosExtras[i];
-        await _dao.inserirFoto(FotosVistoriaCompanion.insert(
-          id: '${widget.vistoriaId}_extra_$i',
-          vistoriaId: widget.vistoriaId,
-          legenda: extra['titulo'] ?? 'Foto Extra',
+        final pathOrUrl = extra['pathLocal'] as String? ?? '';
+        final isHttp = pathOrUrl.startsWith('http');
+        final pathLocal = isHttp ? null : pathOrUrl;
+        final cloudUrl = (extra['url'] as String?) ?? (isHttp ? pathOrUrl : null);
+
+        await _dao.inserirOuAtualizarFoto(FotosVistoriaCompanion(
+          id: drift.Value('${widget.vistoriaId}_extra_$i'),
+          vistoriaId: drift.Value(widget.vistoriaId),
+          legenda: drift.Value((extra['titulo'] as String?) ?? 'Foto Extra'),
           etapa: const drift.Value('extra'),
           itemId: drift.Value('extra_$i'),
-          pathLocal: drift.Value(extra['pathLocal'] as String?),
-          urlSupabase: drift.Value(extra['url'] as String?),
+          pathLocal: drift.Value(pathLocal),
+          urlSupabase: drift.Value(cloudUrl),
           observacao: drift.Value(extra['obs'] as String?),
           ordem: drift.Value(i),
           obrigatoria: const drift.Value(false),
         ));
+      }
+
+      // Salvar Apontamentos (Avarias para IA)
+      for (int i = 0; i < s.apontamentos.length; i++) {
+        final a = s.apontamentos[i];
+        await _dao.inserirOuAtualizarItem(ItensVistoriaCompanion(
+          id: drift.Value(a.id),
+          vistoriaId: drift.Value(widget.vistoriaId),
+          categoria: drift.Value(a.categoria),
+          nome: drift.Value(a.peca),
+          status: drift.Value(a.motivoAvaria),
+          observacao: drift.Value(a.observacao),
+          etapa: const drift.Value('apontamento'),
+          ordem: drift.Value(i),
+        ));
+
+        // Salvar Fotos do Apontamento
+        for (int fIdx = 0; fIdx < a.fotosLocais.length; fIdx++) {
+          final fPathOrUrl = a.fotosLocais[fIdx];
+          final isHttp = fPathOrUrl.startsWith('http');
+          final fPath = isHttp ? null : fPathOrUrl;
+          final fUrl = isHttp ? fPathOrUrl : (fIdx < a.fotosUrls.length ? a.fotosUrls[fIdx] : null);
+
+          await _dao.inserirOuAtualizarFoto(FotosVistoriaCompanion(
+            id: drift.Value('${a.id}_foto_$fIdx'),
+            vistoriaId: drift.Value(widget.vistoriaId),
+            legenda: drift.Value('${a.peca} - ${a.motivoAvaria}'),
+            etapa: const drift.Value('apontamento'),
+            itemId: drift.Value(a.id),
+            pathLocal: drift.Value(fPath),
+            urlSupabase: drift.Value(fUrl),
+            ordem: drift.Value(fIdx),
+            obrigatoria: const drift.Value(false),
+          ));
+        }
       }
 
       // Vídeo Estrutural
@@ -1216,6 +1362,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     final fotosComStatusVazio = <String>[];
     for (final entry in _wizardState.fotosLocais.entries) {
       final id = entry.key;
+      
+      // Ignorar fotos genéricas que caíram como desconhecido
+      if (id == 'desconhecido') continue;
+
       final fileList = entry.value;
       if (fileList.isNotEmpty) {
         final status = _wizardState.checklistStatus[id];
@@ -1226,11 +1376,16 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
 
     if (fotosComStatusVazio.isNotEmpty) {
+      final nomes = fotosComStatusVazio.map((id) {
+        var k = id.replaceAll('foto_', '').replaceAll('peca_cam_', '');
+        return k.replaceAll('_', ' ').toUpperCase();
+      }).join(', ');
+
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Status Obrigatório', style: TextStyle(color: Colors.red)),
-          content: const Text('Você adicionou fotos em alguns itens, mas esqueceu de preencher o status deles. Por favor, selecione um status antes de avançar.'),
+          content: Text('Você adicionou fotos em alguns itens, mas esqueceu de preencher o status deles. Por favor, selecione um status antes de avançar.\n\nItens pendentes:\n$nomes'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
@@ -1457,6 +1612,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     });
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<VistoriaWizardState>.value(
@@ -1575,6 +1732,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       ),
                     ),
                 ],
+
                 IconButton(
                   icon: _isSaving
                       ? const SizedBox(
@@ -1634,6 +1792,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       if (titulo == 'Pintura (Caminhão)') return const StepPinturaCaminhao();
                       if (titulo == 'Fotos Extras')
                         return const StepFotosExtras();
+                      if (titulo == 'Apontamentos')
+                        return const StepApontamentos();
                       if (titulo == 'Dados do Veículo')
                         return const StepDadosVeiculo();
                       if (titulo == 'Checklist Opcional')

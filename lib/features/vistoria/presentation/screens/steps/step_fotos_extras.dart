@@ -283,19 +283,46 @@ class _StepFotosExtrasState extends State<StepFotosExtras> {
                       topLeft: Radius.circular(12),
                       bottomLeft: Radius.circular(12),
                     ),
-                    child: Image.file(
-                      File(foto['pathLocal']),
-                      width: 90,
-                      height: 90,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
+                    child: () {
+                      final p = (foto['pathLocal'] as String?) ?? '';
+                      final u = (foto['url'] as String?) ?? '';
+                      final target = p.isNotEmpty ? p : u;
+                      if (target.startsWith('http')) {
+                        return Image.network(
+                          target,
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 90,
+                            height: 90,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        );
+                      }
+                      final file = File(target);
+                      if (file.existsSync()) {
+                        return Image.file(
+                          file,
+                          width: 90,
+                          height: 90,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 90,
+                            height: 90,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                          ),
+                        );
+                      }
+                      return Container(
                         width: 90,
                         height: 90,
                         color: Colors.grey[200],
-                        child:
-                            const Icon(Icons.broken_image, color: Colors.grey),
-                      ),
-                    ),
+                        child: const Icon(Icons.broken_image, color: Colors.grey),
+                      );
+                    }(),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

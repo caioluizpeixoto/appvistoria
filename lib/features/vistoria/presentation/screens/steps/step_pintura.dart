@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/utils/speech_recognizer.dart';
 import '../../../domain/vistoria_wizard_state.dart';
 import '../../../domain/vistoria_type.dart';
 import '../../widgets/inspecao_item_widget.dart';
@@ -124,6 +125,10 @@ class StepPintura extends StatelessWidget {
           // ── Resumo visual ──────────────────────────────────────────────────
           _PinturaResumoCard(
               originais: originais, repinturas: repinturas, total: _pecas.length),
+          const SizedBox(height: 12),
+
+          // ── Verificação de Cor e Pintura (Estilo BIN) ─────────────────────
+          const _CorVeiculoCard(),
           const SizedBox(height: 8),
 
           // ── Lista de itens ─────────────────────────────────────────────────
@@ -606,3 +611,314 @@ class _AiImagePreviewState extends State<_AiImagePreview> {
     );
   }
 }
+
+/// Card de verificação de cor e pintura estilo BIN (sem foto, com observações e campo editável)
+class _CorVeiculoCard extends StatefulWidget {
+  const _CorVeiculoCard();
+
+  @override
+  State<_CorVeiculoCard> createState() => _CorVeiculoCardState();
+}
+
+class _CorVeiculoCardState extends State<_CorVeiculoCard> {
+  final _corCtrl = TextEditingController();
+  final _obsCtrl = TextEditingController();
+  bool _isEditing = false;
+  bool _isListening = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = context.read<VistoriaWizardState>();
+      final corAtual = state.getCodigo('cor_veiculo').isNotEmpty
+          ? state.getCodigo('cor_veiculo')
+          : state.cor;
+      _corCtrl.text = corAtual;
+      if (corAtual.isEmpty) {
+        _isEditing = true;
+      }
+      _obsCtrl.text = state.getObs('cor_veiculo');
+      final savedStatus = state.getStatus('cor_veiculo');
+      if (savedStatus.isEmpty ||
+          !const [
+            'Pintura original',
+            'Veículo com envelopamento',
+            'Cor divergente do documento',
+            'Fantasia',
+          ].contains(savedStatus)) {
+        state.setStatus('cor_veiculo', 'Pintura original');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _corCtrl.dispose();
+    _obsCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onMicLongPress() async {
+    setState(() => _isListening = true);
+    await SpeechRecognizer.startListening();
+  }
+
+  void _onMicLongPressEnd(LongPressEndDetails details) async {
+    setState(() => _isListening = false);
+    String rawText = await SpeechRecognizer.stopListening();
+    if (rawText.isNotEmpty) {
+      final currentText = _obsCtrl.text;
+      final newText = currentText.isEmpty ? rawText : '$currentText $rawText';
+      _obsCtrl.text = newText;
+      if (mounted) {
+        context.read<VistoriaWizardState>().setObs('cor_veiculo', newText);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<VistoriaWizardState>();
+    final corDoc = state.corBin.isNotEmpty
+        ? state.corBin
+        : (state.cor.isNotEmpty ? state.cor : '');
+    final statusAtual = state.getStatus('cor_veiculo');
+    final corConstatada = _corCtrl.text.trim();
+    final isDivergente = corDoc.isNotEmpty &&
+        corConstatada.isNotEmpty &&
+        corDoc.trim().toUpperCase() != corConstatada.toUpperCase();
+
+    final opcoesStatus = const [
+      'Pintura original',
+      'Veículo com envelopamento',
+      'Cor divergente do documento',
+      'Fantasia',
+    ];
+
+    final statusValido = opcoesStatus.contains(statusAtual)
+        ? statusAtual
+        : 'Pintura original';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDivergente
+              ? AppTheme.naoConforme.withValues(alpha: 0.5)
+              : AppTheme.border,
+          width: isDivergente ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                const Icon(Icons.palette_rounded,
+                    color: AppTheme.primary, size: 22),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Cor do Veículo e Pintura Geral',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+                if (isDivergente)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.naoConformeLight,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                          color: AppTheme.naoConforme.withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: AppTheme.naoConforme, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'Divergente',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.naoConforme,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Info BIN / Documento
+          if (corDoc.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded,
+                        size: 16, color: AppTheme.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Cor no Documento / BIN: $corDoc',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // Campo editável de cor constatada
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: TextFormField(
+              controller: _corCtrl,
+              readOnly: !_isEditing,
+              textCapitalization: TextCapitalization.characters,
+              style: TextStyle(
+                fontSize: 15,
+                color: !_isEditing
+                    ? AppTheme.textSecondary
+                    : AppTheme.textPrimary,
+                fontWeight:
+                    !_isEditing ? FontWeight.w600 : FontWeight.normal,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Cor constatada no veículo',
+                hintText: 'Ex: BRANCA, AZUL, PRATA...',
+                filled: !_isEditing,
+                fillColor: !_isEditing
+                    ? AppTheme.surfaceVariant
+                    : AppTheme.surface,
+                prefixIcon: Icon(
+                  Icons.color_lens_rounded,
+                  size: 20,
+                  color:
+                      !_isEditing ? AppTheme.textSecondary : AppTheme.primary,
+                ),
+                suffixIcon: !_isEditing
+                    ? IconButton(
+                        icon: const Icon(Icons.edit_rounded,
+                            size: 20, color: AppTheme.primary),
+                        tooltip: 'Editar cor constatada',
+                        onPressed: () => setState(() => _isEditing = true),
+                      )
+                    : null,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              onChanged: (v) {
+                state.cor = v;
+                state.setCodigo('cor_veiculo', v);
+                if (isDivergente && (statusAtual == 'Pintura original' || statusAtual.isEmpty)) {
+                  state.setStatus('cor_veiculo', 'Cor divergente do documento');
+                }
+              },
+            ),
+          ),
+
+          // Status
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: DropdownButtonFormField<String>(
+              value: statusValido,
+              decoration: const InputDecoration(
+                labelText: 'Status da Cor / Pintura',
+                prefixIcon: Icon(Icons.check_circle_outline_rounded,
+                    size: 18, color: AppTheme.primary),
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              ),
+              items: opcoesStatus.map((opt) {
+                return DropdownMenuItem(
+                  value: opt,
+                  child: Text(opt, style: const TextStyle(fontSize: 13)),
+                );
+              }).toList(),
+              onChanged: (v) {
+                if (v != null) state.setStatus('cor_veiculo', v);
+              },
+            ),
+          ),
+
+          // Observação
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            child: TextFormField(
+              controller: _obsCtrl,
+              maxLines: 2,
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w500),
+              decoration: InputDecoration(
+                labelText: 'Observação da Pintura / Cor (opcional)',
+                hintText:
+                    'Descreva detalhes da pintura ou divergências...',
+                prefixIcon: const Icon(Icons.notes_rounded, size: 18),
+                suffixIcon: GestureDetector(
+                  onLongPress: _onMicLongPress,
+                  onLongPressEnd: _onMicLongPressEnd,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: _isListening
+                          ? Colors.red.withValues(alpha: 0.1)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.mic,
+                      color: _isListening
+                          ? Colors.red
+                          : AppTheme.textSecondary,
+                    ),
+                  ),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 12),
+              ),
+              onChanged: (v) => state.setObs('cor_veiculo', v),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

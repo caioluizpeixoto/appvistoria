@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'empresa_rodape_helper.dart';
 
 import '../../database/app_database.dart';
 import '../../features/vistoria/domain/vistoria_type.dart';
@@ -11,6 +14,39 @@ import '../../features/vistoria/domain/vistoria_wizard_state.dart';
 import '../../features/vistoria/domain/checklist_definitions.dart';
 import '../../injection_container.dart';
 import '../../database/daos/vistoria_dao.dart';
+
+Uint8List _safeReadAndOptimizePhoto(String path) {
+  try {
+    final file = File(path);
+    if (!file.existsSync()) return Uint8List(0);
+    final rawBytes = file.readAsBytesSync();
+
+    if (rawBytes.length < 600 * 1024) {
+      return rawBytes;
+    }
+
+    final decoded = img.decodeImage(rawBytes);
+    if (decoded == null) return rawBytes;
+
+    img.Image target = decoded;
+    if (decoded.width > 1920 || decoded.height > 1920) {
+      if (decoded.width >= decoded.height) {
+        target = img.copyResize(decoded, width: 1920, interpolation: img.Interpolation.linear);
+      } else {
+        target = img.copyResize(decoded, height: 1920, interpolation: img.Interpolation.linear);
+      }
+    }
+
+    final compressed = img.encodeJpg(target, quality: 90);
+    return Uint8List.fromList(compressed);
+  } catch (e) {
+    try {
+      return File(path).readAsBytesSync();
+    } catch (_) {
+      return Uint8List(0);
+    }
+  }
+}
 
 Future<pw.ImageProvider?> _loadAssetImage(List<String> paths) async {
   for (final path in paths) {
@@ -144,6 +180,8 @@ Future<String?> generateChecklistPdf({
   const secondaryColor = PdfColor.fromInt(0xFF4A4A4A);
   const lightBg = PdfColor.fromInt(0xFFF5F7FA);
   const conformeColor = PdfColor.fromInt(0xFF4CAF50);
+  const comObsColor = PdfColor.fromInt(0xFFFBC02D); // Amarelo
+  const comRestricaoColor = PdfColor.fromInt(0xFFF97316); // Laranja
   const naoConformeColor = PdfColor.fromInt(0xFFF44336);
   const naoPossuiColor = PdfColor.fromInt(0xFF9E9E9E);
 
@@ -174,28 +212,27 @@ Future<String?> generateChecklistPdf({
                 child: pw.Text('PÁGINA ${context.pageNumber}', style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey700)),
               ),
               pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(), textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
-                          ? '24.868.718.0001-62 - RUA SETE DE ABRIL 541 CENTRO COSMOPOLIS SP - CEP 13.150.610 - TEL 19 3872-1891'
-                          : '11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604',
-                      textAlign: pw.TextAlign.center,
-                      style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
-                    ),
-                    pw.SizedBox(height: 2),
-                    pw.Text(
-                      ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
-                          ? 'COSMOPOLIS@ULTRAVISAO.COM.BR'
-                          : 'SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP',
-                      textAlign: pw.TextAlign.center,
-                      style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
-                    ),
-                  ],
-                ),
+                child: () {
+                  final rodape = EmpresaRodapeInfo.obterAtual();
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text(rodape.razaoSocial, textAlign: pw.TextAlign.center, style: pw.TextStyle(font: fontBold, fontSize: 7, color: PdfColors.grey800)),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        rodape.linhaEndereco,
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
+                      ),
+                      pw.SizedBox(height: 2),
+                      pw.Text(
+                        rodape.linhaContato,
+                        textAlign: pw.TextAlign.center,
+                        style: pw.TextStyle(font: fontRegular, fontSize: 6, color: PdfColors.grey800),
+                      ),
+                    ],
+                  );
+                }(),
               ),
               pw.SizedBox(width: 140),
             ],
@@ -252,19 +289,26 @@ Future<String?> generateChecklistPdf({
           final obs = wState.checklistObs[itemId] ?? '';
 
           PdfColor statusColor = PdfColors.black;
-          if (status == 'Conforme' ||
+          final statusUpper = status.toUpperCase();
+          if (statusUpper.contains('RESTRIÇÃO') || statusUpper.contains('RESTRICAO')) {
+            statusColor = comRestricaoColor; // Laranja
+          } else if (statusUpper.contains('OBSERVA') || statusUpper.contains('APONTAMENTO')) {
+            statusColor = comObsColor; // Amarelo
+          } else if (status == 'Conforme' ||
               status == 'Sim' ||
               status == 'Funcionando' ||
-              status == 'Possui / Escritório')
+              status == 'Possui / Escritório') {
             statusColor = conformeColor;
-          if (status == 'Não Conforme' || status == 'Danificado')
+          } else if (status == 'Não Conforme' || status == 'Danificado') {
             statusColor = naoConformeColor;
-          if (status == 'Não Possui' ||
+          } else if (status == 'Não Possui' ||
               status == 'Não' ||
               status == 'Inexistente' ||
-              status == 'Não Tem') statusColor = naoPossuiColor;
-          if (status == 'Está com Cliente')
+              status == 'Não Tem') {
+            statusColor = naoPossuiColor;
+          } else if (status == 'Está com Cliente') {
             statusColor = PdfColor.fromInt(0xFFFFA500);
+          }
 
           return pw.TableRow(
             decoration: pw.BoxDecoration(
@@ -521,9 +565,9 @@ Future<String?> generateChecklistPdf({
             children: wizardState!.fotosLocais.entries.where((e) => e.value.isNotEmpty).expand((entry) {
               final item = entry.key;
               return entry.value.map((path) {
-                final file = File(path);
-                if (!file.existsSync()) return pw.SizedBox();
-                final image = pw.MemoryImage(file.readAsBytesSync());
+                final bytes = _safeReadAndOptimizePhoto(path);
+                if (bytes.isEmpty) return pw.SizedBox();
+                final image = pw.MemoryImage(bytes);
                 return pw.Container(
                   width: 200,
                   margin: const pw.EdgeInsets.only(bottom: 15),

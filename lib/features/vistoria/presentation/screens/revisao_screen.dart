@@ -5,6 +5,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../features/consulta_bin/data/repositories/radar_repository.dart';
 import '../../../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 import '../../../../core/services/pdf_generator_service.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../../../injection_container.dart';
 import 'package:drift/drift.dart' as drift;
 import '../../../../database/daos/vistoria_dao.dart';
@@ -142,6 +143,7 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
     }
 
     setState(() => _gerandoPdf = true);
+    await Future.delayed(const Duration(milliseconds: 60));
     try {
       final pdfService = sl<PdfGeneratorService>();
       if (_vistoria != null && _veiculo != null) {
@@ -164,7 +166,13 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
             pdfUrl: pdfPath,
           );
 
-          context.push('/pdf-preview/${widget.vistoriaId}?path=$pdfPath');
+          // Sincroniza imediatamente com o Supabase (upload do PDF e dados atualizados na nuvem)
+          try {
+            sl<SyncService>().syncVistoriaPorId(widget.vistoriaId);
+          } catch (_) {}
+
+          final placaQuery = Uri.encodeComponent((_veiculo?.placa ?? state.placa).trim());
+          context.push('/pdf-preview/${widget.vistoriaId}?path=$pdfPath&placa=$placaQuery');
         }
       }
     } catch (e) {
@@ -255,11 +263,10 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Checklist de fotos ──────────────────────────────────
-                  if (_state != null && _state!.fotosObrigatorias.isNotEmpty)
-                    _FotosChecklist(state: _state!),
-
-                  const SizedBox(height: 16),
+                  // ── Checklist de fotos (ocultado temporariamente a pedido) ─
+                  // if (_state != null && _state!.fotosObrigatorias.isNotEmpty)
+                  //   _FotosChecklist(state: _state!),
+                  // const SizedBox(height: 16),
 
                   // ── Itens com divergência ───────────────────────────────
                   if (_state != null && _state!.itensDivergentes.isNotEmpty)
@@ -391,9 +398,15 @@ class _StatusCard extends StatelessWidget {
       case 'Conforme':
         statusColor = AppTheme.conforme;
         break;
+      case 'Conforme com observação':
       case 'Conforme com observações':
-        statusColor = AppTheme.comObs;
+        statusColor = AppTheme.comObs; // Amarelo
         break;
+      case 'Conforme com restrição':
+      case 'Conforme com restrições':
+        statusColor = AppTheme.comRestricao; // Laranja
+        break;
+      case 'Não Conforme':
       case 'Reprovado':
         statusColor = AppTheme.naoConforme;
         break;
@@ -496,6 +509,7 @@ class _VeiculoCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _FotosChecklist extends StatelessWidget {
   final VistoriaWizardState state;
   const _FotosChecklist({required this.state});

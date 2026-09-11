@@ -25,14 +25,48 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Pegar o PDF da pasta laudos-pdf
-    const { data: pdfFiles } = await supabaseClient.storage.from('laudos-pdf').list(vistoriaId)
+    // Pegar o PDF da vistoria
     let pdfUrl = ''
-    if (pdfFiles && pdfFiles.length > 0) {
-      const pdfName = pdfFiles[0].name
-      const { data } = supabaseClient.storage.from('laudos-pdf').getPublicUrl(`${vistoriaId}/${pdfName}`)
-      pdfUrl = data.publicUrl
-    } else {
+    
+    // 1. Tentar pegar a URL registrada em vistorias_cloud
+    const { data: vistoriaCloud } = await supabaseClient
+      .from('vistorias_cloud')
+      .select('*')
+      .eq('id', vistoriaId)
+      .maybeSingle()
+
+    if (vistoriaCloud) {
+      const dadosCompletos = vistoriaCloud.dados_completos
+      if (dadosCompletos?.vistoria?.pdfUrl && dadosCompletos.vistoria.pdfUrl.startsWith('http')) {
+        pdfUrl = dadosCompletos.vistoria.pdfUrl
+      } else if (vistoriaCloud.pdf_url && vistoriaCloud.pdf_url.startsWith('http')) {
+        pdfUrl = vistoriaCloud.pdf_url
+      }
+    }
+
+    // 2. Se ainda não tem URL, procurar no storage laudos-pdf
+    if (!pdfUrl) {
+      // 2a. Busca direta na pasta ${vistoriaId}
+      const { data: pdfFiles } = await supabaseClient.storage.from('laudos-pdf').list(vistoriaId)
+      if (pdfFiles && pdfFiles.length > 0) {
+        const pdfFile = pdfFiles.find(f => f.name.toLowerCase().endsWith('.pdf')) || pdfFiles[0]
+        const { data } = supabaseClient.storage.from('laudos-pdf').getPublicUrl(`${vistoriaId}/${pdfFile.name}`)
+        pdfUrl = data.publicUrl
+      }
+
+      // 2b. Se não achou e tem user_id, busca em ${user_id}/${vistoriaId}
+      if (!pdfUrl && vistoriaCloud?.user_id) {
+        const userFolder = `${vistoriaCloud.user_id}/${vistoriaId}`
+        const { data: userPdfFiles } = await supabaseClient.storage.from('laudos-pdf').list(userFolder)
+        if (userPdfFiles && userPdfFiles.length > 0) {
+          const pdfFile = userPdfFiles.find(f => f.name.toLowerCase().endsWith('.pdf')) || userPdfFiles[0]
+          const { data } = supabaseClient.storage.from('laudos-pdf').getPublicUrl(`${userFolder}/${pdfFile.name}`)
+          pdfUrl = data.publicUrl
+        }
+      }
+    }
+
+    if (!pdfUrl) {
       return new Response('Laudo PDF não encontrado. O upload pode ainda estar em andamento.', { status: 404 })
     }
 

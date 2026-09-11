@@ -25,6 +25,7 @@ class InspecaoItemWidget extends StatefulWidget {
   final String? codigoHint;
   final String? infoTexto; // Texto informativo extra (ex: chassi da BIN)
   final bool showDivergenciaAlert;
+  final List<String>? sugestoesObs;
 
   const InspecaoItemWidget({
     super.key,
@@ -37,6 +38,7 @@ class InspecaoItemWidget extends StatefulWidget {
     this.codigoHint,
     this.infoTexto,
     this.showDivergenciaAlert = false,
+    this.sugestoesObs,
   });
 
   @override
@@ -158,22 +160,20 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
     final state = context.read<VistoriaWizardState>();
     final file = File(croppedFile.path);
 
-    // Salvar automaticamente na galeria (pasta Pictures/AppVistoria)
+    // Salvar no diretório de documentos do app para não ser apagado pelo cache
+    String finalPath = file.path;
     try {
+      final appDir = await getApplicationDocumentsDirectory();
       final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final fileName = 'VISTORIA_${widget.itemId}_$timestamp.jpg';
-      final defaultPath = '/storage/emulated/0/Pictures/AppVistoria';
-      final dir = Directory(defaultPath);
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      await file.copy('${dir.path}/$fileName');
-    } catch (_) {
-      // Ignora erro silenciosamente se não conseguir salvar (ex: permissões negadas em certas versões do Android)
+      final fileName = 'vistoria_${widget.itemId}_$timestamp.jpg';
+      final savedFile = await file.copy('${appDir.path}/$fileName');
+      finalPath = savedFile.path;
+    } catch (e) {
+      print('Erro ao salvar no diretório do app: $e');
     }
 
     // Adiciona localmente de imediato para feedback rápido
-    state.addFotoLocal(widget.itemId, croppedFile.path);
+    state.addFotoLocal(widget.itemId, finalPath);
 
     // Upload em background
     setState(() => _uploading = true);
@@ -417,20 +417,35 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                           },
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              File(fotos[i]),
-                              width: 100,
-                              height: 120,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Container(
-                                width: 100,
-                                height: 120,
-                                color: Colors.grey[200],
-                                child: const Icon(Icons.broken_image,
-                                    color: Colors.grey),
-                              ),
-                            ),
+                            child: fotos[i].startsWith('http')
+                                ? Image.network(
+                                    fotos[i],
+                                    width: 100,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                      width: 100,
+                                      height: 120,
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.broken_image,
+                                          color: Colors.grey),
+                                    ),
+                                  )
+                                : Image.file(
+                                    File(fotos[i]),
+                                    width: 100,
+                                    height: 120,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Container(
+                                      width: 100,
+                                      height: 120,
+                                      color: Colors.grey[200],
+                                      child: const Icon(Icons.broken_image,
+                                          color: Colors.grey),
+                                    ),
+                                  ),
                           ),
                         ),
                         Positioned(
@@ -567,7 +582,10 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
             child: DropdownButtonFormField<String>(
+              key: ValueKey(
+                  '${widget.itemId}_${statusAtual.isEmpty ? "vazio" : statusAtual}'),
               value: statusAtual.isEmpty ? null : statusAtual,
+              isExpanded: true,
               hint: const Text('Selecionar status'),
               decoration: InputDecoration(
                 labelText: 'Status',
@@ -576,33 +594,96 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
                   size: 18,
                   color: _statusColor(statusAtual),
                 ),
-                // Microfone movido para a Observação
+                suffixIcon: statusAtual.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded,
+                            size: 18, color: AppTheme.textSecondary),
+                        tooltip: 'Limpar seleção',
+                        padding: EdgeInsets.zero,
+                        constraints:
+                            const BoxConstraints(minWidth: 32, minHeight: 32),
+                        onPressed: () {
+                          state.setStatus(widget.itemId, '');
+                        },
+                      )
+                    : null,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
               ),
               items: [
-                ...widget.statusOptions,
-                if (statusAtual.isNotEmpty &&
-                    !widget.statusOptions.contains(statusAtual))
-                  statusAtual,
-              ].map((s) {
-                return DropdownMenuItem(
-                  value: s,
-                  child: Row(
-                    children: [
-                      Icon(
-                        _statusIcon(s),
-                        size: 16,
-                        color: _statusColor(s),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(s, style: const TextStyle(fontSize: 13)),
-                    ],
+                if (statusAtual.isNotEmpty)
+                  const DropdownMenuItem<String>(
+                    value: '',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.clear_rounded,
+                          size: 16,
+                          color: AppTheme.textHint,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Limpar seleção (Em branco)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textHint,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                );
-              }).toList(),
+                ...widget.statusOptions.map((s) {
+                  return DropdownMenuItem(
+                    value: s,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _statusIcon(s),
+                          size: 16,
+                          color: _statusColor(s),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            s,
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (statusAtual.isNotEmpty &&
+                    statusAtual != '' &&
+                    !widget.statusOptions.contains(statusAtual))
+                  DropdownMenuItem(
+                    value: statusAtual,
+                    child: Row(
+                      children: [
+                        Icon(
+                          _statusIcon(statusAtual),
+                          size: 16,
+                          color: _statusColor(statusAtual),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            statusAtual,
+                            style: const TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
               onChanged: (v) {
-                if (v != null) state.setStatus(widget.itemId, v);
+                state.setStatus(widget.itemId, v ?? '');
               },
             ),
           ),
@@ -717,7 +798,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
         s.contains('perfeito') ||
         s.contains('padr') ||
         s.contains('regular') ||
-        s.contains('sem reparo')) {
+        s.contains('sem reparo') ||
+        s.contains('conforme')) {
       return AppTheme.conforme;
     }
 
@@ -773,7 +855,8 @@ class _InspecaoItemWidgetState extends State<InspecaoItemWidget> {
         s.contains('perfeito') ||
         s.contains('padr') ||
         s.contains('regular') ||
-        s.contains('sem reparo')) {
+        s.contains('sem reparo') ||
+        s.contains('conforme')) {
       return Icons.check_circle_rounded;
     }
 

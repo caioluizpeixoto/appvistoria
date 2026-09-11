@@ -13,8 +13,10 @@ class AppTheme {
 
   static const Color conforme = Color(0xFF2E7D32);
   static const Color conformeLight = Color(0xFFE8F5E9);
-  static const Color comObs = Color(0xFFF57F17);
-  static const Color comObsLight = Color(0xFFFFF8E1);
+  static const Color comObs = Color(0xFFFBC02D); // Amarelo
+  static const Color comObsLight = Color(0xFFFFFDE7);
+  static const Color comRestricao = Color(0xFFF97316); // Laranja
+  static const Color comRestricaoLight = Color(0xFFFFF7ED);
   static const Color naoConforme = Color(0xFFC62828);
   static const Color naoConformeLight = Color(0xFFFFEBEE);
   static const Color naoAplicavel = Color(0xFF757575);

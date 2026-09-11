@@ -12,6 +12,8 @@ part 'vistoria_dao.g.dart';
   ItensPintura,
   ItensEstrutura,
   VidrosVistoria,
+  Clientes,
+  Vistoriadores,
 ])
 class VistoriaDao extends DatabaseAccessor<AppDatabase>
     with _$VistoriaDaoMixin {
@@ -118,6 +120,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
           vistoriadorCpf: Value(vistoriadorCpf),
           pdfUrl: Value(pdfUrl),
           status: const Value('concluido'),
+          sincronizado: const Value(false),
           updatedAt: Value(DateTime.now()),
         ),
       );
@@ -138,6 +141,19 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
     if (results.isEmpty) return null;
     return results.last; // Retorna o mais recente caso haja vários antigos
   }
+
+  // ── Sincronização ──────────────────────────────────────────────────────────
+  Future<void> upsertCliente(ClientesCompanion c) =>
+      into(clientes).insert(c, mode: InsertMode.insertOrReplace);
+
+  Future<void> upsertVistoriador(VistoriadoresCompanion v) =>
+      into(vistoriadores).insert(v, mode: InsertMode.insertOrReplace);
+
+  Future<void> upsertVistoria(VistoriasCompanion v) =>
+      into(vistorias).insert(v, mode: InsertMode.insertOrReplace);
+
+  Future<void> upsertVeiculo(VeiculosCompanion v) =>
+      into(veiculos).insert(v, mode: InsertMode.insertOrReplace);
 
   Future<int> inserirVeiculo(VeiculosCompanion v) => into(veiculos).insert(v);
 
@@ -204,6 +220,9 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
   Future<int> inserirFoto(FotosVistoriaCompanion foto) =>
       into(fotosVistoria).insert(foto);
 
+  Future<int> inserirOuAtualizarFoto(FotosVistoriaCompanion foto) =>
+      into(fotosVistoria).insertOnConflictUpdate(foto);
+
   Future<bool> atualizarFoto(FotosVistoriaCompanion foto) =>
       update(fotosVistoria).replace(foto);
 
@@ -254,4 +273,48 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<int> inserirOuAtualizarVidro(VidrosVistoriaCompanion item) =>
       into(vidrosVistoria).insertOnConflictUpdate(item);
+
+  // ── Vistoriadores ─────────────────────────────────────────────────────────
+
+  Future<List<Vistoriadore>> listarVistoriadores() =>
+      (select(db.vistoriadores)..orderBy([(t) => OrderingTerm.asc(t.nome)])).get();
+
+  Stream<List<Vistoriadore>> watchVistoriadores() =>
+      (select(db.vistoriadores)..orderBy([(t) => OrderingTerm.asc(t.nome)])).watch();
+
+  Future<Vistoriadore?> obterVistoriadorAtivo() =>
+      (select(db.vistoriadores)..where((t) => t.ativo.equals(true))).getSingleOrNull();
+
+  Future<int> inserirOuAtualizarVistoriador(VistoriadoresCompanion v) =>
+      into(db.vistoriadores).insertOnConflictUpdate(v);
+
+  Future<void> definirVistoriadorAtivo(String id) async {
+    // Desativa todos
+    await (update(db.vistoriadores)).write(const VistoriadoresCompanion(
+      ativo: Value(false),
+    ));
+    // Ativa o selecionado
+    await (update(db.vistoriadores)..where((t) => t.id.equals(id))).write(
+      const VistoriadoresCompanion(
+        ativo: Value(true),
+      ),
+    );
+  }
+
+  Future<int> deletarVistoriador(String id) =>
+      (delete(db.vistoriadores)..where((t) => t.id.equals(id))).go();
+
+  // ── Clientes ─────────────────────────────────────────────────────────────
+
+  Future<List<Cliente>> listarClientes() =>
+      (select(db.clientes)..orderBy([(t) => OrderingTerm.asc(t.nome)])).get();
+
+  Stream<List<Cliente>> watchClientes() =>
+      (select(db.clientes)..orderBy([(t) => OrderingTerm.asc(t.nome)])).watch();
+
+  Future<int> inserirOuAtualizarCliente(ClientesCompanion c) =>
+      into(db.clientes).insertOnConflictUpdate(c);
+
+  Future<int> deletarCliente(String id) =>
+      (delete(db.clientes)..where((t) => t.id.equals(id))).go();
 }

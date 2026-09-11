@@ -1,24 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/blocs/auth_bloc.dart';
-import '../../../../injection_container.dart';
-import '../../../../database/daos/vistoria_dao.dart';
-import 'package:go_router/go_router.dart';
-import '../../../../core/services/sync_service.dart';
-import '../screens/historico_nuvem_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final user = Supabase.instance.client.auth.currentUser;
-    final role = user?.userMetadata?['role'] as String? ?? 'empresa';
-    final isUsuarioOnly = role == 'usuario';
 
     return Drawer(
       backgroundColor: AppTheme.surface,
@@ -30,10 +21,36 @@ class AppDrawer extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_rounded,
+                      color: AppTheme.primary),
+                  title: const Text(
+                    'Minha Carteira',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Saldo e extrato de recargas',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      size: 20, color: AppTheme.textHint),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/carteira');
+                  },
+                ),
+                const Divider(),
+                ListTile(
                   leading: const Icon(Icons.fact_check_rounded,
                       color: AppTheme.textSecondary),
                   title: const Text(
-                    'Laudos Locais',
+                    'Histórico de Laudos',
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textPrimary,
@@ -59,6 +76,38 @@ class AppDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     context.push('/historico-radar');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.badge_rounded,
+                      color: AppTheme.textSecondary),
+                  title: const Text(
+                    'Vistoriadores',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/vistoriadores');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.people_alt_rounded,
+                      color: AppTheme.textSecondary),
+                  title: const Text(
+                    'Clientes',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/clientes');
                   },
                 ),
                 const Divider(),

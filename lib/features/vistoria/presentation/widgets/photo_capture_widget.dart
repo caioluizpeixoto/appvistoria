@@ -209,6 +209,7 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
   }
 
   Widget _buildPhotoPreview() {
+    final isHttp = _currentPhoto != null && _currentPhoto!.path.startsWith('http');
     return Column(
       children: [
         ClipRRect(
@@ -222,18 +223,31 @@ class _PhotoCaptureWidgetState extends State<PhotoCaptureWidget> {
                 ),
               );
             },
-            child: Image.file(
-              _currentPhoto!,
-              height: 200,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => Container(
-                height: 200,
-                width: double.infinity,
-                color: Colors.grey[200],
-                child: const Icon(Icons.broken_image, color: Colors.grey),
-              ),
-            ),
+            child: isHttp
+                ? Image.network(
+                    _currentPhoto!.path,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 200,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  )
+                : Image.file(
+                    _currentPhoto!,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 200,
+                      width: double.infinity,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: 12),

@@ -1,0 +1,123 @@
+      // 1. Upload do PDF (em background)
+      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            pdfStoragePath,
+            finalBytes,
+            fileOptions:
+                const FileOptions(upsert: true, contentType: 'application/pdf'),
+          );
+
+      // 2. Geração e Upload do HTML Interativo
+      try {
+        final htmlContent = HtmlGeneratorService.generateHtml(
+          vistoria: vistoria,
+          veiculo: veiculo,
+          allSections: allSections,
+          state: wizardState,
+        );
+        final htmlBytes = utf8.encode(htmlContent);
+        Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+              htmlStoragePath,
+              Uint8List.fromList(htmlBytes),
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'text/html; charset=utf-8',
+              ),
+            );
+      } catch (htmlErr) {
+        print('Erro ao gerar/enviar HTML interativo: $htmlErr');
+      }
+
+---
+
+      // 1. Upload do PDF (em background mas vamos aguardar)
+      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            pdfStoragePath,
+            finalBytes,
+            fileOptions:
+                const FileOptions(upsert: true, contentType: 'application/pdf'),
+          );
+
+      // 2. Geração e Upload do HTML Interativo
+      try {
+        final htmlContent = HtmlGeneratorService.generateHtml(
+          vistoria: vistoria,
+          veiculo: veiculo,
+          allSections: allSections,
+          state: wizardState,
+        );
+        final htmlBytes = utf8.encode(htmlContent);
+        await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+              htmlStoragePath,
+              Uint8List.fromList(htmlBytes),
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'text/html; charset=utf-8',
+              ),
+            );
+        print('Upload do HTML finalizado com sucesso!');
+      } catch (htmlErr) {
+        print('Erro ao gerar/enviar HTML interativo: $htmlErr');
+      }
+
+==== ANOTHER REPLACE ====
+
+      // 1. Upload do PDF (em background)
+      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            pdfStoragePath,
+            finalBytes,
+            fileOptions:
+                const FileOptions(upsert: true, contentType: 'application/pdf'),
+          );
+
+      // 2. Geração e Upload do HTML Interativo
+      try {
+        final htmlContent = HtmlGeneratorService.generateHtml(
+          vistoria: vistoria,
+          veiculo: veiculo,
+          allSections: allSections,
+          state: wizardState,
+        );
+        final htmlBytes = utf8.encode(htmlContent);
+        Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+              htmlStoragePath,
+              Uint8List.fromList(htmlBytes),
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'text/html; charset=utf-8',
+              ),
+            );
+      } catch (htmlErr) {
+        print('Erro ao gerar/enviar HTML interativo: $htmlErr');
+      }
+
+---
+
+      // 1. Upload do PDF (em background mas vamos aguardar)
+      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            pdfStoragePath,
+            finalBytes,
+            fileOptions:
+                const FileOptions(upsert: true, contentType: 'application/pdf'),
+          );
+
+      // 2. Geração e Upload do HTML Interativo
+      try {
+        final htmlContent = HtmlGeneratorService.generateHtml(
+          vistoria: vistoria,
+          veiculo: veiculo,
+          allSections: allSections,
+          state: wizardState,
+        );
+        final htmlBytes = utf8.encode(htmlContent);
+        await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+              htmlStoragePath,
+              Uint8List.fromList(htmlBytes),
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'text/html; charset=utf-8',
+              ),
+            );
+        print('Upload do HTML finalizado com sucesso!');
+      } catch (htmlErr) {
+        print('Erro ao gerar/enviar HTML interativo: $htmlErr');
+      }

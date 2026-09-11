@@ -1,6 +1,9 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:app_vistoria/injection_container.dart';
+import 'package:app_vistoria/database/app_database.dart' as import_app_database;
+import 'package:app_vistoria/core/services/sync_service.dart' as import_sync_service;
 
 // ── Events ────────────────────────────────────────────────────────────────────
 abstract class AuthEvent extends Equatable {
@@ -139,23 +142,27 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
     }
   }
 
-  Future<void> _onLogout(
-      AuthLogoutRequested event, Emitter<AuthBlocState> emit) async {
+  Future<void> _onLogout(AuthLogoutRequested event, Emitter<AuthBlocState> emit) async {
+    emit(AuthLoading());
     try {
       await _supabase.auth.signOut();
-    } catch (e) {
-      // Ignorar erros de rede ou sessão expirada no backend,
-      // queremos forçar o logout local de qualquer forma.
-    } finally {
+      
+      // Limpa banco local no logout
+      final db = sl<import_app_database.AppDatabase>();
+      await db.clearAll();
+
       emit(AuthUnauthenticated());
+    } catch (e) {
+      emit(AuthError('Erro ao fazer logout: $e'));
     }
   }
 
-  void _onAuthStateChanged(
-      AuthStateChanged event, Emitter<AuthBlocState> emit) {
-    final user = event.supabaseAuthState.session?.user;
-    if (user != null) {
-      emit(AuthAuthenticated(user));
+  void _onAuthStateChanged(AuthStateChanged event, Emitter<AuthBlocState> emit) {
+    final session = event.supabaseAuthState.session;
+    if (session != null) {
+      emit(AuthAuthenticated(session.user));
+      // Dispara sync em background (não aguarda (await) para não travar a tela)
+      sl<import_sync_service.SyncService>().autoSync();
     } else {
       emit(AuthUnauthenticated());
     }

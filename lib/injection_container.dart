@@ -12,6 +12,9 @@ import 'core/services/image_service.dart';
 import 'core/services/ocr_service.dart';
 import 'core/services/pdf_generator_service.dart';
 import 'core/services/sync_service.dart';
+import 'features/wallet/data/payment/mock_pix_payment_service.dart';
+import 'features/wallet/data/payment/payment_provider.dart';
+import 'features/wallet/data/repositories/wallet_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -64,5 +67,16 @@ Future<void> initDependencies() async {
   );
   sl.registerLazySingleton<SyncService>(
     () => SyncService(),
+  );
+
+  // ── Carteira Financeira e Pagamentos ──────────────────────────────────────
+  sl.registerLazySingleton<PaymentProvider>(
+    () => MockPixPaymentService(),
+  );
+  sl.registerLazySingleton<WalletRepository>(
+    () => WalletRepository(
+      supabase: sl<SupabaseClient>(),
+      paymentProvider: sl<PaymentProvider>(),
+    ),
   );
 }

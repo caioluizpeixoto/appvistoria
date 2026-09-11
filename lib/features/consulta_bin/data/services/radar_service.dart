@@ -30,7 +30,7 @@ class RadarService {
 
       final response = await supabase.functions
           .invoke('radar-listar-consultas', body: body)
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 20));
 
       final data = response.data;
       if (data != null &&

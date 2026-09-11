@@ -23,40 +23,61 @@ serve(async (req) => {
 
     const basicAuth = btoa(`${radarUser}:${radarPassword}`);
 
-    const listParams = new URLSearchParams();
-    listParams.append("page", "1");
-    listParams.append("forpage", "100"); // Obter as últimas 100 consultas
+    let todasConsultas: any[] = [];
+    const normalizedParam = (param ?? "").toLowerCase();
+    const normalizedValue = (value ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
 
-    const listResponse = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultas/list", {
-      method: "POST",
-      headers: {
-        "Authorization": `Basic ${basicAuth}`,
-        "api-token": radarApiToken,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: listParams.toString(),
-    });
+    // Se estiver buscando um veículo específico, busca páginas para cobrir todo o histórico
+    const maxPages = (param && value) ? 10 : 1;
 
-    const listData = await listResponse.json();
+    for (let p = 1; p <= maxPages; p++) {
+      const listParams = new URLSearchParams();
+      listParams.append("page", p.toString());
+      listParams.append("forpage", "100");
+      if (param && value) {
+        listParams.append("param", normalizedParam);
+        listParams.append("value", value);
+      }
 
-    if (listData?.erro) {
-      throw new Error(listData.erro);
+      const listResponse = await fetch("https://www.radarconsultas.com.br/rdrv2/api/consultas/list", {
+        method: "POST",
+        headers: {
+          "Authorization": `Basic ${basicAuth}`,
+          "api-token": radarApiToken,
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: listParams.toString(),
+      });
+
+      const listData = await listResponse.json();
+      if (listData?.erro) break;
+
+      const items = listData?.consultas;
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        break;
+      }
+
+      todasConsultas = todasConsultas.concat(items);
+
+      if (param && value) {
+        const achou = items.some((c: any) => {
+          const itemVal = (c.parametro_valor ?? "").toString().replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+          return itemVal === normalizedValue;
+        });
+        if (achou || items.length < 100) break;
+      }
     }
 
     let consultasFiltradas = [];
 
-    if (listData?.consultas && Array.isArray(listData.consultas)) {
-      if (param && value) {
-        const normalizedParam = param.toLowerCase();
-        const normalizedValue = value.replace(/[^A-Za-z0-9]/g, "");
-
-        consultasFiltradas = listData.consultas.filter((c: any) => 
-          c.parametro_valor?.toUpperCase() === normalizedValue.toUpperCase() &&
-          c.parametro?.toLowerCase() === normalizedParam
-        );
-      } else {
-        consultasFiltradas = listData.consultas;
-      }
+    if (param && value) {
+      consultasFiltradas = todasConsultas.filter((c: any) => {
+        const itemVal = (c.parametro_valor ?? "").toString().replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+        const itemParam = (c.parametro ?? "").toString().toLowerCase();
+        return itemVal === normalizedValue && (itemParam === normalizedParam || itemParam.includes(normalizedParam) || normalizedParam.includes(itemParam) || normalizedParam.length === 0);
+      });
+    } else {
+      consultasFiltradas = todasConsultas;
     }
 
     return new Response(JSON.stringify({

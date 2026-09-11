@@ -14,6 +14,7 @@ part 'app_database.g.dart';
 @DriftDatabase(
   tables: [
     Vistoriadores,
+    Clientes,
     Vistorias,
     Veiculos,
     ItensVistoria,
@@ -34,7 +35,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -81,8 +82,32 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(vistorias, vistorias.clienteCpf);
             await m.addColumn(vistorias, vistorias.clienteTelefone);
           }
+          if (from < 6) {
+            await m.createTable(clientes);
+          }
+          if (from < 7) {
+            await m.addColumn(vistorias, vistorias.userId);
+            await m.addColumn(clientes, clientes.userId);
+            await m.addColumn(vistoriadores, vistoriadores.userId);
+          }
         },
       );
+
+  Future<void> clearAll() async {
+    return transaction(() async {
+      await delete(consultasAutocred).go();
+      await delete(consultasBin).go();
+      await delete(vidrosVistoria).go();
+      await delete(itensEstrutura).go();
+      await delete(itensPintura).go();
+      await delete(fotosVistoria).go();
+      await delete(itensVistoria).go();
+      await delete(veiculos).go();
+      await delete(vistorias).go();
+      await delete(clientes).go();
+      await delete(vistoriadores).go();
+    });
+  }
 }
 
 LazyDatabase _openConnection() {

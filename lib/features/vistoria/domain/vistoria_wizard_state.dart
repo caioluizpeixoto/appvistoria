@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'vistoria_type.dart';
+import 'entities/apontamento_avaria.dart';
 
 /// Estado compartilhado do wizard de vistoria.
 /// Mantém todos os dados temporários enquanto o vistoriador percorre as etapas.
@@ -34,6 +35,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String anoFabricacao = '';
   String anoModelo = '';
   String cor = '';
+  String corBin = '';
   String combustivel = '';
   String municipio = '';
   String uf = '';
@@ -62,6 +64,8 @@ class VistoriaWizardState extends ChangeNotifier {
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
   bool gerarFichaTecnicaComIa = true;
+  Map<String, dynamic>? fichaTecnicaJsonCache;
+  String? apontamentosHashCache;
 
   // ── Checklist de itens: status e observação por itemId ────────────────────
   // Todas as etapas de inspeção usam este mapa
@@ -77,6 +81,9 @@ class VistoriaWizardState extends ChangeNotifier {
 
   // ── Fotos Extras (Step 12) ────────────────────────────────────────────────
   final List<Map<String, dynamic>> fotosExtras = [];
+
+  // ── Apontamentos / Avarias (Para cálculo por IA) ──────────────────────────
+  final List<ApontamentoAvaria> apontamentos = [];
 
   // ── Vídeo Estrutural ──────────────────────────────────────────────────────
   String? videoEstruturalPath;
@@ -168,7 +175,7 @@ class VistoriaWizardState extends ChangeNotifier {
   int get totalSteps {
     if (isChecklistPesado) return 5;
     if (isChecklist) return 4;
-    int count = 10;
+    int count = 11;
     if (temCroqui) count++;
     if (temCroqui && !isCaminhao) count++;
     if (isCaminhao) count++;
@@ -303,6 +310,54 @@ class VistoriaWizardState extends ChangeNotifier {
     }
   }
 
+  // ── Apontamentos / Avarias ────────────────────────────────────────────────
+
+  void addApontamento(ApontamentoAvaria apontamento) {
+    apontamentos.add(apontamento);
+    notifyListeners();
+  }
+
+  void updateApontamento(int index, ApontamentoAvaria apontamento) {
+    if (index >= 0 && index < apontamentos.length) {
+      apontamentos[index] = apontamento;
+      notifyListeners();
+    }
+  }
+
+  void removeApontamento(int index) {
+    if (index >= 0 && index < apontamentos.length) {
+      apontamentos.removeAt(index);
+      notifyListeners();
+    }
+  }
+
+  void addFotoApontamento(int apontamentoIndex, String pathLocal) {
+    if (apontamentoIndex >= 0 && apontamentoIndex < apontamentos.length) {
+      apontamentos[apontamentoIndex].fotosLocais.add(pathLocal);
+      notifyListeners();
+    }
+  }
+
+  void removeFotoApontamento(int apontamentoIndex, int fotoIndex) {
+    if (apontamentoIndex >= 0 && apontamentoIndex < apontamentos.length) {
+      final fotos = apontamentos[apontamentoIndex].fotosLocais;
+      if (fotoIndex >= 0 && fotoIndex < fotos.length) {
+        fotos.removeAt(fotoIndex);
+        notifyListeners();
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> getApontamentosParaIa() {
+    return apontamentos.map((a) => {
+      'categoria': a.categoria,
+      'peca': a.peca,
+      'motivo_avaria': a.motivoAvaria,
+      'observacao': a.observacao,
+      'qtd_fotos': a.fotosLocais.length + a.fotosUrls.length,
+    }).toList();
+  }
+
   // ── Pré-preencher do veículo ──────────────────────────────────────────────
 
   void preencherDadosVeiculo(Map<String, dynamic> dados) {
@@ -398,7 +453,7 @@ class VistoriaWizardState extends ChangeNotifier {
             sl.contains('observação') ||
             sl.contains('repintura');
       });
-      return temObs ? 'Conforme com observações' : 'Conforme';
+      return temObs ? 'Conforme com observação' : 'Conforme';
     }
     if (divs.isNotEmpty) {
       return divs.length >= 2 ? 'Reprovado' : 'Necessita análise complementar';
@@ -410,6 +465,9 @@ class VistoriaWizardState extends ChangeNotifier {
     int count = 0;
     fotosLocais.forEach((_, list) => count += list.length);
     count += fotosExtras.length;
+    for (final a in apontamentos) {
+      count += a.fotosLocais.length;
+    }
     return count;
   }
 

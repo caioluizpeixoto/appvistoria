@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -9,6 +10,7 @@ import 'package:pdf/widgets.dart' as pw;
 import '../../database/app_database.dart';
 import '../../features/vistoria/domain/vistoria_type.dart';
 import '../../features/vistoria/domain/vistoria_wizard_state.dart';
+import '../../features/vistoria/domain/entities/apontamento_avaria.dart';
 import '../../injection_container.dart';
 import '../../database/daos/autocred_dao.dart';
 import '../../database/daos/vistoria_dao.dart';
@@ -25,11 +27,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'pdf_checklist_generator.dart';
 import '../utils/veiculo_parser.dart';
+import 'html_generator_service.dart';
 import '../normalizers/radar_normalizer.dart';
 import '../normalizers/radar_normalized_data.dart';
 import '../../features/consulta_bin/data/repositories/radar_repository.dart';
 import '../../features/consulta_bin/domain/entities/radar_veiculo.dart';
 import 'package:flutter_html_to_pdf/flutter_html_to_pdf.dart';
+import 'fipe_service.dart';
+import 'empresa_rodape_helper.dart';
+import 'vehicle_depreciation_service.dart';
 
 pw.ImageProvider? _globalRodapeImage;
 
@@ -213,17 +219,48 @@ class PdfGeneratorService {
         }
 
         final itens = await vistoriaDao.listarItensPorVistoria(vistoria.id);
+        final fotos = await vistoriaDao.listarFotosPorVistoria(vistoria.id);
+
         for (final item in itens) {
           if (item.etapa == 'checklist_opcional') {
             wizardState.realizarChecklistOpcional = true;
             wizardState.checklistOpcional[item.nome] = item.status;
+          } else if (item.etapa == 'apontamento') {
+            // Itens exclusivos da aba "Apontamentos para Cálculo por IA"
+            // Não entram no checklistStatus geral da vistoria
           } else {
             wizardState.checklistStatus[item.nome] = item.status;
             wizardState.checklistObs[item.nome] = item.observacao ?? '';
           }
         }
 
-        final fotos = await vistoriaDao.listarFotosPorVistoria(vistoria.id);
+        // Se wizardState ainda não tiver apontamentos, carrega os da etapa 'apontamento'
+        if (wizardState.apontamentos.isEmpty) {
+          final itensApontamento = itens.where((i) => i.etapa == 'apontamento').toList()
+            ..sort((a, b) => a.ordem.compareTo(b.ordem));
+          for (final item in itensApontamento) {
+            final fotosDoItem = fotos
+                .where((f) => f.etapa == 'apontamento' && f.itemId == item.id)
+                .map((f) => f.pathLocal ?? '')
+                .where((p) => p.isNotEmpty)
+                .toList();
+            final fotosUrlsDoItem = fotos
+                .where((f) => f.etapa == 'apontamento' && f.itemId == item.id)
+                .map((f) => f.urlSupabase ?? '')
+                .where((u) => u.isNotEmpty)
+                .toList();
+
+            wizardState.apontamentos.add(ApontamentoAvaria(
+              id: item.id,
+              categoria: item.categoria,
+              peca: item.nome,
+              motivoAvaria: item.status,
+              observacao: item.observacao ?? '',
+              fotosLocais: fotosDoItem,
+              fotosUrls: fotosUrlsDoItem,
+            ));
+          }
+        }
         for (final foto in fotos) {
           if (foto.etapa == 'extra') {
             if (foto.pathLocal != null && foto.pathLocal!.isNotEmpty) {
@@ -468,9 +505,9 @@ class PdfGeneratorService {
     };
 
     bool hasAnyPhoto = false;
+    final allSections = <Map<String, dynamic>>[];
 
     if (wizardState != null) {
-      final allSections = <Map<String, dynamic>>[];
       final additionalItemPhotos = <Map<String, dynamic>>[];
 
       for (final entry in secoesFotos.entries) {
@@ -504,10 +541,17 @@ class PdfGeneratorService {
             }
           }
         }
+        String? obsDaSecao;
+        if (tituloSecao.contains('PINTURA')) {
+          final obsPintura = wizardState.getObs('cor_veiculo').trim();
+          if (obsPintura.isNotEmpty) obsDaSecao = obsPintura;
+        }
+
         if (fotosSecao.isNotEmpty) {
           allSections.add({
             'titulo': tituloSecao,
             'fotos': fotosSecao,
+            if (obsDaSecao != null) 'obs': obsDaSecao,
           });
           hasAnyPhoto = true;
         }
@@ -607,45 +651,62 @@ class PdfGeneratorService {
                 PdfColor labelColor = PdfColors.grey700;
                 String statusIcon = '';
 
-                if (s.isNotEmpty) {
-                  if (s.contains('divergente') ||
-                      s.contains('adulteração') ||
-                      s.contains('reprovado') ||
-                      s.contains('não original') ||
-                      s.contains('substituído') ||
-                      s.contains('ausente') ||
-                      s.contains('danificad') ||
-                      s.contains('colisão') ||
-                      s.contains('ilegível') ||
-                      s.contains('não localizad') ||
-                      s.contains('não conforme') ||
-                      s.contains('nao conforme')) {
-                    labelColor = PdfColor.fromHex('EE4036');
-                    statusIcon =
-                        '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
-                  } else if (s.contains('reparo') ||
-                      s.contains('amassad') ||
-                      s.contains('risco') ||
-                      s.contains('trincad') ||
-                      s.contains('quebrad') ||
-                      s.contains('apontamento') ||
-                      s.contains('observaçã') ||
-                      s.contains('observa') ||
-                      s.contains('atenção') ||
-                      s.contains('desgaste')) {
-                    labelColor = PdfColor.fromHex('FBB03B');
-                    statusIcon =
-                        '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
-                  } else {
-                    labelColor = PdfColor.fromHex('8CC63F'); // Conforme
-                    statusIcon =
-                        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                final bool isReprovado = s.contains('divergente') ||
+                    s.contains('adulteração') ||
+                    s.contains('reprovado') ||
+                    s.contains('não original') ||
+                    s.contains('substituído') ||
+                    s.contains('ausente') ||
+                    s.contains('danificad') ||
+                    s.contains('colisão') ||
+                    s.contains('ilegível') ||
+                    s.contains('não localizad') ||
+                    s.contains('não conforme') ||
+                    s.contains('nao conforme');
+
+                final bool hasObs = obsText.trim().isNotEmpty &&
+                    !obsText.trim().toLowerCase().startsWith('dentro do') &&
+                    !obsText.trim().toLowerCase().startsWith('dentro dos');
+
+                final bool isObservacao = hasObs ||
+                    s.contains('reparo') ||
+                    s.contains('amassad') ||
+                    s.contains('risco') ||
+                    s.contains('trincad') ||
+                    s.contains('quebrad') ||
+                    s.contains('apontamento') ||
+                    s.contains('observaçã') ||
+                    s.contains('observa') ||
+                    s.contains('avaria') ||
+                    s.contains('atenção') ||
+                    s.contains('desgaste') ||
+                    s.contains('remarcad');
+
+                String displayStatusText = statusAtual;
+
+                if (isReprovado) {
+                  labelColor = PdfColor.fromHex('EE4036');
+                  statusIcon =
+                      '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+                } else if (isObservacao) {
+                  labelColor = PdfColor.fromHex('FBB03B');
+                  statusIcon =
+                      '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+                  if (displayStatusText.isEmpty ||
+                      displayStatusText.toLowerCase().contains('padr') ||
+                      displayStatusText.toLowerCase().contains('conforme') ||
+                      displayStatusText.toLowerCase().contains('original')) {
+                    displayStatusText = 'COM OBSERVAÇÃO';
                   }
+                } else if (s.isNotEmpty) {
+                  labelColor = PdfColor.fromHex('8CC63F'); // Conforme
+                  statusIcon =
+                      '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
                 }
 
                 return pw.Container(
                   width: isLarge ? 240.0 : 170.0,
-                  height: isLarge ? 160.0 : 113.0,
+                  height: isLarge ? 175.0 : 126.0,
                   decoration: pw.BoxDecoration(
                     border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
                     color: PdfColors.white,
@@ -657,7 +718,7 @@ class PdfGeneratorService {
                         child: imageWidget,
                       ),
                       pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                         alignment: pw.Alignment.center,
                         child: pw.Column(
                           mainAxisSize: pw.MainAxisSize.min,
@@ -666,42 +727,44 @@ class PdfGeneratorService {
                               label,
                               style: pw.TextStyle(
                                   font: styles.bold,
-                                  fontSize: 6,
-                                  color: PdfColors.grey700),
+                                  fontSize: isLarge ? 8.5 : 7.5,
+                                  color: PdfColors.grey800),
                               textAlign: pw.TextAlign.center,
+                              maxLines: 2,
                             ),
-                            if (s.isNotEmpty) ...[
-                              pw.SizedBox(height: 1.5),
+                            if (displayStatusText.isNotEmpty) ...[
+                              pw.SizedBox(height: 2),
                               pw.Row(
                                 mainAxisAlignment: pw.MainAxisAlignment.center,
+                                mainAxisSize: pw.MainAxisSize.min,
                                 children: [
                                   pw.SvgImage(
                                     svg: statusIcon,
-                                    width: 6,
-                                    height: 6,
+                                    width: 7.5,
+                                    height: 7.5,
                                   ),
-                                  pw.SizedBox(width: 2.5),
+                                  pw.SizedBox(width: 3),
                                   pw.Text(
-                                    s.toUpperCase(),
+                                    displayStatusText.toUpperCase(),
                                     style: pw.TextStyle(
                                         font: styles.bold,
-                                        fontSize: 5,
+                                        fontSize: isLarge ? 7.0 : 6.0,
                                         color: labelColor),
                                   ),
                                 ],
                               ),
                             ],
-                            if (obsText.isNotEmpty) ...[
+                            if (hasObs) ...[
                               pw.SizedBox(height: 2),
                               pw.Text(
                                 obsText,
                                 style: pw.TextStyle(
                                   font: styles.regular,
-                                  fontSize: 4.5,
-                                  color: PdfColors.grey600,
+                                  fontSize: isLarge ? 6.5 : 5.5,
+                                  color: PdfColors.grey700,
                                 ),
                                 textAlign: pw.TextAlign.center,
-                                maxLines: 2,
+                                maxLines: 3,
                                 overflow: pw.TextOverflow.clip,
                               ),
                             ],
@@ -713,32 +776,72 @@ class PdfGeneratorService {
                 );
               }
 
-              pw.Widget buildSectionHeader(String title) {
-                return pw.Container(
-                  width: double.infinity,
-                  margin: const pw.EdgeInsets.only(top: 8, bottom: 6),
-                  padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColor.fromHex('1F5E3D'),
-                    borderRadius: pw.BorderRadius.circular(4),
-                  ),
-                  child: pw.Text(
-                    title,
-                    style: pw.TextStyle(
-                      color: PdfColors.white,
-                      font: styles.bold,
-                      fontSize: 9,
+              pw.Widget buildSectionHeader(String title, {String? sectionObs}) {
+                return pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Container(
+                      width: double.infinity,
+                      margin: const pw.EdgeInsets.only(top: 8, bottom: 4),
+                      padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('1F5E3D'),
+                        borderRadius: pw.BorderRadius.circular(4),
+                      ),
+                      child: pw.Text(
+                        title,
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          font: styles.bold,
+                          fontSize: 9,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (sectionObs != null && sectionObs.trim().isNotEmpty) ...[
+                      pw.Container(
+                        width: double.infinity,
+                        margin: const pw.EdgeInsets.only(bottom: 6),
+                        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: pw.BoxDecoration(
+                          color: PdfColor.fromHex('FFF8E1'),
+                          borderRadius: pw.BorderRadius.circular(4),
+                          border: pw.Border.all(color: PdfColor.fromHex('FBB03B'), width: 0.5),
+                        ),
+                        child: pw.Row(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.SvgImage(
+                              svg:
+                                  '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+                              width: 8,
+                              height: 8,
+                            ),
+                            pw.SizedBox(width: 4),
+                            pw.Expanded(
+                              child: pw.Text(
+                                'Observações da Seção: ${sectionObs.trim()}',
+                                style: pw.TextStyle(
+                                  font: styles.regular,
+                                  fontSize: 7,
+                                  color: PdfColors.grey900,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 );
               }
 
               for (final section in sectionsToPrint) {
                 final tituloSecao = section['titulo'] as String? ?? '';
                 final fotos = section['fotos'] as List<Map<String, dynamic>>? ?? [];
+                final secaoObs = section['obs'] as String? ?? '';
                 if (fotos.isEmpty) continue;
 
-                widgets.add(buildSectionHeader(tituloSecao));
+                widgets.add(buildSectionHeader(tituloSecao, sectionObs: secaoObs));
 
                 final isPrimarySection = tituloSecao.contains('FOTOS PRINCIPAIS');
 
@@ -780,6 +883,53 @@ class PdfGeneratorService {
                 if (quadroApontamentos != null) {
                   widgets.add(pw.SizedBox(height: 10));
                   widgets.add(quadroApontamentos);
+                }
+
+                final obsVistoriador = (wizardState?.observacoesVistoriador ?? vistoria.observacoesGerais ?? '').trim();
+                final obsVeiculo = (wizardState?.observacoesVeiculo ?? '').trim();
+                final recomendacoes = (wizardState?.recomendacoes ?? '').trim();
+
+                if (obsVistoriador.isNotEmpty || obsVeiculo.isNotEmpty || recomendacoes.isNotEmpty) {
+                  widgets.add(pw.SizedBox(height: 10));
+                  widgets.add(
+                    pw.Container(
+                      width: double.infinity,
+                      padding: const pw.EdgeInsets.all(8),
+                      decoration: pw.BoxDecoration(
+                        color: PdfColor.fromHex('F8F9FA'),
+                        borderRadius: pw.BorderRadius.circular(4),
+                        border: pw.Border.all(color: PdfColors.grey400, width: 0.5),
+                      ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          if (obsVistoriador.isNotEmpty) ...[
+                            pw.Text('OBSERVAÇÕES DO VISTORIADOR:',
+                                style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColors.black)),
+                            pw.SizedBox(height: 2),
+                            pw.Text(obsVistoriador,
+                                style: pw.TextStyle(font: styles.regular, fontSize: 7, color: PdfColors.grey800)),
+                            if (obsVeiculo.isNotEmpty || recomendacoes.isNotEmpty) pw.SizedBox(height: 6),
+                          ],
+                          if (obsVeiculo.isNotEmpty) ...[
+                            pw.Text('OBSERVAÇÕES DO VEÍCULO:',
+                                style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColors.black)),
+                            pw.SizedBox(height: 2),
+                            pw.Text(obsVeiculo,
+                                style: pw.TextStyle(font: styles.regular, fontSize: 7, color: PdfColors.grey800)),
+                            if (recomendacoes.isNotEmpty) pw.SizedBox(height: 6),
+                          ],
+                          if (recomendacoes.isNotEmpty) ...[
+                            pw.Text('RECOMENDAÇÕES:',
+                                style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColors.black)),
+                            pw.SizedBox(height: 2),
+                            pw.Text(recomendacoes,
+                                style: pw.TextStyle(font: styles.regular, fontSize: 7, color: PdfColors.grey800)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
                 }
 
                 final parecerStr = (() {
@@ -1008,108 +1158,131 @@ class PdfGeneratorService {
     final deveGerarFichaIa = wizardState?.gerarFichaTecnicaComIa ?? true;
     if (deveGerarFichaIa) {
       try {
-        List<String> apontamentosList = [];
+        final List<Map<String, dynamic>> apontamentosParaIa = [];
         final wState = wizardState;
-      if (wState != null) {
-        apontamentosList = wState.checklistStatus.entries
-            .where((e) {
-              final status = e.value;
-              final obs = wState.checklistObs[e.key] ?? '';
-              final isOk = _isStatusConformeOuOk(status);
-              if (isOk && obs.trim().isEmpty) return false;
-              if (isOk && obs.trim().isNotEmpty) {
-                final obsUpper = obs.trim().toUpperCase();
-                if (_isStatusConformeOuOk(obsUpper)) return false;
-              }
-
-              final valUpper = status.trim().toUpperCase();
-              final obsUpper = obs.trim().toUpperCase();
-
-              final hasDanoAberto = obsUpper.contains('RISC') ||
-                  obsUpper.contains('AMASS') ||
-                  obsUpper.contains('TRINC') ||
-                  obsUpper.contains('QUEBR') ||
-                  obsUpper.contains('FERRUG') ||
-                  obsUpper.contains('CORRO') ||
-                  obsUpper.contains('DESCASC') ||
-                  obsUpper.contains('DEFEIT');
-
-              final isRepinturaServico = (valUpper.contains('REPINTURA') ||
-                      valUpper.contains('REPINTADO') ||
-                      valUpper.contains('RETOQUE') ||
-                      valUpper.contains('MICROPINTURA') ||
-                      valUpper.contains('MICRO PINTURA')) &&
-                  !hasDanoAberto;
-
-              // Se for apenas repintura/serviço estético já feito (sem avaria/dano aberto), NÃO deve aparecer nem ser enviado para a IA
-              if (isRepinturaServico) return false;
-
-              // Se for plaqueta ausente no câmbio (sem dano físico aberto), NÃO é avaria mecânica nem defeito e não deve ser enviado para a IA como serviço a fazer
-              final isPlaquetaAusente = valUpper.contains('PLAQUETA AUSENTE') ||
-                  (e.key == 'cambio_gravacao' && (valUpper.contains('AUSENTE') || valUpper.contains('SEM ACESSO')));
-              if (isPlaquetaAusente && !hasDanoAberto) return false;
-
-              return true;
-            })
-            .map((e) {
-              final nomeLimpo = _cleanItemName(e.key);
-              final obs = wState.checklistObs[e.key] ?? '';
-              final valUpper = e.value.toUpperCase();
-              final obsUpper = obs.toUpperCase();
-              final isSemAcesso = valUpper.contains('SEM ACESSO') ||
-                  valUpper.contains('SEMA ACESSO') ||
-                  valUpper.contains('NÃO LOCALIZADO') ||
-                  valUpper.contains('NAO LOCALIZADO') ||
-                  valUpper.contains('NÃO CONSTA') ||
-                  valUpper.contains('NAO CONSTA') ||
-                  obsUpper.contains('SEM ACESSO') ||
-                  obsUpper.contains('SEMA ACESSO');
-
-              if (isSemAcesso) {
-                return '$nomeLimpo: ${e.value} [ATENÇÃO: ITEM SEM ACESSO / NÃO É AVARIA - VALOR PEÇA R\$ 0,00 E MÃO DE OBRA R\$ 0,00]${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
-              }
-              return '$nomeLimpo: ${e.value}${obs.isNotEmpty ? " (Obs: $obs)" : ""}';
-            }).toList();
-      }
-
-      String brandStr = (veiculo.marca ?? '').trim();
-      String modelStr = (veiculo.modelo ?? '').trim();
-      if (brandStr.isEmpty) brandStr = 'NÃO INFORMADA';
-      if (modelStr.isEmpty) modelStr = 'NÃO INFORMADO';
-
-      String locationUf = veiculo.uf ?? '';
-      try {
-        final gpsUf = await _obterUfPorGps();
-        if (gpsUf != null && gpsUf.isNotEmpty) {
-          locationUf = gpsUf;
+        if (wState != null) {
+          // EXCLUSIVAMENTE os apontamentos cadastrados na aba Step Apontamentos (Apontamentos para Cálculo por IA).
+          // Conforme regra de negócio, os apontamentos normais do laudo (checklist de estrutura/pintura/vidros)
+          // NÃO entram no cálculo de depreciação financeira — apenas o que for explicitamente cadastrado nesta aba.
+          for (final apt in wState.apontamentos) {
+            apontamentosParaIa.add({
+              'apontamentoId': apt.id,
+              'nomePeca': apt.peca,
+              'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
+            });
+          }
         }
-      } catch (_) {}
 
-      final resFicha = await Supabase.instance.client.functions.invoke(
-        'gerar-ficha-veiculo',
-        body: {
-          'brand': brandStr,
-          'model': modelStr,
-          'year':
-              veiculo.anoFabricacao ?? veiculo.anoModelo ?? DateTime.now().year,
-          'version': veiculo.modelo ?? '',
-          'fuel': veiculo.combustivel ?? '',
-          'engine': veiculo.motorVeiculo ?? '',
-          if (apontamentosList.isNotEmpty) 'apontamentos': apontamentosList,
-          'uf': locationUf,
-        },
-      ).timeout(const Duration(seconds: 45));
+        String brandStr = (veiculo.marca ?? '').trim();
+        String modelStr = (veiculo.modelo ?? '').trim();
+        if (brandStr.isEmpty) brandStr = 'NÃO INFORMADA';
+        if (modelStr.isEmpty) modelStr = 'NÃO INFORMADO';
 
-      if (resFicha.status == 200 && resFicha.data != null) {
-        final data =
-            resFicha.data is String ? jsonDecode(resFicha.data) : resFicha.data;
-        if (data != null && data['data'] != null) {
-          _buildFichaTecnicaPages(pdf, data['data'], vistoria, styles,
+        String locationUf = veiculo.uf ?? '';
+        try {
+          final gpsUf = await _obterUfPorGps();
+          if (gpsUf != null && gpsUf.isNotEmpty) {
+            locationUf = gpsUf;
+          }
+        } catch (_) {}
+
+        String? fipeValor;
+
+        // 1. Tentar primeiro obter dos dados já consultados da placa (Radar / AutoCred / BIN)
+        final fontesConsulta = [
+          dadosConsultaJson,
+          radarVeiculo?.resultadoCompleto,
+        ];
+        for (final fonte in fontesConsulta) {
+          if (fonte == null) continue;
+          List<dynamic> fipes = [];
+          if (fonte['fipe'] is List) {
+            fipes = fonte['fipe'] as List<dynamic>;
+          } else if (fonte['fipes'] is List) {
+            fipes = fonte['fipes'] as List<dynamic>;
+          } else if (fonte['precificador'] is List) {
+            fipes = fonte['precificador'] as List<dynamic>;
+          } else if (fonte['fipe'] is Map) {
+            fipes = [fonte['fipe']];
+          }
+
+          for (final f in fipes) {
+            if (f is Map) {
+              final v = f['valor_fipe'] ?? f['fipe_valor'] ?? f['valorfipe'] ?? f['valor'] ?? f['preco'];
+              if (v != null && v.toString().trim().isNotEmpty && v.toString().trim() != '-') {
+                fipeValor = v.toString().trim();
+                break;
+              }
+            }
+          }
+          if (fipeValor != null && fipeValor.isNotEmpty) break;
+
+          final rootFipe = fonte['valor_fipe'] ?? fonte['valorfipe'] ?? fonte['fipe_valor'];
+          if (rootFipe != null && rootFipe.toString().trim().isNotEmpty && rootFipe.toString().trim() != '-') {
+            fipeValor = rootFipe.toString().trim();
+            break;
+          }
+        }
+
+        // 2. Se não veio da consulta prévia, consulta online na FIPE com VeiculoParser e anoModelo
+        if (fipeValor == null || fipeValor.isEmpty) {
+          try {
+            final parsedMM = VeiculoParser.extrairMarcaModelo('${veiculo.marca ?? ''} ${veiculo.modelo ?? ''}'.trim());
+            final marcaFipe = parsedMM.marca.isNotEmpty ? parsedMM.marca : brandStr;
+            final modeloFipe = parsedMM.modelo.isNotEmpty ? parsedMM.modelo : modelStr;
+            final anoFipe = veiculo.anoModelo ?? veiculo.anoFabricacao ?? DateTime.now().year;
+
+            final fipeInfo = await FipeService.consultarFipe(
+              marca: marcaFipe,
+              modelo: modeloFipe,
+              ano: anoFipe,
+              tipoVeiculo: veiculo.tipo,
+            );
+            if (fipeInfo != null && fipeInfo.valor.isNotEmpty) {
+              fipeValor = fipeInfo.valor;
+            }
+          } catch (fipeErr) {
+            print('Erro ao consultar FIPE para Ficha Técnica: $fipeErr');
+          }
+        }
+
+        // A IA NUNCA recebe o valor FIPE nem dados financeiros do carro.
+        final resFicha = await Supabase.instance.client.functions.invoke(
+          'gerar-ficha-veiculo',
+          body: {
+            'brand': brandStr,
+            'model': modelStr,
+            'year':
+                veiculo.anoFabricacao ?? veiculo.anoModelo ?? DateTime.now().year,
+            'version': veiculo.modelo ?? '',
+            'fuel': veiculo.combustivel ?? '',
+            'engine': veiculo.motorVeiculo ?? '',
+            if (apontamentosParaIa.isNotEmpty) 'apontamentos': apontamentosParaIa,
+            'uf': locationUf,
+          },
+        ).timeout(const Duration(seconds: 45));
+
+        if (resFicha.status == 200 && resFicha.data != null) {
+          final data =
+              resFicha.data is String ? jsonDecode(resFicha.data) : resFicha.data;
+          if (data != null && data['data'] != null) {
+            final fichaData = data['data'] as Map<String, dynamic>;
+            if (fipeValor != null && fipeValor.isNotEmpty) {
+              fichaData['fipe_valor_oficial'] = fipeValor;
+            }
+            _buildFichaTecnicaPages(pdf, fichaData, vistoria, styles,
+                logoImage, assinaturaImage, wizardState);
+          }
+        } else {
+          print('Erro IA (Status ${resFicha.status}): ${resFicha.data}');
+          // Fallback sem IA: renderiza a Ficha Técnica com a FIPE oficial e os apontamentos locais
+          final fallbackData = <String, dynamic>{
+            if (fipeValor != null && fipeValor.isNotEmpty) 'fipe_valor_oficial': fipeValor,
+            'apontamentos_veiculo': <Map<String, dynamic>>[],
+          };
+          _buildFichaTecnicaPages(pdf, fallbackData, vistoria, styles,
               logoImage, assinaturaImage, wizardState);
         }
-      } else {
-        print('Erro IA (Status ${resFicha.status}): ${resFicha.data}');
-      }
     } catch (e) {
       print('Erro ao gerar ficha técnica inteligente: $e');
       // Continua gerando o PDF normalmente
@@ -1269,6 +1442,19 @@ class PdfGeneratorService {
           }
         }
 
+        if (bytesRadar == null || bytesRadar.isEmpty) {
+          try {
+            final jsonStr = consulta.retornoBruto;
+            if (jsonStr != null && jsonStr.isNotEmpty) {
+              final Map<String, dynamic> dadosPesquisa = jsonDecode(jsonStr);
+              dadosPesquisa['placa'] = veiculo.placa;
+              bytesRadar = await PdfRadarGenerator.generatePesquisaPdfBytes(dadosPesquisa);
+            }
+          } catch (e) {
+            print('Falha ao gerar o fallback nativo do Radar: $e');
+          }
+        }
+
         if (bytesRadar != null && bytesRadar.isNotEmpty) {
           final sf.PdfDocument docPrincipal = sf.PdfDocument(inputBytes: finalBytes);
           final sf.PdfDocument docRadar = sf.PdfDocument(inputBytes: bytesRadar);
@@ -1310,14 +1496,101 @@ class PdfGeneratorService {
     await file.writeAsBytes(finalBytes);
 
     try {
-      final storagePath = '${vistoria.id}/$nomeBase.pdf';
-      // Removido o 'await' para que o upload ocorra em segundo plano e não trave a geração local
-      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
-            storagePath,
+      final userId = vistoria.userId ?? Supabase.instance.client.auth.currentUser?.id ?? 'offline';
+      final pdfStoragePath = '$userId/${vistoria.id}/$nomeBase.pdf';
+      final directPdfStoragePath = '${vistoria.id}/$nomeBase.pdf';
+      final htmlStoragePath = '$userId/${vistoria.id}/laudo.html';
+
+      // 1. Upload do PDF (em background mas vamos aguardar, gravando em ambos os caminhos)
+      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            pdfStoragePath,
             finalBytes,
             fileOptions:
                 const FileOptions(upsert: true, contentType: 'application/pdf'),
           );
+      await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+            directPdfStoragePath,
+            finalBytes,
+            fileOptions:
+                const FileOptions(upsert: true, contentType: 'application/pdf'),
+          );
+
+      // 2. Upload das Fotos para o Storage antes da geração do HTML
+      try {
+        final List<Future<void>> uploadFutures = [];
+        int photoIndex = 0;
+
+        for (var section in allSections) {
+          final fotos = section['fotos'] as List?;
+          if (fotos != null) {
+            for (var foto in fotos) {
+              if (foto is Map<String, dynamic>) {
+                final localPath = foto['path'] as String?;
+                if (localPath != null && localPath.isNotEmpty) {
+                  final file = File(localPath);
+                  if (file.existsSync()) {
+                    final ext = p.extension(localPath).isNotEmpty ? p.extension(localPath) : '.jpg';
+                    final safeLabel = (foto['label'] ?? 'foto_$photoIndex')
+                        .toString()
+                        .toLowerCase()
+                        .replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+                    final photoStoragePath = '$userId/${vistoria.id}/fotos/${photoIndex}_$safeLabel$ext';
+                    photoIndex++;
+
+                    uploadFutures.add(() async {
+                      try {
+                        final bytes = await file.readAsBytes();
+                        await Supabase.instance.client.storage
+                            .from('laudos-pdf')
+                            .uploadBinary(
+                              photoStoragePath,
+                              bytes,
+                              fileOptions: const FileOptions(
+                                upsert: true,
+                                contentType: 'image/jpeg',
+                              ),
+                            );
+                        final publicUrl = Supabase.instance.client.storage
+                            .from('laudos-pdf')
+                            .getPublicUrl(photoStoragePath);
+                        foto['url'] = publicUrl;
+                      } catch (e) {
+                        print('Erro ao enviar foto $photoStoragePath: $e');
+                      }
+                    }());
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (uploadFutures.isNotEmpty) {
+          await Future.wait(uploadFutures);
+          print('Upload de ${uploadFutures.length} fotos finalizado com sucesso!');
+        }
+
+        // 3. Geração e Upload do HTML Interativo (agora usando URLs públicas)
+        final htmlContent = HtmlGeneratorService.generateHtml(
+          vistoria: vistoria,
+          veiculo: veiculo,
+          allSections: allSections,
+          state: wizardState,
+        );
+        final htmlBytes = utf8.encode(htmlContent);
+        await Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(
+              htmlStoragePath,
+              Uint8List.fromList(htmlBytes),
+              fileOptions: const FileOptions(
+                upsert: true,
+                contentType: 'text/html; charset=utf-8',
+              ),
+            );
+        print('Upload do HTML finalizado com sucesso! Tamanho: ${htmlBytes.length} bytes');
+      } catch (htmlErr) {
+        print('Erro ao gerar/enviar HTML interativo: $htmlErr');
+      }
+
     } catch (e) {
       print('Erro ao fazer upload do PDF para o Supabase: $e');
     }
@@ -1356,41 +1629,40 @@ class PdfGeneratorService {
                         color: PdfColors.grey700)),
               ),
               pw.Expanded(
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Text(((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?) ?? 'APP VISTORIA').toUpperCase(),
-                        textAlign: pw.TextAlign.center,
-                        style: pw.TextStyle(
-                            font: styles.bold,
-                            fontSize: 7,
-                            color: PdfColors.grey800)),
-                    pw.SizedBox(height: 2),
-                    pw.FittedBox(
-                        fit: pw.BoxFit.scaleDown,
-                        child: pw.Text(
-                            ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
-                                ? '24.868.718.0001-62 - RUA SETE DE ABRIL 541 CENTRO COSMOPOLIS SP - CEP 13.150.610 - TEL 19 3872-1891'
-                                : '11.977.969/0001-33 - AV REBOUÇAS 1989 - SUMARÉ - SP - CEP 13170-275 - TEL 19 3306.8604',
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(
-                                font: styles.regular,
-                                fontSize: 6,
-                                color: PdfColors.grey800))),
-                    pw.SizedBox(height: 2),
-                    pw.FittedBox(
-                        fit: pw.BoxFit.scaleDown,
-                        child: pw.Text(
-                            ((Supabase.instance.client.auth.currentUser?.userMetadata?['name'] as String?)?.toUpperCase().contains('AUTO PROVE') ?? false)
-                                ? 'COSMOPOLIS@ULTRAVISAO.COM.BR'
-                                : 'SUMARE@ULTRAVISAO.COM.BR - CREDENCIAMENTO 06/2025-3651- DETRAN SP',
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(
-                                font: styles.regular,
-                                fontSize: 6,
-                                color: PdfColors.grey800))),
-                  ],
-                ),
+                child: () {
+                  final rodape = EmpresaRodapeInfo.obterAtual();
+                  return pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text(rodape.razaoSocial,
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(
+                              font: styles.bold,
+                              fontSize: 7,
+                              color: PdfColors.grey800)),
+                      pw.SizedBox(height: 2),
+                      pw.FittedBox(
+                          fit: pw.BoxFit.scaleDown,
+                          child: pw.Text(
+                              rodape.linhaEndereco,
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                  font: styles.regular,
+                                  fontSize: 6,
+                                  color: PdfColors.grey800))),
+                      pw.SizedBox(height: 2),
+                      pw.FittedBox(
+                          fit: pw.BoxFit.scaleDown,
+                          child: pw.Text(
+                              rodape.linhaContato,
+                              textAlign: pw.TextAlign.center,
+                              style: pw.TextStyle(
+                                  font: styles.regular,
+                                  fontSize: 6,
+                                  color: PdfColors.grey800))),
+                    ],
+                  );
+                }(),
               ),
               pw.SizedBox(width: 120),
             ],
@@ -1475,6 +1747,16 @@ class PdfGeneratorService {
       Vistoria vistoria, _PdfStyles styles, pw.ImageProvider? logo,
       {VistoriaWizardState? state, String? placa, bool showQr = false}) {
     final placaStr = placa ?? state?.placa;
+    
+    String? qrUrl;
+    if (showQr) {
+      final userId = vistoria.userId ?? Supabase.instance.client.auth.currentUser?.id ?? 'offline';
+      final htmlUrl = Supabase.instance.client.storage
+          .from('laudos-pdf')
+          .getPublicUrl('$userId/${vistoria.id}/laudo.html');
+      qrUrl = '$htmlUrl?v=${DateTime.now().millisecondsSinceEpoch}';
+    }
+
     return pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 4),
       child: pw.Row(
@@ -1505,11 +1787,9 @@ class PdfGeneratorService {
             ),
           ),
           // QR Code Estilizado (Apenas se showQr for true)
-          if (showQr)
+          if (showQr && qrUrl != null)
             _buildQrCodeWithPlate(
-                Supabase.instance.client.storage
-                    .from('laudos-pdf')
-                    .getPublicUrl('${vistoria.id}/${vistoria.numeroLaudo}.pdf'),
+                qrUrl,
                 placaStr,
                 styles),
         ],
@@ -1967,7 +2247,8 @@ class PdfGeneratorService {
     Map<String, dynamic>? dadosConsultaJson,
   }) async {
     final limeGreen = PdfColor.fromHex('8CC63F');
-    final warningYellow = PdfColor.fromHex('FBB03B');
+    final warningYellow = PdfColor.fromHex('FBC02D'); // Amarelo para observação
+    final warningOrange = PdfColor.fromHex('F97316'); // Laranja para restrição
     final dangerRed = PdfColor.fromHex('EE4036');
 
     String computedStatus = (vistoria.statusFinal != null && vistoria.statusFinal!.trim().isNotEmpty)
@@ -1994,9 +2275,14 @@ class PdfGeneratorService {
       statusColor = dangerRed;
       statusIcon =
           '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+    } else if (upStatus.contains('RESTRIÇÃO') ||
+        upStatus.contains('RESTRICAO')) {
+      statusColor = warningOrange; // Laranja para Conforme com restrição
+      statusIcon =
+          '<svg viewBox="0 0 24 24"><path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
     } else if (upStatus.contains('APONTAMENTOS') ||
         upStatus.contains('OBSERVA')) {
-      statusColor = warningYellow;
+      statusColor = warningYellow; // Amarelo para Conforme com observação
       statusIcon =
           '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     } else {
@@ -3215,12 +3501,13 @@ class PdfGeneratorService {
       }
     }
     final limeGreen = PdfColor.fromHex('8CC63F');
-    final warningYellow = PdfColor.fromHex('FBB03B');
+    final warningYellow = PdfColor.fromHex('FBC02D'); // Amarelo para observação
+    final warningOrange = PdfColor.fromHex('F97316'); // Laranja para restrição
     final dangerRed = PdfColor.fromHex('EE4036');
 
-    PdfColor statusColor = warningYellow;
+    PdfColor statusColor = limeGreen;
     String statusIcon =
-        '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="white" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     String upStatus = computedStatus.toUpperCase();
     if (upStatus.contains('NÃO CONFORME') ||
         upStatus.contains('REPROVADO') ||
@@ -3228,9 +3515,14 @@ class PdfGeneratorService {
       statusColor = dangerRed;
       statusIcon =
           '<svg viewBox="0 0 24 24"><path fill="white" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
+    } else if (upStatus.contains('RESTRIÇÃO') ||
+        upStatus.contains('RESTRICAO')) {
+      statusColor = warningOrange; // Laranja para Conforme com restrição
+      statusIcon =
+          '<svg viewBox="0 0 24 24"><path fill="white" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>';
     } else if (upStatus.contains('APONTAMENTOS') ||
         upStatus.contains('OBSERVA')) {
-      statusColor = warningYellow;
+      statusColor = warningYellow; // Amarelo para Conforme com observação
       statusIcon =
           '<svg viewBox="0 0 24 24"><path fill="white" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     } else if (upStatus.contains('CONFORME') || upStatus == 'APROVADO') {
@@ -4098,7 +4390,8 @@ class PdfGeneratorService {
         final isConforme = status.toUpperCase().contains('CONFORME') ||
             status.toUpperCase().contains('ORIGINAL') ||
             status.toUpperCase().contains('PADRÃO DO FABRICANTE') ||
-            status.toUpperCase().contains('PADRÕES');
+            status.toUpperCase().contains('PADRÕES') ||
+            status.toUpperCase().contains('PADRÃO');
         final color = isConforme
             ? _kGreen
             : (status == 'NÃO ANALISADO' ? _kGreyDark : _kRed);
@@ -5251,69 +5544,69 @@ class PdfGeneratorService {
               ),
             ),
             pw.Positioned(
-              top: 10,
-              left: 10,
+              top: 120,
+              left: 82,
               child: _buildCaixaStatus(
                   'LONGARINA DIANTEIRA DIREITA',
                   state?.getStatus('longarina_dianteira_direita') ??
                       'NÃO ANALISADO',
                   styles,
-                  width: 95,
+                  width: 82,
                   tagOnTop: true),
             ),
             pw.Positioned(
-              top: 10,
-              left: 215,
-              child: _buildCaixaStatus(
-                  'LONGARINA CENTRO DIREITA',
-                  state?.getStatus('longarina_centro_direita') ??
-                      'NÃO ANALISADO',
-                  styles,
-                  width: 95,
-                  tagOnTop: true),
-            ),
-            pw.Positioned(
-              top: 10,
-              right: 15,
+              top: 110,
+              left: 370,
               child: _buildCaixaStatus(
                   'LONGARINA TRASEIRA DIREITA',
                   state?.getStatus('longarina_traseira_direita') ??
                       'NÃO ANALISADO',
                   styles,
-                  width: 95,
+                  width: 82,
                   tagOnTop: true),
             ),
             pw.Positioned(
-              bottom: 10,
-              left: 10,
+              top: 305,
+              left: -8,
+              child: _buildCaixaStatus(
+                  'PAINEL FRONTAL',
+                  state?.getStatus('painel_frontal') ??
+                      'NÃO ANALISADO',
+                  styles,
+                  width: 76,
+                  tagOnTop: false),
+            ),
+            pw.Positioned(
+              top: 325,
+              left: 82,
               child: _buildCaixaStatus(
                   'LONGARINA DIANTEIRA ESQUERDA',
                   state?.getStatus('longarina_dianteira_esquerda') ??
                       'NÃO ANALISADO',
                   styles,
-                  width: 95,
+                  width: 82,
                   tagOnTop: false),
             ),
             pw.Positioned(
-              bottom: 10,
-              left: 215,
-              child: _buildCaixaStatus(
-                  'LONGARINA CENTRO ESQUERDA',
-                  state?.getStatus('longarina_centro_esquerda') ??
-                      'NÃO ANALISADO',
-                  styles,
-                  width: 95,
-                  tagOnTop: false),
-            ),
-            pw.Positioned(
-              bottom: 10,
-              right: 15,
+              top: 317,
+              left: 374,
               child: _buildCaixaStatus(
                   'LONGARINA TRASEIRA ESQUERDA',
                   state?.getStatus('longarina_traseira_esquerda') ??
                       'NÃO ANALISADO',
                   styles,
-                  width: 95,
+                  width: 82,
+                  tagOnTop: false),
+            ),
+            pw.Positioned(
+              top: 302,
+              right: -20,
+              child: _buildCaixaStatus(
+                  'PAINEL TRASEIRO',
+                  state?.getStatus('painel_traseiro') ??
+                      'NÃO ANALISADO',
+                  styles,
+                  width: 76,
                   tagOnTop: false),
             ),
           ],
@@ -5414,6 +5707,17 @@ class PdfGeneratorService {
         status.contains('CORTADO') ||
         status.contains('DANIFICADO')) {
       color = _kRed;
+    } else if (status.contains('RESTRIÇÃO') || status.contains('RESTRICAO')) {
+      color = const PdfColor.fromInt(0xFFFF9800); // Laranja
+    } else if (status.contains('OBSERVA') ||
+        status.contains('AMASSADO') ||
+        status.contains('APONTAMENTOS') ||
+        status.contains('ALONGADO') ||
+        status.contains('CONSIDERAÇÃO') ||
+        status.contains('CONSIDERACAO') ||
+        status.contains('OBSTRUÍDO') ||
+        status.contains('OBSTRUIDO')) {
+      color = const PdfColor.fromInt(0xFFFBC02D); // Amarelo
     } else if (status.contains('CONFORME') ||
         status.contains('SEM REPARO') ||
         status.contains('ORIGINAL') ||
@@ -5421,14 +5725,8 @@ class PdfGeneratorService {
         status.contains('PADRÕES') ||
         status == 'APROVADO') {
       color = _kGreen;
-    } else if (status.contains('REPARO') ||
-        status.contains('OBSERVAÇÕES') ||
-        status.contains('AMASSADO') ||
-        status.contains('APONTAMENTOS') ||
-        status.contains('ALONGADO') ||
-        status.contains('CONSIDERAÇÃO') ||
-        status.contains('OBSTRUÍDO')) {
-      color = _kOrange;
+    } else if (status.contains('REPARO')) {
+      color = const PdfColor.fromInt(0xFFFF9800);
     }
 
     final titleWidget = pw.Text(
@@ -5497,44 +5795,60 @@ class PdfGeneratorService {
     pw.ImageProvider? assinatura,
     VistoriaWizardState? state,
   ) {
-    final themeRed = PdfColor.fromHex(
-        '#1F5E3D'); // Verde principal (mantendo o nome da variavel para nao quebrar)
+    final themeRed = PdfColor.fromHex('#1F5E3D'); // Verde principal
     final lightRed = PdfColor.fromHex('#F1F8E9'); // Fundo verde clarinho
     final borderRed = PdfColor.fromHex('#C5E1A5'); // Borda verde suave
-    final textDark = PdfColor.fromHex('#333333');
+    final textDark = PdfColor.fromHex('#222222');
     final textMuted = PdfColor.fromHex('#666666');
+    final mainGreen = PdfColor.fromHex('#8CC63F');
+    final blueColor = const PdfColor.fromInt(0xFF1976D2);
 
-    pw.Widget buildRedBar(String text) {
+    pw.Widget buildRedBar(String text, {PdfColor? bgColor}) {
       return pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-        margin: const pw.EdgeInsets.only(bottom: 8, top: 8),
+        padding: const pw.EdgeInsets.symmetric(vertical: 3.5, horizontal: 6),
+        margin: const pw.EdgeInsets.only(bottom: 3, top: 4),
         decoration: pw.BoxDecoration(
-          color: themeRed,
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          color: bgColor ?? themeRed,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
         ),
-        child: pw.Text(text,
-            style: pw.TextStyle(
-                font: styles.bold, fontSize: 9, color: PdfColors.white)),
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: styles.bold,
+            fontSize: 7.5,
+            color: PdfColors.white,
+          ),
+        ),
       );
     }
 
     pw.Widget buildSoftTh(String text) {
       return pw.Container(
-        padding: const pw.EdgeInsets.all(6),
+        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
         color: lightRed,
-        child: pw.Text(text,
-            style:
-                pw.TextStyle(font: styles.bold, fontSize: 8, color: themeRed)),
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: styles.bold,
+            fontSize: 7,
+            color: themeRed,
+          ),
+        ),
       );
     }
 
-    pw.Widget buildSoftTd(String text) {
+    pw.Widget buildSoftTd(String text, {bool isBold = false, PdfColor? color}) {
       return pw.Container(
-        padding: const pw.EdgeInsets.all(6),
-        child: pw.Text(text,
-            style: pw.TextStyle(
-                font: styles.regular, fontSize: 8, color: textDark)),
+        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            font: isBold ? styles.bold : styles.regular,
+            fontSize: 7,
+            color: color ?? textDark,
+          ),
+        ),
       );
     }
 
@@ -5554,492 +5868,594 @@ class PdfGeneratorService {
       }
     }
 
-    // Especificações e Manutenção
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(16),
-      build: (ctx) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            _buildHeader(vistoria, styles, logo, state: state),
-            pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(
-                    color: lightRed,
-                    borderRadius:
-                        const pw.BorderRadius.all(pw.Radius.circular(6)),
-                    border: pw.Border.all(color: themeRed, width: 1)),
-                child: pw.Center(
-                  child: pw.Text('FICHA TÉCNICA INTELIGENTE DO VEÍCULO',
-                      style: pw.TextStyle(
-                          font: styles.bold, fontSize: 12, color: themeRed)),
-                )),
-            pw.SizedBox(height: 8),
-            buildRedBar('ESPECIFICAÇÕES TÉCNICAS'),
-            if (data['especificacoes_tecnicas'] != null)
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                  border: pw.Border.all(color: borderRed, width: 1),
-                ),
-                child: pw.Table(
-                  border: pw.TableBorder.symmetric(
-                      inside: pw.BorderSide(color: borderRed, width: 0.5)),
-                  children:
-                      (data['especificacoes_tecnicas'] as Map<String, dynamic>)
-                          .entries
-                          .map((e) {
-                    return pw.TableRow(children: [
-                      buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
-                      buildSoftTd(e.value.toString()),
-                    ]);
-                  }).toList(),
-                ),
+    final String? fipeOficialStr = data['fipe_valor_oficial']?.toString();
+    final double? valorFipeDouble =
+        VehicleDepreciationService.converterFipeParaDouble(fipeOficialStr);
+
+    final rawApontamentos = data['apontamentos_veiculo'] is List
+        ? (data['apontamentos_veiculo'] as List)
+        : [];
+    final List<DepreciacaoItem> validApontamentos =
+        VehicleDepreciationService.parseRespostaIa(rawApontamentos);
+
+    final resultadoDepreciacao = VehicleDepreciationService.processar(
+      valorFipe: valorFipeDouble,
+      itens: validApontamentos,
+    );
+
+    final observacoesList = (data['observacoes'] != null &&
+            data['observacoes'] is List)
+        ? (data['observacoes'] as List)
+        : [];
+
+    pw.Widget buildTitleBanner() {
+      return pw.Container(
+        width: double.infinity,
+        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        margin: const pw.EdgeInsets.only(bottom: 2),
+        decoration: pw.BoxDecoration(
+          color: lightRed,
+          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+          border: pw.Border.all(color: themeRed, width: 0.8),
+        ),
+        child: pw.Center(
+          child: pw.Text(
+            'FICHA TÉCNICA INTELIGENTE DO VEÍCULO (IA)',
+            style: pw.TextStyle(
+              font: styles.bold,
+              fontSize: 9.5,
+              color: themeRed,
+            ),
+          ),
+        ),
+      );
+    }
+
+    pw.Widget buildSpecsAndMaintenanceSideBySide() {
+      final specs = data['especificacoes_tecnicas'] as Map<String, dynamic>?;
+      final manut = data['manutencao'] as Map<String, dynamic>?;
+
+      return pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          if (specs != null && specs.isNotEmpty)
+            pw.Expanded(
+              flex: 1,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  buildRedBar('ESPECIFICAÇÕES TÉCNICAS'),
+                  pw.Container(
+                    decoration: pw.BoxDecoration(
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(3)),
+                      border: pw.Border.all(color: borderRed, width: 0.5),
+                    ),
+                    child: pw.Table(
+                      columnWidths: const {
+                        0: pw.FlexColumnWidth(1.0),
+                        1: pw.FlexColumnWidth(1.2),
+                      },
+                      border: pw.TableBorder.symmetric(
+                        inside: pw.BorderSide(color: borderRed, width: 0.5),
+                      ),
+                      children: specs.entries.map((e) {
+                        return pw.TableRow(children: [
+                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
+                          buildSoftTd(e.value.toString()),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
-            pw.SizedBox(height: 8),
-            buildRedBar('MANUTENÇÃO RECOMENDADA'),
-            if (data['manutencao'] != null)
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                  border: pw.Border.all(color: borderRed, width: 1),
-                ),
-                child: pw.Table(
-                  border: pw.TableBorder.symmetric(
-                      inside: pw.BorderSide(color: borderRed, width: 0.5)),
-                  children: (data['manutencao'] as Map<String, dynamic>)
-                      .entries
-                      .map((e) {
-                    return pw.TableRow(children: [
-                      buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
-                      buildSoftTd(e.value.toString()),
-                    ]);
-                  }).toList(),
-                ),
+            ),
+          if (specs != null && specs.isNotEmpty && manut != null && manut.isNotEmpty)
+            pw.SizedBox(width: 6),
+          if (manut != null && manut.isNotEmpty)
+            pw.Expanded(
+              flex: 1,
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  buildRedBar('MANUTENÇÃO RECOMENDADA'),
+                  pw.Container(
+                    decoration: pw.BoxDecoration(
+                      borderRadius:
+                          const pw.BorderRadius.all(pw.Radius.circular(3)),
+                      border: pw.Border.all(color: borderRed, width: 0.5),
+                    ),
+                    child: pw.Table(
+                      columnWidths: const {
+                        0: pw.FlexColumnWidth(1.0),
+                        1: pw.FlexColumnWidth(1.2),
+                      },
+                      border: pw.TableBorder.symmetric(
+                        inside: pw.BorderSide(color: borderRed, width: 0.5),
+                      ),
+                      children: manut.entries.map((e) {
+                        return pw.TableRow(children: [
+                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
+                          buildSoftTd(e.value.toString()),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ),
-            pw.Spacer(),
-            _buildFooter(vistoria, styles, ctx, assinatura,
-                showSignatures: false),
-            _buildPdfFooter(ctx, styles),
-          ],
-        );
-      },
-    ));
+            ),
+        ],
+      );
+    }
 
-    // Problemas e Peças
-    pdf.addPage(pw.Page(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(16),
-      build: (ctx) {
-        final apontamentosOriginais = data['apontamentos_veiculo'] is List
-            ? (data['apontamentos_veiculo'] as List)
-            : [];
-        bool isZeroCurrency(dynamic val) {
-          if (val == null) return true;
-          final str = val.toString().replaceAll(RegExp(r'[^0-9]'), '');
-          return str.isEmpty || int.tryParse(str) == 0;
-        }
+    pw.Widget buildPecasDesgaste() {
+      if (data['pecas_desgaste'] == null ||
+          data['pecas_desgaste'] is! List ||
+          (data['pecas_desgaste'] as List).isEmpty) {
+        return pw.SizedBox.shrink();
+      }
 
-        final validApontamentos = apontamentosOriginais.where((item) {
-          final pecaUpper =
-              (item['peca_ou_problema']?.toString() ?? '').toUpperCase();
-          final obsUpper =
-              (item['observacao_indicada']?.toString() ?? '').toUpperCase();
-          final isNoAvaria = pecaUpper.contains('SEM ACESSO') ||
-              pecaUpper.contains('SEMA ACESSO') ||
-              obsUpper.contains('SEM ACESSO') ||
-              obsUpper.contains('SEMA ACESSO') ||
-              pecaUpper.contains('PLAQUETA AUSENTE') ||
-              obsUpper.contains('PLAQUETA AUSENTE') ||
-              ((pecaUpper.contains('CAMBIO') || pecaUpper.contains('CÂMBIO')) &&
-                  (pecaUpper.contains('AUSENTE') || obsUpper.contains('AUSENTE'))) ||
-              obsUpper.contains('NÃO É AVARIA') ||
-              obsUpper.contains('NAO E AVARIA') ||
-              obsUpper.contains('NÃO REPRESENTA AVARIA') ||
-              pecaUpper.contains('REPINT') ||
-              pecaUpper.contains('RETOQUE') ||
-              obsUpper.contains('SERVIÇO DE REPINTURA') ||
-              obsUpper.contains('REPINTURA JÁ REALIZADA') ||
-              obsUpper.contains('REPINTURA JÁ REALIZADO') ||
-              obsUpper.contains('REPINT') ||
-              obsUpper.contains('RETOQUE') ||
-              obsUpper.contains('OBSTRUÍDO') ||
-              obsUpper.contains('OBSTRUIDO') ||
-              obsUpper.contains('DENTRO DOS PADRÕES') ||
-              obsUpper.contains('DENTRO DOS PADROES') ||
-              obsUpper.contains('PADRÃO DE FÁBRICA') ||
-              obsUpper.contains('PADRAO DE FABRICA') ||
-              obsUpper.contains('PADRÃO DO FABRICANTE') ||
-              obsUpper.contains('SEM AVARIA');
-
-          if (isNoAvaria) return false;
-
-          final valPecaZero = isZeroCurrency(item['valor_peca_estimado']);
-          final valMaoObraZero = isZeroCurrency(item['valor_mao_de_obra_estimado']);
-
-          if (valPecaZero && valMaoObraZero) {
-            return false;
-          }
-
-          return true;
-        }).toList();
-
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            _buildHeader(vistoria, styles, logo, state: state),
-            // Removido Histórico do Modelo (Pontos de Atenção)
-            buildRedBar('PEÇAS DE DESGASTE'),
-            if (data['pecas_desgaste'] != null &&
-                data['pecas_desgaste'] is List)
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                  border: pw.Border.all(color: borderRed, width: 1),
-                ),
-                child: pw.Table(
-                  border: pw.TableBorder.symmetric(
-                      inside: pw.BorderSide(color: borderRed, width: 0.5)),
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          buildRedBar('PEÇAS DE DESGASTE E ESTIMATIVA DE TROCA'),
+          pw.Container(
+            decoration: pw.BoxDecoration(
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+              border: pw.Border.all(color: borderRed, width: 0.5),
+            ),
+            child: pw.Table(
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.6),
+                1: pw.FlexColumnWidth(1.0),
+                2: pw.FlexColumnWidth(1.0),
+                3: pw.FlexColumnWidth(1.3),
+              },
+              border: pw.TableBorder.symmetric(
+                inside: pw.BorderSide(color: borderRed, width: 0.5),
+              ),
+              children: [
+                pw.TableRow(
+                  decoration: pw.BoxDecoration(color: lightRed),
                   children: [
-                    pw.TableRow(
-                        decoration: pw.BoxDecoration(color: lightRed),
-                        children: [
-                          buildSoftTh('PEÇA'),
-                          buildSoftTh('VIDA ÚTIL'),
-                          buildSoftTh('VALOR PEÇA'),
-                          buildSoftTh('MÃO DE OBRA')
-                        ]),
-                    ...((data['pecas_desgaste'] as List).map((item) {
-                      return pw.TableRow(children: [
-                        buildSoftTd(item['peca']?.toString() ?? ''),
-                        buildSoftTd(item['vida_util_media']?.toString() ?? ''),
-                        buildSoftTd(
-                            formatCurrency(item['valor_peca_estimado'])),
-                        buildSoftTd(
-                            '${formatCurrency(item['valor_mao_de_obra_estimado'])} (${item['tempo_mao_de_obra_estimado']})'),
-                      ]);
-                    }).toList()),
+                    buildSoftTh('PEÇA'),
+                    buildSoftTh('VIDA ÚTIL'),
+                    buildSoftTh('VALOR PEÇA'),
+                    buildSoftTh('MÃO DE OBRA'),
                   ],
                 ),
-              ),
-            if (validApontamentos.isNotEmpty) ...[
-              pw.SizedBox(height: 8),
-              pw.Container(
-                width: double.infinity,
-                padding:
-                    const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                margin: const pw.EdgeInsets.only(bottom: 8, top: 8),
-                decoration: const pw.BoxDecoration(
-                  color: PdfColor.fromInt(0xFFF57F17),
-                  borderRadius: pw.BorderRadius.all(pw.Radius.circular(4)),
-                ),
-                child: pw.Text('APONTAMENTOS DA VISTORIA (VALORES ESTIMADOS)',
-                    style: pw.TextStyle(
-                        font: styles.bold,
-                        fontSize: 9,
-                        color: PdfColors.white)),
-              ),
-              pw.Container(
-                decoration: pw.BoxDecoration(
-                  borderRadius:
-                      const pw.BorderRadius.all(pw.Radius.circular(4)),
-                  border: pw.Border.all(
-                      color: const PdfColor.fromInt(0xFFFFE082), width: 1),
-                ),
-                child: pw.Table(
-                  border: pw.TableBorder.symmetric(
-                      inside: const pw.BorderSide(
-                          color: PdfColor.fromInt(0xFFFFE082), width: 0.5)),
-                  children: [
-                    pw.TableRow(
-                        decoration: const pw.BoxDecoration(
-                            color: PdfColor.fromInt(0xFFFFF9C4)),
-                        children: [
-                          pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              child: pw.Text('PEÇA / PROBLEMA',
-                                  style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 8,
-                                      color:
-                                          const PdfColor.fromInt(0xFFF57F17)))),
-                          pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              child: pw.Text('OBSERVAÇÃO',
-                                  style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 8,
-                                      color:
-                                          const PdfColor.fromInt(0xFFF57F17)))),
-                          pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              child: pw.Text('VALOR PEÇA',
-                                  style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 8,
-                                      color:
-                                          const PdfColor.fromInt(0xFFF57F17)))),
-                          pw.Container(
-                              padding: const pw.EdgeInsets.all(6),
-                              child: pw.Text('MÃO DE OBRA',
-                                  style: pw.TextStyle(
-                                      font: styles.bold,
-                                      fontSize: 8,
-                                      color:
-                                          const PdfColor.fromInt(0xFFF57F17)))),
-                        ]),
-                    ...(validApontamentos.map((item) {
-                      final peca = item['peca_ou_problema']?.toString() ?? '';
-                      final obs = item['observacao_indicada']?.toString() ?? '';
-                      final valPeca =
-                          formatCurrency(item['valor_peca_estimado']);
-                      final valMaoObra =
-                          formatCurrency(item['valor_mao_de_obra_estimado']);
+                ...((data['pecas_desgaste'] as List).map((item) {
+                  final tempo = item['tempo_mao_de_obra_estimado']?.toString() ?? '';
+                  final tempoStr = tempo.isNotEmpty ? ' ($tempo)' : '';
+                  return pw.TableRow(children: [
+                    buildSoftTd(item['peca']?.toString() ?? ''),
+                    buildSoftTd(item['vida_util_media']?.toString() ?? ''),
+                    buildSoftTd(formatCurrency(item['valor_peca_estimado'])),
+                    buildSoftTd('${formatCurrency(item['valor_mao_de_obra_estimado'])}$tempoStr'),
+                  ]);
+                }).toList()),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
-                      return pw.TableRow(children: [
-                        buildSoftTd(peca),
-                        buildSoftTd(obs),
-                        buildSoftTd(valPeca),
-                        buildSoftTd(valMaoObra),
-                      ]);
-                    }).toList()),
+    pw.Widget buildApontamentosWidget() {
+      if (resultadoDepreciacao.itens.isEmpty) return pw.SizedBox.shrink();
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          buildRedBar(
+            'DEPRECIAÇÃO ESTIMADA POR APONTAMENTOS (${resultadoDepreciacao.itens.length} ITENS)',
+            bgColor: const PdfColor.fromInt(0xFFF57F17),
+          ),
+          pw.Container(
+            decoration: pw.BoxDecoration(
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+              border: pw.Border.all(
+                color: const PdfColor.fromInt(0xFFFFE082),
+                width: 0.5,
+              ),
+            ),
+            child: pw.Table(
+              columnWidths: const {
+                0: pw.FlexColumnWidth(1.4),
+                1: pw.FlexColumnWidth(1.6),
+                2: pw.FlexColumnWidth(0.9),
+                3: pw.FlexColumnWidth(0.9),
+                4: pw.FlexColumnWidth(1.0),
+              },
+              border: pw.TableBorder.symmetric(
+                inside: const pw.BorderSide(
+                  color: PdfColor.fromInt(0xFFFFE082),
+                  width: 0.5,
+                ),
+              ),
+              children: [
+                pw.TableRow(
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFFFFF9C4),
+                  ),
+                  children: [
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+                      child: pw.Text(
+                        'PEÇA / COMPONENTE',
+                        style: pw.TextStyle(
+                          font: styles.bold,
+                          fontSize: 7,
+                          color: const PdfColor.fromInt(0xFFF57F17),
+                        ),
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+                      child: pw.Text(
+                        'PROBLEMA / DANO APONTADO',
+                        style: pw.TextStyle(
+                          font: styles.bold,
+                          fontSize: 7,
+                          color: const PdfColor.fromInt(0xFFF57F17),
+                        ),
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+                      child: pw.Text(
+                        'VALOR PEÇA',
+                        style: pw.TextStyle(
+                          font: styles.bold,
+                          fontSize: 7,
+                          color: const PdfColor.fromInt(0xFFF57F17),
+                        ),
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+                      child: pw.Text(
+                        'MÃO DE OBRA',
+                        style: pw.TextStyle(
+                          font: styles.bold,
+                          fontSize: 7,
+                          color: const PdfColor.fromInt(0xFFF57F17),
+                        ),
+                      ),
+                    ),
+                    pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
+                      child: pw.Text(
+                        'TOTAL ITEM',
+                        style: pw.TextStyle(
+                          font: styles.bold,
+                          fontSize: 7,
+                          color: const PdfColor.fromInt(0xFFF57F17),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              pw.SizedBox(height: 8),
-              pw.Text(
-                'OBSERVAÇÃO: Os valores de peças e mão de obra apresentados neste relatório são estimativas geradas de forma automatizada por Inteligência Artificial. Eles não representam um orçamento exato ou valor de mercado definitivo, podendo sofrer variações conforme a região, oficina ou fornecedor.',
-                style: pw.TextStyle(
-                  fontSize: 7,
-                  color: PdfColors.grey700,
-                  fontStyle: pw.FontStyle.italic,
-                ),
-                textAlign: pw.TextAlign.justify,
-              ),
-            ],
-            pw.Spacer(),
-            _buildFooter(vistoria, styles, ctx, assinatura,
-                showSignatures: false),
-            _buildPdfFooter(ctx, styles),
-          ],
-        );
-      },
-    ));
+                ...(resultadoDepreciacao.itens.map((item) {
+                  return pw.TableRow(children: [
+                    buildSoftTd(item.nomePeca, isBold: true),
+                    buildSoftTd(item.descricaoProblema),
+                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.valorPeca)),
+                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.valorMaoDeObra)),
+                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.custoTotal), isBold: true),
+                  ]);
+                }).toList()),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
-    // Análise Final e Observações
-    if (data['analise_final'] != null || (data['observacoes'] != null && (data['observacoes'] as List).isNotEmpty)) {
+    pw.Widget buildObservacoesWidget() {
+      if (observacoesList.isEmpty) return pw.SizedBox.shrink();
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          buildRedBar('OBSERVAÇÕES ADICIONAIS'),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(5),
+            decoration: pw.BoxDecoration(
+              color: lightRed,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
+              border: pw.Border.all(color: borderRed, width: 0.5),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: (observacoesList.map((obs) {
+                return pw.Padding(
+                  padding: const pw.EdgeInsets.only(bottom: 2),
+                  child: pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Container(
+                        margin: const pw.EdgeInsets.only(top: 3, right: 4),
+                        width: 3,
+                        height: 3,
+                        decoration: pw.BoxDecoration(
+                          color: themeRed,
+                          shape: pw.BoxShape.circle,
+                        ),
+                      ),
+                      pw.Expanded(
+                        child: pw.Text(
+                          '$obs',
+                          style: pw.TextStyle(
+                            font: styles.regular,
+                            fontSize: 7,
+                            color: textDark,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList()),
+            ),
+          ),
+        ],
+      );
+    }
+
+    pw.Widget buildAnaliseFinalWidget() {
+      final resumo = data['resumo_inteligente']?.toString() ?? '';
+      final fipeFormatada = resultadoDepreciacao.fipeDisponivel
+          ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFipe)
+          : 'Valor FIPE indisponível';
+      final depreciacaoFormatada =
+          VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.depreciacaoTotal);
+      final valorFinalFormatado = resultadoDepreciacao.fipeDisponivel
+          ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFinal)
+          : 'Indisponível';
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(vertical: 3.5, horizontal: 6),
+            margin: const pw.EdgeInsets.only(top: 4),
+            decoration: pw.BoxDecoration(
+              color: mainGreen,
+              borderRadius: const pw.BorderRadius.only(
+                topLeft: pw.Radius.circular(3),
+                topRight: pw.Radius.circular(3),
+              ),
+            ),
+            child: pw.Text(
+              'AVALIAÇÃO FINANCEIRA E DEPRECIAÇÃO (FIPE + APONTAMENTOS)',
+              style: pw.TextStyle(
+                font: styles.bold,
+                fontSize: 7.5,
+                color: PdfColors.white,
+              ),
+            ),
+          ),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(5),
+            decoration: pw.BoxDecoration(
+              borderRadius: const pw.BorderRadius.only(
+                bottomLeft: pw.Radius.circular(3),
+                bottomRight: pw.Radius.circular(3),
+              ),
+              border: pw.Border.all(color: mainGreen, width: 0.5),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                if (resumo.isNotEmpty) ...[
+                  pw.RichText(
+                    text: pw.TextSpan(
+                      children: [
+                        pw.TextSpan(
+                          text: 'Resumo Técnico: ',
+                          style: pw.TextStyle(
+                            font: styles.bold,
+                            fontSize: 7,
+                            color: textDark,
+                          ),
+                        ),
+                        pw.TextSpan(
+                          text: resumo,
+                          style: pw.TextStyle(
+                            font: styles.regular,
+                            fontSize: 7,
+                            color: textDark,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                ],
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.center,
+                  children: [
+                    // Bloco 1: Valor FIPE
+                    pw.Expanded(
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
+                        decoration: pw.BoxDecoration(
+                          color: const PdfColor.fromInt(0xFFF5F5F5),
+                          borderRadius: pw.BorderRadius.circular(2),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Text(
+                              'VALOR FIPE (OFICIAL):',
+                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: textDark),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              fipeFormatada,
+                              style: pw.TextStyle(
+                                font: styles.bold,
+                                fontSize: resultadoDepreciacao.fipeDisponivel ? 9.5 : 7.5,
+                                color: textDark,
+                              ),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              resultadoDepreciacao.fipeDisponivel ? 'Tabela FIPE oficial' : 'FIPE não retornou valor',
+                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 4),
+                    // Bloco 2: Depreciação por Apontamentos
+                    pw.Expanded(
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
+                        decoration: pw.BoxDecoration(
+                          color: const PdfColor.fromInt(0xFFE3F2FD),
+                          borderRadius: pw.BorderRadius.circular(2),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          children: [
+                            pw.Text(
+                              'DEPRECIAÇÃO ESTIMADA:',
+                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: blueColor),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              depreciacaoFormatada,
+                              style: pw.TextStyle(font: styles.bold, fontSize: 9.5, color: blueColor),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              resultadoDepreciacao.temApontamentos
+                                  ? '${resultadoDepreciacao.itens.length} apontamento(s) orçado(s)'
+                                  : 'Sem defeitos apontados (R\$ 0,00)',
+                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    pw.SizedBox(width: 4),
+                    // Bloco 3: Valor Final Estimado
+                    pw.Expanded(
+                      child: pw.Container(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
+                        decoration: pw.BoxDecoration(
+                          color: lightRed,
+                          borderRadius: pw.BorderRadius.circular(2),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.end,
+                          children: [
+                            pw.Text(
+                              'VALOR ESTIMADO FINAL:',
+                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: themeRed),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              valorFinalFormatado,
+                              style: pw.TextStyle(
+                                font: styles.bold,
+                                fontSize: resultadoDepreciacao.fipeDisponivel ? 10 : 8,
+                                color: themeRed,
+                              ),
+                            ),
+                            pw.SizedBox(height: 1),
+                            pw.Text(
+                              'FIPE - Depreciação',
+                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                pw.SizedBox(height: 4),
+                pw.Text(
+                  '* Regra de Avaliação: O valor base do veículo provém exclusivamente da consulta oficial à Tabela FIPE. A depreciação é estritamente a soma determinística de peças e serviços dos defeitos apontados no laudo pelo vistoriador. Caso nenhum defeito seja apontado, a depreciação é R\$ 0,00.',
+                  style: pw.TextStyle(
+                    font: styles.regular,
+                    fontSize: 5.8,
+                    color: PdfColors.grey700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Se o conteúdo couber em 1 página (menos de 4 apontamentos e poucas observações), monta tudo em 1 página única e densa
+    final canFitInOnePage = validApontamentos.length <= 4 && observacoesList.length <= 3;
+
+    if (canFitInOnePage) {
       pdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(16),
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         build: (ctx) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               _buildHeader(vistoria, styles, logo, state: state),
-              if (data['observacoes'] != null &&
-                  data['observacoes'] is List &&
-                  (data['observacoes'] as List).isNotEmpty) ...[
-                buildRedBar('OBSERVAÇÕES ADICIONAIS'),
-                pw.Container(
-                    padding: const pw.EdgeInsets.all(8),
-                    decoration: pw.BoxDecoration(
-                        color: lightRed,
-                        borderRadius:
-                            const pw.BorderRadius.all(pw.Radius.circular(4)),
-                        border: pw.Border.all(color: borderRed, width: 1)),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: ((data['observacoes'] as List).map((obs) {
-                        return pw.Padding(
-                            padding: const pw.EdgeInsets.only(bottom: 4),
-                            child: pw.Row(
-                                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                                children: [
-                                  pw.Container(
-                                    margin: const pw.EdgeInsets.only(
-                                        top: 3, right: 6),
-                                    width: 3,
-                                    height: 3,
-                                    decoration: pw.BoxDecoration(
-                                        color: themeRed,
-                                        shape: pw.BoxShape.circle),
-                                  ),
-                                  pw.Expanded(
-                                      child: pw.Text('$obs',
-                                          style: pw.TextStyle(
-                                              font: styles.regular,
-                                              fontSize: 8,
-                                              color: textDark))),
-                                ]));
-                      }).toList()),
-                    ))
-              ],
-              pw.SizedBox(height: 8),
-              (() {
-                if (data['analise_final'] == null) {
-                  return pw.SizedBox.shrink();
-                }
+              buildTitleBanner(),
+              buildSpecsAndMaintenanceSideBySide(),
+              buildPecasDesgaste(),
+              buildApontamentosWidget(),
+              buildObservacoesWidget(),
+              buildAnaliseFinalWidget(),
+              pw.Spacer(),
+              _buildFooter(vistoria, styles, ctx, assinatura,
+                  showSignatures: false),
+              _buildPdfFooter(ctx, styles),
+            ],
+          );
+        },
+      ));
+    } else {
+      // Caso tenha muitos apontamentos, divide em 2 páginas organizadas e sem espaços vazios excessivos
+      pdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        build: (ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildHeader(vistoria, styles, logo, state: state),
+              buildTitleBanner(),
+              buildSpecsAndMaintenanceSideBySide(),
+              buildPecasDesgaste(),
+              buildApontamentosWidget(),
+              pw.Spacer(),
+              _buildFooter(vistoria, styles, ctx, assinatura,
+                  showSignatures: false),
+              _buildPdfFooter(ctx, styles),
+            ],
+          );
+        },
+      ));
 
-                final analise = data['analise_final'];
-                final resumo =
-                    analise['resumo_estado_veiculo']?.toString() ?? '';
-                String valorMercado =
-                    analise['valor_venda_mercado_local']?.toString() ??
-                        'R\$ 0,00';
-                String desconto =
-                    analise['desconto_total_avarias']?.toString() ?? 'R\$ 0,00';
-                String valorSugerido =
-                    analise['valor_venda_sugerido_final']?.toString() ??
-                        'R\$ 0,00';
-                final justificativa =
-                    analise['justificativa']?.toString() ?? '';
-
-                String guaranteeBrl(String val) {
-                  if (!val.toUpperCase().contains('R\$') &&
-                      !val.contains(r'\$')) {
-                    return 'R\$ ' + val;
-                  }
-                  if (val.contains(r'\$') && !val.toUpperCase().contains('R')) {
-                    return val.replaceFirst(r'\$', 'R\$ ');
-                  }
-                  return val;
-                }
-
-                valorMercado = guaranteeBrl(valorMercado);
-                desconto = guaranteeBrl(desconto);
-                valorSugerido = guaranteeBrl(valorSugerido);
-
-                final mainGreen = PdfColor.fromHex('8CC63F');
-                final blueColor = const PdfColor.fromInt(0xFF1976D2);
-
-                return pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Container(
-                        width: double.infinity,
-                        padding: const pw.EdgeInsets.symmetric(
-                            vertical: 6, horizontal: 8),
-                        decoration: pw.BoxDecoration(
-                          color: mainGreen,
-                          borderRadius: const pw.BorderRadius.only(
-                              topLeft: pw.Radius.circular(4),
-                              topRight: pw.Radius.circular(4)),
-                        ),
-                        child: pw.Text(
-                            'ANÁLISE FINAL E AVALIAÇÃO DE MERCADO (IA)',
-                            style: pw.TextStyle(
-                                font: styles.bold,
-                                fontSize: 9,
-                                color: PdfColors.white)),
-                      ),
-                      pw.Container(
-                          width: double.infinity,
-                          padding: const pw.EdgeInsets.all(8),
-                          decoration: pw.BoxDecoration(
-                            borderRadius: const pw.BorderRadius.only(
-                                bottomLeft: pw.Radius.circular(4),
-                                bottomRight: pw.Radius.circular(4)),
-                            border: pw.Border.all(color: mainGreen, width: 1),
-                          ),
-                          child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text('Resumo do Estado:',
-                                    style: pw.TextStyle(
-                                        font: styles.bold,
-                                        fontSize: 8,
-                                        color: textDark)),
-                                pw.SizedBox(height: 2),
-                                pw.Text(resumo,
-                                    style: pw.TextStyle(
-                                        font: styles.regular,
-                                        fontSize: 8,
-                                        color: textDark)),
-                                pw.SizedBox(height: 6),
-                                pw.Row(
-                                    crossAxisAlignment:
-                                        pw.CrossAxisAlignment.start,
-                                    children: [
-                                      pw.Expanded(
-                                        child: pw.Column(
-                                            crossAxisAlignment:
-                                                pw.CrossAxisAlignment.start,
-                                            children: [
-                                              pw.Text('Valor Médio Local:',
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 8,
-                                                      color: textDark)),
-                                              pw.Text(valorMercado,
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 11,
-                                                      color: textDark)),
-                                            ]),
-                                      ),
-                                      pw.Expanded(
-                                        child: pw.Column(
-                                            crossAxisAlignment:
-                                                pw.CrossAxisAlignment.center,
-                                            children: [
-                                              pw.Text(
-                                                  'Desconto (Avarias/Reparos):',
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 8,
-                                                      color: blueColor)),
-                                              pw.Text(desconto,
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 11,
-                                                      color: blueColor)),
-                                            ]),
-                                      ),
-                                      pw.Expanded(
-                                        child: pw.Column(
-                                            crossAxisAlignment:
-                                                pw.CrossAxisAlignment.end,
-                                            children: [
-                                              pw.Text('Valor Sugerido Final:',
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 8,
-                                                      color: mainGreen)),
-                                              pw.Text(valorSugerido,
-                                                  style: pw.TextStyle(
-                                                      font: styles.bold,
-                                                      fontSize: 12,
-                                                      color: mainGreen)),
-                                            ]),
-                                      ),
-                                    ]),
-                                pw.SizedBox(height: 6),
-                                pw.Text('Justificativa:',
-                                    style: pw.TextStyle(
-                                        font: styles.bold,
-                                        fontSize: 8,
-                                        color: textDark)),
-                                pw.SizedBox(height: 2),
-                                pw.Text(justificativa,
-                                    style: pw.TextStyle(
-                                        font: styles.regular,
-                                        fontSize: 8,
-                                        color: textDark)),
-                                pw.SizedBox(height: 10),
-                                pw.Text(
-                                    '* OBS: As estimativas de valores (mercado, peças, mão de obra e descontos) e o relatório técnico complementar desta ficha são gerados por Inteligência Artificial com base em médias de mercado. Estes valores servem apenas como referência comercial e não constituem promessa, garantia de preço de compra/venda ou orçamento exato.',
-                                    style: pw.TextStyle(
-                                        font: styles.bold,
-                                        fontSize: 7,
-                                        color: PdfColors.grey700)),
-                              ]))
-                    ]);
-              })(),
+      pdf.addPage(pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        build: (ctx) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildHeader(vistoria, styles, logo, state: state),
+              buildTitleBanner(),
+              buildObservacoesWidget(),
+              buildAnaliseFinalWidget(),
               pw.Spacer(),
               _buildFooter(vistoria, styles, ctx, assinatura,
                   showSignatures: false),

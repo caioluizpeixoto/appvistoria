@@ -24,11 +24,17 @@ class _StepConclusaoState extends State<StepConclusao> {
   List<String> get _resultados {
     final state = context.read<VistoriaWizardState>();
     if (state.isChecklist || state.tipoEnum == TipoVistoria.vistoriaEntrada) {
-      return ['Conforme', 'Não Conforme'];
+      return [
+        'Conforme',
+        'Conforme com observação',
+        'Conforme com restrição',
+        'Não Conforme',
+      ];
     }
     return [
       'Conforme',
-      'Conforme com observações',
+      'Conforme com observação',
+      'Conforme com restrição',
       'Reprovado',
       'Necessita análise complementar',
     ];
@@ -112,8 +118,12 @@ class _StepConclusaoState extends State<StepConclusao> {
     switch (resultado) {
       case 'Conforme':
         return AppTheme.conforme;
+      case 'Conforme com observação':
       case 'Conforme com observações':
-        return AppTheme.comObs;
+        return AppTheme.comObs; // Amarelo
+      case 'Conforme com restrição':
+      case 'Conforme com restrições':
+        return AppTheme.comRestricao; // Laranja
       case 'Não Conforme':
       case 'Reprovado':
         return AppTheme.naoConforme;
@@ -128,8 +138,12 @@ class _StepConclusaoState extends State<StepConclusao> {
     switch (resultado) {
       case 'Conforme':
         return Icons.check_circle_rounded;
+      case 'Conforme com observação':
       case 'Conforme com observações':
         return Icons.warning_amber_rounded;
+      case 'Conforme com restrição':
+      case 'Conforme com restrições':
+        return Icons.report_problem_rounded;
       case 'Não Conforme':
       case 'Reprovado':
         return Icons.cancel_rounded;
@@ -754,9 +768,87 @@ class _StepConclusaoState extends State<StepConclusao> {
             ),
           ),
 
+          // ── Fotos Estruturais Pendentes (Sutil, apenas no final) ──────────
+          _buildFotosEstruturaisSection(context, state),
+
           const SizedBox(height: 40),
         ],
       ),
     );
   }
+
+  static const Map<String, String> _fotosEstruturaisEssenciais = {
+    'painel_frontal': 'Painel Frontal',
+    'painel_traseiro': 'Painel Traseiro',
+    'longarina_dianteira_esquerda': 'Longarina Diant. Esq.',
+    'longarina_dianteira_direita': 'Longarina Diant. Dir.',
+    'longarina_traseira_esquerda': 'Longarina Tras. Esq.',
+    'longarina_traseira_direita': 'Longarina Tras. Dir.',
+    'coluna_dianteira_esquerda': 'Coluna A (Esq.)',
+    'coluna_dianteira_direita': 'Coluna A (Dir.)',
+    'coluna_central_esquerda': 'Coluna B (Esq.)',
+    'coluna_central_direita': 'Coluna B (Dir.)',
+    'coluna_traseira_esquerda': 'Coluna C (Esq.)',
+    'coluna_traseira_direita': 'Coluna C (Dir.)',
+  };
+
+  Widget _buildFotosEstruturaisSection(
+      BuildContext context, VistoriaWizardState state) {
+    if (!state.temCroqui || state.isCaminhao) {
+      return const SizedBox.shrink();
+    }
+
+    final pendentes = _fotosEstruturaisEssenciais.entries
+        .where((e) => !state.hasFoto(e.key))
+        .map((e) => e.value)
+        .toList();
+
+    if (pendentes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.amber.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                size: 16, color: Colors.amber),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Fotos de estrutura pendentes (${pendentes.length}):',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    pendentes.join(', '),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+

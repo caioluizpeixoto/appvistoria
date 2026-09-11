@@ -381,7 +381,7 @@ class PdfRadarGenerator {
     pages.add(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(16),
         footer: (context) {
           if (context.pageNumber == context.pagesCount &&
               footerWidget != null) {

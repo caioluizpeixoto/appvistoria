@@ -30,24 +30,28 @@ class AutocredDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<ConsultasAutocredData?> buscarConsultaPorPlaca(String placa) async {
+    final placaLimpa = placa.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
+    final comTraco = placaLimpa.length == 7 ? '${placaLimpa.substring(0, 3)}-${placaLimpa.substring(3)}' : placaLimpa;
     final query = select(consultasAutocred)
-      ..where((t) => t.placa.equals(placa))
+      ..where((t) => t.placa.upper().equals(placaLimpa) | t.placa.upper().equals(comTraco) | t.placa.upper().equals(placa.toUpperCase()))
       ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
       ..limit(1);
     return await query.getSingleOrNull();
   }
 
   Future<ConsultasAutocredData?> buscarConsultaPorChassi(String chassi) async {
+    final chassiLimpo = chassi.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
     final query = select(consultasAutocred)
-      ..where((t) => t.chassi.equals(chassi))
+      ..where((t) => t.chassi.upper().equals(chassiLimpo) | t.chassi.upper().equals(chassi.toUpperCase()))
       ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
       ..limit(1);
     return await query.getSingleOrNull();
   }
 
   Future<ConsultasAutocredData?> buscarConsultaPorMotor(String motor) async {
+    final motorLimpo = motor.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').toUpperCase();
     final query = select(consultasAutocred)
-      ..where((t) => t.motor.equals(motor))
+      ..where((t) => t.motor.upper().equals(motorLimpo) | t.motor.upper().equals(motor.toUpperCase()))
       ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
       ..limit(1);
     return await query.getSingleOrNull();

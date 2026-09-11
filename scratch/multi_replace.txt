@@ -1,0 +1,23 @@
+{
+  "Description": "Generate HTML and upload both HTML and PDF correctly",
+  "Instruction": "Import html_generator_service.dart, call it, upload html, and update pdf upload path.",
+  "ReplacementChunks": [
+    {
+      "AllowMultiple": false,
+      "EndLine": 14,
+      "ReplacementContent": "import 'dart:io';\nimport 'dart:typed_data';\nimport 'package:flutter/services.dart';\nimport 'package:pdf/pdf.dart';\nimport 'package:pdf/widgets.dart' as pw;\nimport 'package:supabase_flutter/supabase_flutter.dart';\nimport '../../database/app_database.dart';\nimport '../../features/vistoria/presentation/blocs/wizard/wizard_bloc.dart';\nimport '../services/fipe_service.dart';\nimport '../services/html_generator_service.dart';",
+      "StartLine": 5,
+      "TargetContent": "import 'dart:io';\nimport 'dart:typed_data';\nimport 'package:flutter/services.dart';\nimport 'package:pdf/pdf.dart';\nimport 'package:pdf/widgets.dart' as pw;\nimport 'package:supabase_flutter/supabase_flutter.dart';\nimport '../../database/app_database.dart';\nimport '../../features/vistoria/presentation/blocs/wizard/wizard_bloc.dart';\nimport '../services/fipe_service.dart';"
+    },
+    {
+      "AllowMultiple": false,
+      "EndLine": 1580,
+      "ReplacementContent": "    try {\n      final userId = vistoria.userId ?? Supabase.instance.client.auth.currentUser?.id ?? 'offline';\n      final pdfStoragePath = '$userId/${vistoria.id}/$nomeBase.pdf';\n      final htmlStoragePath = '$userId/${vistoria.id}/laudo.html';\n\n      // 1. Upload do PDF (em background)\n      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(\n            pdfStoragePath,\n            finalBytes,\n            fileOptions:\n                const FileOptions(upsert: true, contentType: 'application/pdf'),\n          );\n\n      // 2. Gera\u00e7\u00e3o e Upload do HTML Interativo\n      try {\n        final htmlContent = HtmlGeneratorService.generateHtml(\n          vistoria: vistoria,\n          veiculo: veiculo,\n          allSections: allSections,\n          state: wizardState,\n        );\n        final htmlBytes = utf8.encode(htmlContent);\n        Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(\n              htmlStoragePath,\n              Uint8List.fromList(htmlBytes),\n              fileOptions: const FileOptions(\n                upsert: true,\n                contentType: 'text/html; charset=utf-8',\n              ),\n            );\n      } catch (htmlErr) {\n        print('Erro ao gerar/enviar HTML interativo: $htmlErr');\n      }\n\n    } catch (e) {\n      print('Erro ao fazer upload para o Supabase: $e');\n    }",
+      "StartLine": 1568,
+      "TargetContent": "    try {\n      final storagePath = '${vistoria.id}/$nomeBase.pdf';\n      // Removido o 'await' para que o upload ocorra em segundo plano e n\u00e3o trave a gera\u00e7\u00e3o local\n      Supabase.instance.client.storage.from('laudos-pdf').uploadBinary(\n            storagePath,\n            finalBytes,\n            fileOptions:\n                const FileOptions(upsert: true, contentType: 'application/pdf'),\n          );\n    } catch (e) {\n      print('Erro ao fazer upload do PDF para o Supabase: $e');\n    }"
+    }
+  ],
+  "TargetFile": "c:\\Users\\Caio\\Desktop\\app_vistoria\\lib\\core\\services\\pdf_generator_service.dart",
+  "toolAction": "Updating pdf_generator_service",
+  "toolSummary": "Generate and upload HTML"
+}

@@ -11,6 +11,9 @@ import '../../../../database/daos/autocred_dao.dart';
 import '../../../../core/services/pdf_radar_generator.dart';
 import 'dart:convert';
 
+import '../../../../core/services/image_service.dart';
+import '../../../../core/services/sync_service.dart';
+
 class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
 
@@ -26,12 +29,26 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
   void initState() {
     super.initState();
     _futureHistorico = _carregarHistorico();
+    _iniciarSincronizacaoBackground();
+  }
+
+  void _iniciarSincronizacaoBackground() {
+    sl<SyncService>().autoSync().then((_) {
+      if (mounted) {
+        setState(() {
+          _futureHistorico = _carregarHistorico();
+        });
+      }
+    }).catchError((e) {
+      print('Erro no autoSync background: $e');
+    });
   }
 
   void _recarregar() {
     setState(() {
       _futureHistorico = _carregarHistorico();
     });
+    _iniciarSincronizacaoBackground();
   }
 
   Future<List<Map<String, dynamic>>> _carregarHistorico() async {
@@ -39,6 +56,7 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
     final autocredDao = sl<AutocredDao>();
     final vistorias = await dao.listarVistorias();
     final lista = <Map<String, dynamic>>[];
+
     for (var v in vistorias) {
       final veiculo = await dao.buscarVeiculoPorVistoria(v.id);
       var consulta = await autocredDao.buscarConsultaPorVistoria(v.id);
@@ -46,35 +64,8 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
         final placaLimpa =
             veiculo.placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
         consulta = await autocredDao.buscarConsultaPorPlaca(placaLimpa);
-        // Tenta também com a placa original caso tenha sido salva com traço
         if (consulta == null) {
           consulta = await autocredDao.buscarConsultaPorPlaca(veiculo.placa);
-        }
-      }
-
-      String? webhookPdfUrl;
-      if (veiculo != null &&
-          veiculo.placa.isNotEmpty &&
-          (consulta == null ||
-              consulta.arquivoPesquisaUrl == null ||
-              consulta.arquivoPesquisaUrl!.isEmpty)) {
-        try {
-          final placaLimpa = veiculo.placa
-              .replaceAll(RegExp(r'[^A-Za-z0-9]'), '')
-              .toUpperCase();
-          final supabase = sl<SupabaseClient>();
-          final res = await supabase
-              .from('autocred_consultas')
-              .select('arquivo_pesquisa_url')
-              .eq('placa', placaLimpa)
-              .not('arquivo_pesquisa_url', 'is', null)
-              .order('created_at', ascending: false)
-              .limit(1);
-          if (res != null && (res as List).isNotEmpty) {
-            webhookPdfUrl = res.first['arquivo_pesquisa_url'] as String?;
-          }
-        } catch (e) {
-          // ignora
         }
       }
 
@@ -82,7 +73,7 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
         'vistoria': v,
         'veiculo': veiculo,
         'consulta': consulta,
-        'webhookPdfUrl': webhookPdfUrl,
+        'webhookPdfUrl': null,
       });
     }
     return lista;
@@ -93,39 +84,67 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title: const Text('Histórico de Vistorias'),
+        title: const Text('Histórico de Laudos'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Sincronizar',
+            onPressed: _recarregar,
+          ),
+        ],
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: _futureHistorico,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return const Center(child: Text('Erro ao carregar vistorias'));
-          }
-
-          final itens = snapshot.data ?? [];
-          if (itens.isEmpty) {
-            return const Center(child: Text('Nenhuma vistoria encontrada.'));
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: itens.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final item = itens[index];
-              return _VistoriaCard(
-                vistoria: item['vistoria'],
-                veiculo: item['veiculo'],
-                consulta: item['consulta'],
-                webhookPdfUrl: item['webhookPdfUrl'] as String?,
-                onDelete: _recarregar,
+      body: RefreshIndicator(
+        onRefresh: () async => _recarregar(),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _futureHistorico,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Erro ao carregar laudos'),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: _recarregar,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Tentar novamente'),
+                    ),
+                  ],
+                ),
               );
-            },
-          );
-        },
+            }
+
+            final itens = snapshot.data ?? [];
+            if (itens.isEmpty) {
+              return ListView(
+                children: const [
+                  SizedBox(height: 120),
+                  Center(child: Text('Nenhum laudo encontrado.')),
+                ],
+              );
+            }
+
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: itens.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final item = itens[index];
+                return _VistoriaCard(
+                  vistoria: item['vistoria'],
+                  veiculo: item['veiculo'],
+                  consulta: item['consulta'],
+                  webhookPdfUrl: item['webhookPdfUrl'] as String?,
+                  onDelete: _recarregar,
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -320,7 +339,24 @@ class _VistoriaCard extends StatelessWidget {
                               onPressed: () async {
                                 Navigator.pop(ctx);
                                 final dao = sl<VistoriaDao>();
+                                final syncService = sl<SyncService>();
+                                final imgService = sl<ImageService>();
+                                
+                                // Limpar imagens do Supabase antes de excluir a vistoria
+                                final fotos = await dao.listarFotosPorVistoria(vistoria.id);
+                                final pathsToDel = <String>[];
+                                for (final f in fotos) {
+                                  if (f.urlSupabase != null) {
+                                    final p = imgService.extractStoragePath(f.urlSupabase);
+                                    if (p != null) pathsToDel.add(p);
+                                  }
+                                }
+                                if (pathsToDel.isNotEmpty) {
+                                  await imgService.deleteImages(pathsToDel);
+                                }
+
                                 await dao.excluirVistoriaCompleta(vistoria.id);
+                                await syncService.excluirVistoriaNuvem(vistoria.id);
                                 onDelete();
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
@@ -353,8 +389,9 @@ class _VistoriaCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10)),
                 ),
                 onPressed: () {
+                  final placaQuery = Uri.encodeComponent(placa.trim());
                   context.push(
-                      '/pdf-preview/${vistoria.id}?path=${vistoria.pdfUrl}');
+                      '/pdf-preview/${vistoria.id}?path=${vistoria.pdfUrl}&placa=$placaQuery');
                 },
                 icon: const Icon(Icons.picture_as_pdf_rounded,
                     color: AppTheme.primary, size: 20),
@@ -377,8 +414,11 @@ class _VistoriaCard extends StatelessWidget {
                   ),
                   onPressed: () async {
                     Map<String, dynamic> dadosPesquisa = {};
-                    if (consulta?.dadosTratados != null && consulta!.dadosTratados.isNotEmpty) {
-                      dadosPesquisa = consulta!.dadosTratados;
+                    if (consulta?.dadosTratadosJson != null && consulta!.dadosTratadosJson.isNotEmpty) {
+                      try {
+                        final dec = jsonDecode(consulta!.dadosTratadosJson!);
+                        if (dec is Map<String, dynamic>) dadosPesquisa = dec;
+                      } catch (_) {}
                     } else if (consulta?.retornoBruto != null && consulta!.retornoBruto.isNotEmpty) {
                       try {
                         final dec = jsonDecode(consulta!.retornoBruto);

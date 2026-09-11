@@ -55,4 +55,24 @@ class ImageService {
       return null;
     }
   }
+  /// Remove imagens do Supabase Storage dado seus caminhos
+  Future<void> deleteImages(List<String> storagePaths) async {
+    if (storagePaths.isEmpty) return;
+    try {
+      await supabase.storage.from('vistorias').remove(storagePaths);
+    } catch (e) {
+      print('Erro ao deletar imagens: $e');
+    }
+  }
+
+  /// Extrai o caminho relativo (storagePath) de uma URL pública do Supabase
+  String? extractStoragePath(String? publicUrl) {
+    if (publicUrl == null || publicUrl.isEmpty) return null;
+    final marker = '/vistorias/';
+    final idx = publicUrl.indexOf(marker);
+    if (idx != -1) {
+      return publicUrl.substring(idx + marker.length);
+    }
+    return null;
+  }
 }

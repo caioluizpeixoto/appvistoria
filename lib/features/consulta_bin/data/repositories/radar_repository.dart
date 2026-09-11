@@ -174,25 +174,75 @@ class RadarRepository {
 
   Future<List<Map<String, dynamic>>> buscarConsultasRecentesNuvem(
       String coluna, String valor) async {
+    final lista = <Map<String, dynamic>>[];
+    final valorLimpo = valor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final valorOriginal = valor.trim().toUpperCase();
+
+    // 1. Busca no banco local (Drift/SQLite)
     try {
-      // Retirado filtro de user_id para permitir compartilhamento entre celulares
-      final response = await supabase
+      ConsultasAutocredData? local;
+      if (coluna == 'placa') {
+        local = await localDao.buscarConsultaPorPlaca(valorLimpo);
+      } else if (coluna == 'chassi') {
+        local = await localDao.buscarConsultaPorChassi(valorLimpo);
+      } else if (coluna == 'motor') {
+        local = await localDao.buscarConsultaPorMotor(valorLimpo);
+      }
+
+      if (local != null && local.dadosTratadosJson != null && local.dadosTratadosJson!.isNotEmpty) {
+        try {
+          final dados = jsonDecode(local.dadosTratadosJson!);
+          lista.add({
+            'id': local.id,
+            'vistoria_id': local.vistoriaId,
+            'placa': local.placa,
+            'chassi': local.chassi,
+            'motor': local.motor,
+            'status': local.status,
+            'dados_tratados': dados,
+            'arquivo_pesquisa_url': local.arquivoPesquisaUrl,
+            'created_at': local.createdAt.toIso8601String(),
+            'fonte': 'local',
+          });
+        } catch (_) {}
+      }
+    } catch (e) {
+      print('Erro ao buscar consulta local: $e');
+    }
+
+    // 2. Busca na Nuvem (Supabase)
+    try {
+      var query = supabase
           .from('autocred_consultas')
           .select()
-          .eq(coluna, valor)
-          .eq('status', 'concluida')
-          .not('dados_tratados', 'is', null)
-          .order('created_at', ascending: false)
-          .limit(5);
+          .not('dados_tratados', 'is', null);
+
+      if (coluna == 'placa') {
+        final comTraco = valorLimpo.length == 7
+            ? '${valorLimpo.substring(0, 3)}-${valorLimpo.substring(3)}'
+            : valorLimpo;
+        query = query.or('placa.ilike.$valorLimpo,placa.ilike.$comTraco,placa.ilike.$valorOriginal');
+      } else {
+        query = query.ilike(coluna, '%$valorLimpo%');
+      }
+
+      final response = await query.order('created_at', ascending: false).limit(10);
 
       if (response != null && response is List) {
-        return List<Map<String, dynamic>>.from(response);
+        for (var item in response) {
+          final jaExiste = lista.any((l) =>
+              (l['id_pesquisa_radar'] != null && l['id_pesquisa_radar'] == item['id_pesquisa_autocred']) ||
+              l['id'] == item['id']);
+          if (!jaExiste) {
+            lista.add(Map<String, dynamic>.from(item));
+          }
+        }
       }
-      return [];
     } catch (e) {
       print('Erro ao buscar nuvem: $e');
-      return [];
     }
+
+    return lista;
   }
 
   Future<bool> existeConsultaPendente(String coluna, String valor) async {

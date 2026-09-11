@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:app_vistoria/core/utils/speech_recognizer.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/vistoria_wizard_state.dart';
@@ -236,7 +237,18 @@ class StepChecklistInspecao extends StatelessWidget {
       maxHeight: 1600,
     );
     if (xfile != null) {
-      state.addFotoLocal(itemId, xfile.path);
+      String finalPath = xfile.path;
+      try {
+        final file = File(xfile.path);
+        final appDir = await getApplicationDocumentsDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = 'vistoria_${itemId}_$timestamp.jpg';
+        final savedFile = await file.copy('${appDir.path}/$fileName');
+        finalPath = savedFile.path;
+      } catch (e) {
+        print('Erro ao salvar no diretório do app: $e');
+      }
+      state.addFotoLocal(itemId, finalPath);
     }
   }
 
@@ -760,7 +772,18 @@ class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
       maxHeight: 1600,
     );
     if (xfile != null) {
-      widget.state.addFotoLocal(itemId, xfile.path);
+      String finalPath = xfile.path;
+      try {
+        final file = File(xfile.path);
+        final appDir = await getApplicationDocumentsDirectory();
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final fileName = 'vistoria_${itemId}_$timestamp.jpg';
+        final savedFile = await file.copy('${appDir.path}/$fileName');
+        finalPath = savedFile.path;
+      } catch (e) {
+        print('Erro ao salvar no diretório do app: $e');
+      }
+      widget.state.addFotoLocal(itemId, finalPath);
     }
   }
 
@@ -939,7 +962,13 @@ class _ChecklistItemWidgetState extends State<_ChecklistItemWidget> {
                       fullTitle: opt.fullTitle,
                       isSelected: isSelected,
                       selectedColor: opt.selectedColor,
-                      onTap: () => widget.state.setStatus(widget.item.id, opt.value),
+                      onTap: () {
+                        if (isSelected) {
+                          widget.state.setStatus(widget.item.id, '');
+                        } else {
+                          widget.state.setStatus(widget.item.id, opt.value);
+                        }
+                      },
                     ),
                   ),
                 );

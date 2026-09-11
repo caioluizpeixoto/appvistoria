@@ -182,7 +182,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     });
   }
 
-  Future<Map<String, dynamic>?> _verificarNuvem(String valor) async {
+  Future<Map<String, dynamic>?> _verificarNuvem(String rawValor) async {
+    final valor = rawValor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     final repo = sl<RadarRepository>();
     final service = sl<RadarService>();
 
@@ -299,6 +300,12 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.grey),
+                onPressed: () => Navigator.of(ctx).pop(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
             ],
           ),
           content: const Text(
@@ -361,6 +368,12 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                 style:
                     const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.grey),
+              onPressed: () => Navigator.of(ctx).pop(),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
             ),
           ],
         ),
@@ -461,7 +474,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   Future<bool> _buscarVeiculo() async {
     if (_buscandoVeiculo) return false;
 
-    final valor = _buscaCtrl.text.trim();
+    final rawValor = _buscaCtrl.text.trim();
+    if (rawValor.isEmpty) return false;
+
+    final valor = rawValor.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     if (valor.isEmpty) return false;
 
     final escolhida = await _verificarNuvem(valor);
@@ -733,8 +749,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   // ── Iniciar vistoria em background ────────────────────────────────────────
 
   Future<void> _iniciarVistoriaEmBackground() async {
-    final valor = _buscaCtrl.text.trim();
-    if (valor.isEmpty) {
+    final rawValor = _buscaCtrl.text.trim();
+    if (rawValor.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Preencha a Placa, Chassi ou Motor para iniciar.'),
@@ -743,6 +759,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       );
       return;
     }
+    final valor = rawValor.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
 
     try {
       final dao = sl<VistoriaDao>();
