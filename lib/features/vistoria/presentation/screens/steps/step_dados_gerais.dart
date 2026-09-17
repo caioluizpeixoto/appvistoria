@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:uuid/uuid.dart';
@@ -11,6 +13,7 @@ import '../../../../../injection_container.dart';
 import '../../../domain/vistoria_wizard_state.dart';
 import '../../../domain/vistoria_type.dart';
 import '../clientes_screen.dart';
+import '../../../../../core/utils/moeda_input_formatter.dart';
 
 /// Step 1 — Dados Gerais da Vistoria
 class StepDadosGerais extends StatefulWidget {
@@ -28,6 +31,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
   final _clienteTelefoneCtrl = TextEditingController();
   final _vistoriadorNomeCtrl = TextEditingController();
   final _vistoriadorCpfCtrl = TextEditingController();
+  final _valorCtrl = TextEditingController();
 
   List<Vistoriadore> _vistoriadoresCadastrados = [];
   String? _vistoriadorSelecionadoId;
@@ -47,10 +51,31 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
       _vistoriadorNomeCtrl.text = state.vistoriadorNome;
       _vistoriadorCpfCtrl.text = state.vistoriadorCpf;
 
+      // Carregar valor real do laudo com formatação pt_BR
+      if (state.valorLaudo != null && state.valorLaudo! > 0) {
+        _valorCtrl.text = MoedaPtBrInputFormatter.format(state.valorLaudo);
+      } else {
+        final precoSalvo = await _dao.obterValorVistoria(state.vistoriaId);
+        if (precoSalvo != null && precoSalvo > 0) {
+          state.valorLaudo = precoSalvo;
+          _valorCtrl.text = MoedaPtBrInputFormatter.format(precoSalvo);
+        }
+      }
+
       // Carregar lista de vistoriadores e clientes cadastrados
       try {
-        final listaVist = await _dao.listarVistoriadores();
-        final listaCli = await _dao.listarClientes();
+        var listaVist = await _dao.listarVistoriadores();
+        var listaCli = await _dao.listarClientes();
+
+        // Se localmente estiver vazio (ex: novo login), sincroniza imediatamente da nuvem
+        if (listaVist.isEmpty || listaCli.isEmpty) {
+          final syncService = sl<SyncService>();
+          await syncService.syncClientes();
+          await syncService.syncVistoriadores();
+          listaVist = await _dao.listarVistoriadores();
+          listaCli = await _dao.listarClientes();
+        }
+
         if (mounted) {
           setState(() {
             _vistoriadoresCadastrados = listaVist;
@@ -158,6 +183,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
     _clienteTelefoneCtrl.dispose();
     _vistoriadorNomeCtrl.dispose();
     _vistoriadorCpfCtrl.dispose();
+    _valorCtrl.dispose();
     super.dispose();
   }
 
@@ -190,7 +216,8 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
                       : 'Número do Registro',
                   value: state.numeroLaudo.isNotEmpty
                       ? state.numeroLaudo
-                      : 'Carregando...'),
+                      : 'Carregando...',
+              ),
               const Divider(height: 1),
               _InfoRow(
                 icon: Icons.access_time_rounded,
@@ -212,7 +239,125 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // ── Valor do Laudo / Serviço ─────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: state.valorLaudo != null && state.valorLaudo! > 0
+                    ? AppTheme.conforme.withValues(alpha: 0.5)
+                    : AppTheme.border,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.conforme.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.payments_outlined,
+                        size: 18,
+                        color: AppTheme.conforme,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Valor do Laudo / Serviço',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (state.valorLaudo != null && state.valorLaudo! > 0)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.conforme.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'Definido',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.conforme,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Informe o valor real cobrado por esta vistoria (utilizado nos relatórios e fechamentos):',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _valorCtrl,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    MoedaPtBrInputFormatter(),
+                  ],
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    prefixText: 'R\$ ',
+                    prefixStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.conforme,
+                    ),
+                    hintText: '0,00',
+                    filled: true,
+                    fillColor: AppTheme.background,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppTheme.conforme, width: 1.5),
+                    ),
+                  ),
+                  onChanged: (v) {
+                    final parsed = MoedaPtBrInputFormatter.parse(v);
+                    state.valorLaudo = parsed;
+                    _dao.salvarValorVistoria(state.vistoriaId, parsed ?? 0.0);
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // ── Cliente ──────────────────────────────────────────────────────
           if (!state.isChecklist &&
@@ -587,11 +732,13 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
+  final Widget? trailing;
   const _InfoRow(
       {required this.icon,
       required this.label,
       required this.value,
-      this.valueColor});
+      this.valueColor,
+      this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -613,6 +760,10 @@ class _InfoRow extends StatelessWidget {
               color: valueColor ?? AppTheme.textPrimary,
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing!,
+          ],
         ],
       ),
     );

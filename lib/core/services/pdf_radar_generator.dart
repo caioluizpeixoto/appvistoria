@@ -76,7 +76,7 @@ class PdfRadarGenerator {
               } else {
                 valStr = val.toString().trim();
               }
-              
+
               final lowerVal = valStr.toLowerCase();
               if (valStr.isNotEmpty &&
                   lowerVal != 'não informado' &&
@@ -319,8 +319,7 @@ class PdfRadarGenerator {
     final estado = _v(dadosPesquisa, ['uf', 'estado'], fallback: '');
     final procedencia =
         _v(dadosPesquisa, ['procedencia'], fallback: 'NACIONAL');
-    final marcaStr = _v(
-        dadosPesquisa, ['marcamodelo', 'marcaModelo', 'marca'],
+    final marcaStr = _v(dadosPesquisa, ['marcamodelo', 'marcaModelo', 'marca'],
         fallback: '');
 
     final brandSlug = _extractBrandSlug(marcaStr);
@@ -420,13 +419,19 @@ class PdfRadarGenerator {
     return await pdf.save();
   }
 
-  static Future<Uint8List> converterHtmlParaPdfComLogo(String htmlContent) async {
+  static Future<Uint8List> converterHtmlParaPdfComLogo(
+      String htmlContent) async {
     // Carrega a logo do app em base64
     String base64Logo = '';
     try {
       final bytes = await rootBundle.load('assets/images/logo.pdf.png');
       base64Logo = base64Encode(bytes.buffer.asUint8List());
-    } catch (_) {}
+    } catch (_) {
+      try {
+        final bytes = await rootBundle.load('assets/images/logo.png');
+        base64Logo = base64Encode(bytes.buffer.asUint8List());
+      } catch (_) {}
+    }
 
     final logoHtml = base64Logo.isNotEmpty
         ? '''
@@ -456,12 +461,16 @@ class PdfRadarGenerator {
     max-width: 100% !important;
     box-sizing: border-box !important;
   }
+  .marca-dagua-em-andamento, .marca-dagua {
+    display: none !important;
+  }
 </style>
 ''';
 
     String adjustedHtml = htmlContent;
     if (adjustedHtml.contains('</head>')) {
-      adjustedHtml = adjustedHtml.replaceFirst('</head>', '$cssPrintFix</head>');
+      adjustedHtml =
+          adjustedHtml.replaceFirst('</head>', '$cssPrintFix</head>');
     } else if (adjustedHtml.contains('<body')) {
       adjustedHtml = adjustedHtml.replaceFirst('<body', '$cssPrintFix<body');
     } else {
@@ -553,9 +562,43 @@ class PdfRadarGenerator {
     try {
       Uint8List? bytes;
 
-      final url = (urlPesquisa != null && urlPesquisa.trim().isNotEmpty)
+      String url = (urlPesquisa != null && urlPesquisa.trim().isNotEmpty)
           ? urlPesquisa.trim()
-          : _v(dadosPesquisa, ['arquivoPesquisaUrl', 'arquivo_pesquisa_url', 'view_full', 'url'], fallback: '');
+          : _v(
+              dadosPesquisa,
+              [
+                'arquivoPesquisaUrl',
+                'arquivo_pesquisa_url',
+                'view_full',
+                'url'
+              ],
+              fallback: '');
+
+      // Se a URL contém um subtoken de módulo (/ctoken/rtoken), mas NÃO é uma pesquisa de motor,
+      // devemos carregar a URL do relatório consolidado geral (/ctoken) para trazer todos os módulos (Auto Perícia, Leilão, etc.)!
+      final String paramStr =
+          _v(dadosPesquisa, ['parametro', 'param', 'tipoBusca'], fallback: '')
+              .toLowerCase();
+      final String tituloStr =
+          _v(dadosPesquisa, ['titulo', 'produto'], fallback: '').toLowerCase();
+      final bool isMotor = paramStr == 'motor' ||
+          tituloStr.contains('motor') ||
+          ((dadosPesquisa['motor'] != null &&
+                  dadosPesquisa['motor'].toString().isNotEmpty) &&
+              (dadosPesquisa['placa'] == null ||
+                  dadosPesquisa['placa'].toString().isEmpty));
+
+      if (url.contains('/resultado/')) {
+        final uri = Uri.tryParse(url);
+        if (uri != null) {
+          final segments = uri.pathSegments;
+          final resultadoIdx = segments.indexOf('resultado');
+          if (resultadoIdx != -1 && segments.length > resultadoIdx + 2) {
+            final cleanPath = segments.sublist(0, resultadoIdx + 2).join('/');
+            url = uri.replace(path: cleanPath).toString();
+          }
+        }
+      }
 
       if (url.isNotEmpty && url.startsWith('http')) {
         try {
@@ -621,13 +664,8 @@ class PdfRadarGenerator {
     }
   }
 
-  static pw.Widget _buildTopHeader(
-      String placa,
-      String chassi,
-      String renavam,
-      String anomodelo,
-      String estado,
-      String procedencia,
+  static pw.Widget _buildTopHeader(String placa, String chassi, String renavam,
+      String anomodelo, String estado, String procedencia,
       {pw.ImageProvider? brandLogoImage}) {
     return pw.Row(children: [
       pw.Expanded(
@@ -711,8 +749,7 @@ class PdfRadarGenerator {
                     child: pw.Row(children: [
                   _buildTopGridCell('CHASSI', chassi),
                   pw.SizedBox(width: 8),
-                  _buildTopGridCell(
-                      estado.isNotEmpty ? 'ESTADO' : 'ANO MOD.',
+                  _buildTopGridCell(estado.isNotEmpty ? 'ESTADO' : 'ANO MOD.',
                       estado.isNotEmpty ? estado : anomodelo),
                 ]))
               ])))
@@ -972,454 +1009,455 @@ class PdfRadarGenerator {
 
   static List<pw.Widget> _buildSectionBin(Map<String, dynamic> data) {
     return _buildDataGrid([
-          [
-            'Placa',
-            _v(data, ['placa']),
-            'Procedência',
-            _v(data, ['procedencia'])
-          ],
-          [
-            'Chassi',
-            _v(data, ['chassi']),
-            'Numero do Motor',
-            _v(data, ['numerodomotor', 'motor'])
-          ],
-          [
-            'Renavam',
-            _v(data, ['renavam']),
-            'Montagem',
-            _v(data, ['montagem'])
-          ],
-          [
-            'Cor',
-            _v(data, ['cor']),
-            'Ano Modelo',
-            _v(data, ['anomodelo', 'anoModelo'])
-          ],
-          [
-            'Ano Fabricação',
-            _v(data, ['anofabricacao', 'anoFabricacao']),
-            'Marca/Modelo',
-            _v(data, ['marcamodelo', 'marcaModelo'])
-          ],
-          [
-            'Municipio',
-            _v(data, ['municipio', 'cidade']),
-            'UF',
-            _v(data, ['uf', 'estado'])
-          ],
-          [
-            'Capacidade de passageiros',
-            _v(data, [
-              'capacidade_passageiros',
-              'capacidadepassageiros',
-              'lotacao',
-              'quantidade_passageiros',
-              'quantidadepassageiros',
-              'passageiros'
-            ]),
-            'Combustível',
-            _v(data, ['combustivel', 'tipocombustivel'])
-          ],
-          [
-            'Potência',
-            _v(data, ['potencia']),
-            'Especie',
-            _v(data, ['especie'])
-          ],
-          [
-            'Carroceria',
-            _v(data, ['carroceria']),
-            'Nº Câmbio',
-            _v(data, ['cambio', 'ncambio'], fallback: '-')
-          ],
-          [
-            'Capacidade de Carga',
-            _v(data, ['capacidade_carga', 'capacidadecarga']),
-            'Cilindradas',
-            _v(data, ['cilindradas'])
-          ],
-          [
-            'Remarcação do Chassi',
-            _v(data, ['remarcacao_chassi', 'remarcacaochassi']),
-            'Tipo',
-            _v(data, ['tipo', 'tipoveiculo'])
-          ],
-          [
-            'Situação',
-            _v(data, ['situacao']),
-            'Data última Atualização',
-            _v(data, ['data_atualizacao', 'dataatualizacao'])
-          ],
-          [
-            'Emplacamento Eletrônico',
-            _v(data, ['emplacamento_eletronico', 'emplacamentoeletronico']),
-            'Histórico Roubo e Furto *',
-            _findList(data, ['rf']).isNotEmpty 
-                ? 'POSSUI OCORRÊNCIA'
-                : _v(data, [
-                    'historico_roubo_furto',
-                    'roubo_furto',
-                    'roubofurto',
-                    'queixaderoubo'
-                  ], fallback: 'Nada Consta')
-          ],
-        ]);
+      [
+        'Placa',
+        _v(data, ['placa']),
+        'Procedência',
+        _v(data, ['procedencia'])
+      ],
+      [
+        'Chassi',
+        _v(data, ['chassi']),
+        'Numero do Motor',
+        _v(data, ['numerodomotor', 'motor'])
+      ],
+      [
+        'Renavam',
+        _v(data, ['renavam']),
+        'Montagem',
+        _v(data, ['montagem'])
+      ],
+      [
+        'Cor',
+        _v(data, ['cor']),
+        'Ano Modelo',
+        _v(data, ['anomodelo', 'anoModelo'])
+      ],
+      [
+        'Ano Fabricação',
+        _v(data, ['anofabricacao', 'anoFabricacao']),
+        'Marca/Modelo',
+        _v(data, ['marcamodelo', 'marcaModelo'])
+      ],
+      [
+        'Municipio',
+        _v(data, ['municipio', 'cidade']),
+        'UF',
+        _v(data, ['uf', 'estado'])
+      ],
+      [
+        'Capacidade de passageiros',
+        _v(data, [
+          'capacidade_passageiros',
+          'capacidadepassageiros',
+          'lotacao',
+          'quantidade_passageiros',
+          'quantidadepassageiros',
+          'passageiros'
+        ]),
+        'Combustível',
+        _v(data, ['combustivel', 'tipocombustivel'])
+      ],
+      [
+        'Potência',
+        _v(data, ['potencia']),
+        'Especie',
+        _v(data, ['especie'])
+      ],
+      [
+        'Carroceria',
+        _v(data, ['carroceria']),
+        'Nº Câmbio',
+        _v(data, ['cambio', 'ncambio'], fallback: '-')
+      ],
+      [
+        'Capacidade de Carga',
+        _v(data, ['capacidade_carga', 'capacidadecarga']),
+        'Cilindradas',
+        _v(data, ['cilindradas'])
+      ],
+      [
+        'Remarcação do Chassi',
+        _v(data, ['remarcacao_chassi', 'remarcacaochassi']),
+        'Tipo',
+        _v(data, ['tipo', 'tipoveiculo'])
+      ],
+      [
+        'Situação',
+        _v(data, ['situacao']),
+        'Data última Atualização',
+        _v(data, ['data_atualizacao', 'dataatualizacao'])
+      ],
+      [
+        'Emplacamento Eletrônico',
+        _v(data, ['emplacamento_eletronico', 'emplacamentoeletronico']),
+        'Histórico Roubo e Furto *',
+        _findList(data, ['rf']).isNotEmpty
+            ? 'POSSUI OCORRÊNCIA'
+            : _v(
+                data,
+                [
+                  'historico_roubo_furto',
+                  'roubo_furto',
+                  'roubofurto',
+                  'queixaderoubo'
+                ],
+                fallback: 'Nada Consta')
+      ],
+    ]);
   }
 
-  static List<pw.Widget> _buildInformacoesRelevantesBin(Map<String, dynamic> data) {
+  static List<pw.Widget> _buildInformacoesRelevantesBin(
+      Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Informações Relevantes',
-            svgIcon: _svgEye,
-            bgColor: _kYellowHeader,
-            textColor: _kYellowHeaderDarkText),
-        ..._buildDataGrid([
-          [
-            'Queixa de Roubo e/ou Furto',
-            _v(data, ['queixaderoubo', 'roubofurto', 'queixa_roubo'],
-                fallback: 'VEICULO NÃO POSSUI RESTRIÇÃO DE ROUBO/FURTO')
-          ],
-          [
-            'Situação',
-            _v(data, ['situacao']),
-            'Recall',
-            _v(data, ['recall'])
-          ],
-          [
-            'Ind. Restrições',
-            _v(data, ['ind_restricoes', 'indrestricoes']),
-            'Restrição Renajud',
-            _v(data, ['restricaorenajud', 'renajud'], fallback: 'NAO')
-          ],
-          [
-            'Restrição RFB',
-            _v(data, ['restricaorfb', 'rfb']),
-            'Restrição01',
-            _v(data, ['restricao1', 'restricoes1', 'restricao01'],
-                fallback: 'NADA CONSTA')
-          ],
-          [
-            'Restrição02',
-            _v(data, ['restricao2', 'restricoes2', 'restricao02'],
-                fallback: 'NADA CONSTA'),
-            'Restrição03',
-            _v(data, ['restricao3', 'restricoes3', 'restricao03'],
-                fallback: 'NADA CONSTA')
-          ],
-          [
-            'Restrição04',
-            _v(data, ['restricao4', 'restricoes4', 'restricao04'],
-                fallback: 'NADA CONSTA'),
-            'Data Limite Restrição Tributária',
-            _v(data, ['datalimiterestricaotributaria', 'datalimite'])
-          ],
-          [
-            'Placa Mercosul',
-            _v(data, ['placamercosul', 'mercosul'])
-          ],
-        ]),
+      _buildSectionHeader('Informações Relevantes',
+          svgIcon: _svgEye,
+          bgColor: _kYellowHeader,
+          textColor: _kYellowHeaderDarkText),
+      ..._buildDataGrid([
+        [
+          'Queixa de Roubo e/ou Furto',
+          _v(data, ['queixaderoubo', 'roubofurto', 'queixa_roubo'],
+              fallback: 'VEICULO NÃO POSSUI RESTRIÇÃO DE ROUBO/FURTO')
+        ],
+        [
+          'Situação',
+          _v(data, ['situacao']),
+          'Recall',
+          _v(data, ['recall'])
+        ],
+        [
+          'Ind. Restrições',
+          _v(data, ['ind_restricoes', 'indrestricoes']),
+          'Restrição Renajud',
+          _v(data, ['restricaorenajud', 'renajud'], fallback: 'NAO')
+        ],
+        [
+          'Restrição RFB',
+          _v(data, ['restricaorfb', 'rfb']),
+          'Restrição01',
+          _v(data, ['restricao1', 'restricoes1', 'restricao01'],
+              fallback: 'NADA CONSTA')
+        ],
+        [
+          'Restrição02',
+          _v(data, ['restricao2', 'restricoes2', 'restricao02'],
+              fallback: 'NADA CONSTA'),
+          'Restrição03',
+          _v(data, ['restricao3', 'restricoes3', 'restricao03'],
+              fallback: 'NADA CONSTA')
+        ],
+        [
+          'Restrição04',
+          _v(data, ['restricao4', 'restricoes4', 'restricao04'],
+              fallback: 'NADA CONSTA'),
+          'Data Limite Restrição Tributária',
+          _v(data, ['datalimiterestricaotributaria', 'datalimite'])
+        ],
+        [
+          'Placa Mercosul',
+          _v(data, ['placamercosul', 'mercosul'])
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildBaseEstadual(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Base Estadual **', svgIcon: _svgFlag),
-        ..._buildDataGrid([
-          [
-            'Placa',
-            _v(data, ['placa']),
-            'Procedencia',
-            _v(data, ['procedencia'])
-          ],
-          [
-            'Chassi',
-            _v(data, ['chassi']),
-            'Motor',
-            _v(data, ['motor', 'numerodomotor'])
-          ],
-          [
-            'Renavam',
-            _v(data, ['renavam']),
-            'Data de emissão do CRV',
-            _v(data, [
-              'dataemissaocrv',
-              'emissaocrv',
-              'data_emissao_crv',
-              'emissao_crv',
-              'data_emissao_do_crv',
-              'crv_data',
-              'data_crv',
-              'dataemissao',
-              'data_emissao'
-            ])
-          ],
-          [
-            'Indica débitos IPVA licenciamento',
-            _v(data, [
-              'debitosipva',
-              'indica_debitos_ipva',
-              'indicadebitosipva',
-              'ipva_licenciamento',
-              'debito_ipva',
-              'debitos_ipva',
-              'indicadebitos',
-              'debitos',
-              'debito',
-              'debitoipva'
-            ]),
-            'Indica débitos em multas',
-            _v(data, [
-              'debitosmultas',
-              'indica_debitos_multas',
-              'indicadebitosmultas',
-              'debito_multas',
-              'debitos_multas',
-              'debitomultas',
-              'multas',
-              'multa'
-            ])
-          ],
-          [
-            'Cor',
-            _v(data, ['cor']),
-            'ANO FAB/MOD',
-            '${_v(data, ['anofabricacao', 'anoFabricacao'])}/${_v(data, [
-                  'anomodelo',
-                  'anoModelo'
-                ])}'
-          ],
-          [
-            'Município/UF',
-            '${_v(data, ['municipio', 'cidade'])}/${_v(data, [
-                  'uf',
-                  'estado'
-                ])}',
-            'Marca',
-            _v(data, ['marcamodelo', 'marca'])
-          ],
-          [
-            'Combustível',
-            _v(data, ['combustivel', 'tipocombustivel']),
-            'Potência',
-            _v(data, ['potencia'])
-          ],
-          [
-            'Capacidade de carga',
-            _v(data, ['capacidadecarga', 'capacidade_carga']),
-            'Espécie',
-            _v(data, ['especie'])
-          ],
-          [
-            'Carroceria',
-            _v(data, ['carroceria']),
-            'Tipo de carroceria',
-            _v(data, [
-              'tipocarroceria',
-              'tipo_carroceria',
-              'carroceriatipo',
-              'carroceria_tipo',
-              'descricaocarroceria',
-              'descricao_carroceria'
-            ])
-          ],
-          [
-            'Câmbio',
-            _v(data, ['cambio']),
-            'Eixos',
-            _v(data, ['eixos', 'quantidadeeixos', 'qtdeixos', 'numeixos'])
-          ],
-          [
-            'Cilindradas',
-            _v(data, ['cilindradas']),
-            'Situação chassi',
-            _v(data, ['situacaochassi', 'situacao_chassi'])
-          ],
-          [
-            'PBT',
-            _formatTons(_v(data, ['pbt'])),
-            'Categoria',
-            _v(data, ['categoria'])
-          ],
-          [
-            'Tipo do veículo',
-            _v(data, ['tipoveiculo', 'tipo_veiculo']),
-            'CMT',
-            _formatTons(_v(data, ['cmt']))
-          ],
-          [
-            'Situação',
-            _v(data, ['situacao']),
-            'Roubo/furto',
-            _v(data, ['roubofurto', 'roubo_furto'], fallback: 'Não Possui')
-          ],
-        ]),
+      _buildSectionHeader('Base Estadual **', svgIcon: _svgFlag),
+      ..._buildDataGrid([
+        [
+          'Placa',
+          _v(data, ['placa']),
+          'Procedencia',
+          _v(data, ['procedencia'])
+        ],
+        [
+          'Chassi',
+          _v(data, ['chassi']),
+          'Motor',
+          _v(data, ['motor', 'numerodomotor'])
+        ],
+        [
+          'Renavam',
+          _v(data, ['renavam']),
+          'Data de emissão do CRV',
+          _v(data, [
+            'dataemissaocrv',
+            'emissaocrv',
+            'data_emissao_crv',
+            'emissao_crv',
+            'data_emissao_do_crv',
+            'crv_data',
+            'data_crv',
+            'dataemissao',
+            'data_emissao'
+          ])
+        ],
+        [
+          'Indica débitos IPVA licenciamento',
+          _v(data, [
+            'debitosipva',
+            'indica_debitos_ipva',
+            'indicadebitosipva',
+            'ipva_licenciamento',
+            'debito_ipva',
+            'debitos_ipva',
+            'indicadebitos',
+            'debitos',
+            'debito',
+            'debitoipva'
+          ]),
+          'Indica débitos em multas',
+          _v(data, [
+            'debitosmultas',
+            'indica_debitos_multas',
+            'indicadebitosmultas',
+            'debito_multas',
+            'debitos_multas',
+            'debitomultas',
+            'multas',
+            'multa'
+          ])
+        ],
+        [
+          'Cor',
+          _v(data, ['cor']),
+          'ANO FAB/MOD',
+          '${_v(data, ['anofabricacao', 'anoFabricacao'])}/${_v(data, [
+                'anomodelo',
+                'anoModelo'
+              ])}'
+        ],
+        [
+          'Município/UF',
+          '${_v(data, ['municipio', 'cidade'])}/${_v(data, ['uf', 'estado'])}',
+          'Marca',
+          _v(data, ['marcamodelo', 'marca'])
+        ],
+        [
+          'Combustível',
+          _v(data, ['combustivel', 'tipocombustivel']),
+          'Potência',
+          _v(data, ['potencia'])
+        ],
+        [
+          'Capacidade de carga',
+          _v(data, ['capacidadecarga', 'capacidade_carga']),
+          'Espécie',
+          _v(data, ['especie'])
+        ],
+        [
+          'Carroceria',
+          _v(data, ['carroceria']),
+          'Tipo de carroceria',
+          _v(data, [
+            'tipocarroceria',
+            'tipo_carroceria',
+            'carroceriatipo',
+            'carroceria_tipo',
+            'descricaocarroceria',
+            'descricao_carroceria'
+          ])
+        ],
+        [
+          'Câmbio',
+          _v(data, ['cambio']),
+          'Eixos',
+          _v(data, ['eixos', 'quantidadeeixos', 'qtdeixos', 'numeixos'])
+        ],
+        [
+          'Cilindradas',
+          _v(data, ['cilindradas']),
+          'Situação chassi',
+          _v(data, ['situacaochassi', 'situacao_chassi'])
+        ],
+        [
+          'PBT',
+          _formatTons(_v(data, ['pbt'])),
+          'Categoria',
+          _v(data, ['categoria'])
+        ],
+        [
+          'Tipo do veículo',
+          _v(data, ['tipoveiculo', 'tipo_veiculo']),
+          'CMT',
+          _formatTons(_v(data, ['cmt']))
+        ],
+        [
+          'Situação',
+          _v(data, ['situacao']),
+          'Roubo/furto',
+          _v(data, ['roubofurto', 'roubo_furto'], fallback: 'Não Possui')
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildInformacoesRelevantesEstadual(
       Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Informações Relevantes',
-            svgIcon: _svgEye,
-            bgColor: _kYellowHeader,
-            textColor: _kYellowHeaderDarkText),
-        ..._buildDataGrid([
-          [
-            'Comunicação de Venda',
-            _v(data, ['comunicacaovenda', 'comunicadovenda'], fallback: 'Não'),
-            'DPVAT',
-            _v(data, ['dpvat'])
-          ],
-          [
-            'IPVA',
-            _v(data, ['ipva']),
-            'DERSA',
-            _v(data, ['dersa'])
-          ],
-          [
-            'DER',
-            _v(data, ['der']),
-            'DETRAN',
-            _v(data, ['detran'])
-          ],
-          [
-            'CETESB',
-            _v(data, ['cetesb']),
-            'Municipais',
-            _v(data, ['municipais'])
-          ],
-          [
-            'Polícia Rodoviária Federal',
-            _v(data, ['prf', 'policiarodoviariafederal']),
-            'Débito Licenciamento',
-            _v(data, ['debitolicenciamento', 'licenciamento'])
-          ],
-          [
-            'Data Licenciamento',
-            _v(data, ['datalicenciamento']),
-            'Exercício Licenciamento',
-            _v(data, ['exerciciolicenciamento'])
-          ],
-          [
-            'Débito Multas',
-            _v(data, ['debitomultas', 'multas']),
-            'Restrições Administrativas',
-            _v(data, ['restricoesadministrativas', 'restricaoadministrativa'])
-          ],
-          [
-            'Restrições BloqueioGuincho',
-            _v(data, ['restricoesbloqueioguincho', 'bloqueioguincho']),
-            'Restrições Furto',
-            _v(data, ['restricoesfurto'], fallback: 'Não Possui')
-          ],
-          [
-            'Restrições InspAmbiental',
-            _v(data, ['restricoesinspambiental', 'inspambiental']),
-            'Restrições Judicial',
-            _v(data, ['restricoesjudicial', 'restricaojudicial'])
-          ],
-          [
-            'Restrições Renajud',
-            _v(data, ['restricoesrenajud', 'restricaorenajud'],
-                fallback: 'Não Possui'),
-            'Restrições Tributária',
-            _v(data, ['restricoestributaria', 'restricaotributaria'])
-          ],
-          [
-            'Restrições Financeiras',
-            _v(data, ['restricoesfinanceiras', 'restricaofinanceira']),
-            'Restrição 1',
-            _v(data, ['restricao1_br', 'restricaobaseagregadores1'],
-                fallback: 'SEM RESTRICAO'),
-            'Restrição 2',
-            _v(data, ['restricao2_br', 'restricaobaseagregadores2'],
-                fallback: 'SEM RESTRICAO')
-          ],
-          [
-            'Restrição 3',
-            _v(data, ['restricao3_br', 'restricaobaseagregadores3'],
-                fallback: 'SEM RESTRICAO'),
-            'Restrição 4',
-            _v(data, ['restricao4_br', 'restricaobaseagregadores4'],
-                fallback: 'SEM RESTRICAO')
-          ],
-        ]),
+      _buildSectionHeader('Informações Relevantes',
+          svgIcon: _svgEye,
+          bgColor: _kYellowHeader,
+          textColor: _kYellowHeaderDarkText),
+      ..._buildDataGrid([
+        [
+          'Comunicação de Venda',
+          _v(data, ['comunicacaovenda', 'comunicadovenda'], fallback: 'Não'),
+          'DPVAT',
+          _v(data, ['dpvat'])
+        ],
+        [
+          'IPVA',
+          _v(data, ['ipva']),
+          'DERSA',
+          _v(data, ['dersa'])
+        ],
+        [
+          'DER',
+          _v(data, ['der']),
+          'DETRAN',
+          _v(data, ['detran'])
+        ],
+        [
+          'CETESB',
+          _v(data, ['cetesb']),
+          'Municipais',
+          _v(data, ['municipais'])
+        ],
+        [
+          'Polícia Rodoviária Federal',
+          _v(data, ['prf', 'policiarodoviariafederal']),
+          'Débito Licenciamento',
+          _v(data, ['debitolicenciamento', 'licenciamento'])
+        ],
+        [
+          'Data Licenciamento',
+          _v(data, ['datalicenciamento']),
+          'Exercício Licenciamento',
+          _v(data, ['exerciciolicenciamento'])
+        ],
+        [
+          'Débito Multas',
+          _v(data, ['debitomultas', 'multas']),
+          'Restrições Administrativas',
+          _v(data, ['restricoesadministrativas', 'restricaoadministrativa'])
+        ],
+        [
+          'Restrições BloqueioGuincho',
+          _v(data, ['restricoesbloqueioguincho', 'bloqueioguincho']),
+          'Restrições Furto',
+          _v(data, ['restricoesfurto'], fallback: 'Não Possui')
+        ],
+        [
+          'Restrições InspAmbiental',
+          _v(data, ['restricoesinspambiental', 'inspambiental']),
+          'Restrições Judicial',
+          _v(data, ['restricoesjudicial', 'restricaojudicial'])
+        ],
+        [
+          'Restrições Renajud',
+          _v(data, ['restricoesrenajud', 'restricaorenajud'],
+              fallback: 'Não Possui'),
+          'Restrições Tributária',
+          _v(data, ['restricoestributaria', 'restricaotributaria'])
+        ],
+        [
+          'Restrições Financeiras',
+          _v(data, ['restricoesfinanceiras', 'restricaofinanceira']),
+          'Restrição 1',
+          _v(data, ['restricao1_br', 'restricaobaseagregadores1'],
+              fallback: 'SEM RESTRICAO'),
+          'Restrição 2',
+          _v(data, ['restricao2_br', 'restricaobaseagregadores2'],
+              fallback: 'SEM RESTRICAO')
+        ],
+        [
+          'Restrição 3',
+          _v(data, ['restricao3_br', 'restricaobaseagregadores3'],
+              fallback: 'SEM RESTRICAO'),
+          'Restrição 4',
+          _v(data, ['restricao4_br', 'restricaobaseagregadores4'],
+              fallback: 'SEM RESTRICAO')
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildProprietario(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Informações de Proprietário', svgIcon: _svgPerson),
-        ..._buildDataGrid([
-          [
-            'Anterior',
-            _v(data, ['proprietarioanterior', 'nomeproprietarioanterior']),
-            'Atual',
-            _v(data, [
-              'proprietario',
-              'nomeproprietario',
-              'proprietario_atual',
-              'nome_proprietario_atual',
-              'possuidor'
-            ])
-          ],
-        ]),
+      _buildSectionHeader('Informações de Proprietário', svgIcon: _svgPerson),
+      ..._buildDataGrid([
+        [
+          'Anterior',
+          _v(data, ['proprietarioanterior', 'nomeproprietarioanterior']),
+          'Atual',
+          _v(data, [
+            'proprietario',
+            'nomeproprietario',
+            'proprietario_atual',
+            'nome_proprietario_atual',
+            'possuidor'
+          ])
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildChassi(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Decodificador de Chassi', svgIcon: _svgWrench),
-        ..._buildDataGrid([
-          ['CHASSI NÃO POSSUÍ IRREGULARIDADES'],
-          [
-            'Chassi',
-            _v(data, ['chassi']),
-            'ANO MOD',
-            _v(data, ['anomodelo', 'anoModelo'])
-          ],
-          [
-            'Combustível',
-            _v(data, ['combustivel']),
-            'Marca',
-            _v(data, ['marca'])
-          ],
-          [
-            'Modelo',
-            _v(data, ['modelo']),
-            'Veículo',
-            _v(data, ['veiculo'])
-          ],
-          [
-            'Versão',
-            _v(data, ['versao']),
-            'Motor',
-            _v(data, ['chassi_motor', 'motor', 'numerodomotor'])
-          ],
-          [
-            'COD. Categoria',
-            _v(data, ['codigocategoria', 'codcategoria']),
-            'Categoria',
-            _v(data, [
-              'categoria_chassi',
-              'chassi_categoria',
-              'chassicategoria',
-              'categoria'
-            ])
-          ],
-          [
-            'Local fabricação',
-            _v(data, ['chassi_local', 'localfabricacao']),
-            'Origem',
-            _v(data, ['origem'])
-          ],
-          [
-            'País',
-            _v(data, ['chassi_pais', 'pais']),
-            'Região',
-            _v(data, ['chassi_regiao', 'regiao'])
-          ],
-        ]),
+      _buildSectionHeader('Decodificador de Chassi', svgIcon: _svgWrench),
+      ..._buildDataGrid([
+        ['CHASSI NÃO POSSUÍ IRREGULARIDADES'],
+        [
+          'Chassi',
+          _v(data, ['chassi']),
+          'ANO MOD',
+          _v(data, ['anomodelo', 'anoModelo'])
+        ],
+        [
+          'Combustível',
+          _v(data, ['combustivel']),
+          'Marca',
+          _v(data, ['marca'])
+        ],
+        [
+          'Modelo',
+          _v(data, ['modelo']),
+          'Veículo',
+          _v(data, ['veiculo'])
+        ],
+        [
+          'Versão',
+          _v(data, ['versao']),
+          'Motor',
+          _v(data, ['chassi_motor', 'motor', 'numerodomotor'])
+        ],
+        [
+          'COD. Categoria',
+          _v(data, ['codigocategoria', 'codcategoria']),
+          'Categoria',
+          _v(data, [
+            'categoria_chassi',
+            'chassi_categoria',
+            'chassicategoria',
+            'categoria'
+          ])
+        ],
+        [
+          'Local fabricação',
+          _v(data, ['chassi_local', 'localfabricacao']),
+          'Origem',
+          _v(data, ['origem'])
+        ],
+        [
+          'País',
+          _v(data, ['chassi_pais', 'pais']),
+          'Região',
+          _v(data, ['chassi_regiao', 'regiao'])
+        ],
+      ]),
     ];
   }
 
@@ -1553,249 +1591,254 @@ class PdfRadarGenerator {
 
   static List<pw.Widget> _buildHistoricoLaudos(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('Histórico de Laudos', svgIcon: _svgDocument),
-        ..._buildDataGrid([
-          [
-            _v(data, ['historicolaudos', 'laudos'],
-                fallback: 'VEÍCULO NÃO POSSUÍ LAUDO EM NOSSA PLATAFORMA')
-          ],
-        ]),
+      _buildSectionHeader('Histórico de Laudos', svgIcon: _svgDocument),
+      ..._buildDataGrid([
+        [
+          _v(data, ['historicolaudos', 'laudos'],
+              fallback: 'VEÍCULO NÃO POSSUÍ LAUDO EM NOSSA PLATAFORMA')
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildSenatranInfo(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('SENATRAN Detalhado Informações - Online',
-            svgIcon: _svgCar),
-        ..._buildDataGrid([
-          [
-            'Placa',
-            _v(data, ['placa']),
-            'Renavam',
-            _v(data, ['renavam'])
-          ],
-          [
-            'Tipo do proprietario',
-            _v(data, ['tipoproprietario']),
-            'Documento Proprietario',
-            _v(data, ['documentoproprietario', 'documento_proprietario'])
-          ],
-          [
-            'Proprietario',
-            _v(data, ['proprietario', 'nomeproprietario']),
-            'Chassi',
-            _v(data, ['chassi'])
-          ],
-          [
-            'Tipo',
-            _v(data, ['tipo', 'tipoveiculo']),
-            'Espécie',
-            _v(data, ['especie'])
-          ],
-          [
-            'Numero Carroceria',
-            _v(data, ['numerocarroceria']),
-            'Tipo da Carroceria',
-            _v(data, [
-              'tipocarroceria',
-              'tipo_carroceria',
-              'carroceriatipo',
-              'carroceria_tipo',
-              'descricaocarroceria',
-              'descricao_carroceria'
-            ])
-          ],
-          [
-            'Categoria',
-            _v(data, ['categoria']),
-            'Combustível',
-            _v(data, ['combustivel'])
-          ],
-          [
-            'Marca / Modelo',
-            _v(data, ['marcamodelo']),
-            'Cambio',
-            _v(data, ['cambio'])
-          ],
-          [
-            'Motor',
-            _v(data, ['motor', 'numerodomotor']),
-            'Ano de Fabricacao',
-            _v(data, ['anofabricacao'])
-          ],
-          [
-            'Ano de Modelo',
-            _v(data, ['anomodelo']),
-            'Cor',
-            _v(data, ['cor'])
-          ],
-          [
-            'Lotação',
-            _v(data, [
-              'lotacao',
-              'capacidade_passageiros',
-              'capacidadepassageiros',
-              'quantidade_passageiros',
-              'quantidadepassageiros',
-              'passageiros'
-            ]),
-            'Potencia',
-            _v(data, ['potencia'])
-          ],
-          [
-            'Cilindradas',
-            _v(data, ['cilindradas']),
-            'Tipo de arrendatário',
-            _v(data, ['tipoarrendatario'])
-          ],
-          [
-            'Nome do Arrendatario',
-            _v(data, ['nomearrendatario']),
-            'Documento do arrendatario',
-            _v(data, ['documentoarrendatario'])
-          ],
-          [
-            'Procedência',
-            _v(data, ['procedencia']),
-            'Nº Serie Chassi',
-            _v(data, ['serieschassi', 'seriechassi'])
-          ],
-          [
-            'CMC',
-            _v(data, ['cmc']),
-            'CMT',
-            _v(data, ['cmt'])
-          ],
-          [
-            'PBT',
-            _v(data, ['pbt']),
-            'Placa novo modelo',
-            _v(data, ['placanovomodelo', 'mercosul'])
-          ],
-          [
-            'Situação',
-            _v(data, ['situacao']),
-            'Remarcação Chassi',
-            _v(data, ['remarcacaochassi'])
-          ],
-          [
-            'Eixo Auxiliar',
-            _v(data, ['eixoauxiliar', 'eixo_auxiliar']),
-            'Eixo Traseiro',
-            _v(data, ['eixotraseiro', 'eixo_traseiro'])
-          ],
-          [
-            'Município de Emplacamento',
-            _v(data, ['municipioemplacamento', 'municipio_emplacamento']),
-            'Quantidade de eixos',
-            _v(data, ['quantidadeeixos', 'quantidade_eixos', 'eixos', 'qtdeixos', 'numeixos'])
-          ],
-          [
-            'UF de jurisdição',
-            _v(data, ['ufjurisdicao', 'uf_jurisdicao']),
-            'Data de emissão CRV',
-            _v(data, ['dataemissaocrv', 'data_emissao_crv'])
-          ],
-          [
-            'Data Ultima Atualizacao',
-            _v(data, [
-              'dataultimaatualizacao',
-              'data_ultima_atualizacao',
-              'data_atualizacao'
-            ]),
-            'Natureza Faturado',
-            _v(data, ['naturezafaturado', 'natureza_faturado'])
-          ],
-          [
-            'UF Faturado',
-            _v(data, ['uffaturado', 'uf_faturado']),
-            'Natureza do importador',
-            _v(data, ['naturezaimportador', 'natureza_importador'])
-          ],
-          [
-            'Documento do importandor',
-            _v(data, ['documentoimportador', 'documento_importador']),
-            'País tranferência',
-            _v(data, ['paistransferencia', 'pais_transferencia'])
-          ],
-          [
-            'Documento do proprietário indicado',
-            _v(data, [
-              'documentoproprietarioindicado',
-              'documento_proprietario_indicado'
-            ]),
-            'Declaração de importação',
-            _v(data, ['declaracaoimportacao', 'declaracao_importacao'])
-          ],
-          [
-            'Identificação do faturamento',
-            _v(data, ['identificacaofaturamento', 'identificacao_faturamento']),
-            'Identificação do importador',
-            _v(data, ['identificacaoimportador', 'identificacao_importador'])
-          ],
-          [
-            'Possuidor',
-            'Nome: ' +
-                _v(data, ['nomepossuidor', 'nome_possuidor'], fallback: '-') +
-                '\nDocumento: ' +
-                _v(data, ['documentoposuidort', 'documento_possuidor'],
-                    fallback: '-'),
-            'Registro Aduaneiro',
-            _v(data, ['registroaduaneiro', 'registro_aduaneiro'])
-          ],
-          [
-            'Permite Baixar CRV Digital?',
-            _v(data, ['permitebaixarcrvdigital', 'crv_digital'],
-                fallback: 'Não'),
-            '',
-            ''
-          ],
-        ]),
+      _buildSectionHeader('SENATRAN Detalhado Informações - Online',
+          svgIcon: _svgCar),
+      ..._buildDataGrid([
+        [
+          'Placa',
+          _v(data, ['placa']),
+          'Renavam',
+          _v(data, ['renavam'])
+        ],
+        [
+          'Tipo do proprietario',
+          _v(data, ['tipoproprietario']),
+          'Documento Proprietario',
+          _v(data, ['documentoproprietario', 'documento_proprietario'])
+        ],
+        [
+          'Proprietario',
+          _v(data, ['proprietario', 'nomeproprietario']),
+          'Chassi',
+          _v(data, ['chassi'])
+        ],
+        [
+          'Tipo',
+          _v(data, ['tipo', 'tipoveiculo']),
+          'Espécie',
+          _v(data, ['especie'])
+        ],
+        [
+          'Numero Carroceria',
+          _v(data, ['numerocarroceria']),
+          'Tipo da Carroceria',
+          _v(data, [
+            'tipocarroceria',
+            'tipo_carroceria',
+            'carroceriatipo',
+            'carroceria_tipo',
+            'descricaocarroceria',
+            'descricao_carroceria'
+          ])
+        ],
+        [
+          'Categoria',
+          _v(data, ['categoria']),
+          'Combustível',
+          _v(data, ['combustivel'])
+        ],
+        [
+          'Marca / Modelo',
+          _v(data, ['marcamodelo']),
+          'Cambio',
+          _v(data, ['cambio'])
+        ],
+        [
+          'Motor',
+          _v(data, ['motor', 'numerodomotor']),
+          'Ano de Fabricacao',
+          _v(data, ['anofabricacao'])
+        ],
+        [
+          'Ano de Modelo',
+          _v(data, ['anomodelo']),
+          'Cor',
+          _v(data, ['cor'])
+        ],
+        [
+          'Lotação',
+          _v(data, [
+            'lotacao',
+            'capacidade_passageiros',
+            'capacidadepassageiros',
+            'quantidade_passageiros',
+            'quantidadepassageiros',
+            'passageiros'
+          ]),
+          'Potencia',
+          _v(data, ['potencia'])
+        ],
+        [
+          'Cilindradas',
+          _v(data, ['cilindradas']),
+          'Tipo de arrendatário',
+          _v(data, ['tipoarrendatario'])
+        ],
+        [
+          'Nome do Arrendatario',
+          _v(data, ['nomearrendatario']),
+          'Documento do arrendatario',
+          _v(data, ['documentoarrendatario'])
+        ],
+        [
+          'Procedência',
+          _v(data, ['procedencia']),
+          'Nº Serie Chassi',
+          _v(data, ['serieschassi', 'seriechassi'])
+        ],
+        [
+          'CMC',
+          _v(data, ['cmc']),
+          'CMT',
+          _v(data, ['cmt'])
+        ],
+        [
+          'PBT',
+          _v(data, ['pbt']),
+          'Placa novo modelo',
+          _v(data, ['placanovomodelo', 'mercosul'])
+        ],
+        [
+          'Situação',
+          _v(data, ['situacao']),
+          'Remarcação Chassi',
+          _v(data, ['remarcacaochassi'])
+        ],
+        [
+          'Eixo Auxiliar',
+          _v(data, ['eixoauxiliar', 'eixo_auxiliar']),
+          'Eixo Traseiro',
+          _v(data, ['eixotraseiro', 'eixo_traseiro'])
+        ],
+        [
+          'Município de Emplacamento',
+          _v(data, ['municipioemplacamento', 'municipio_emplacamento']),
+          'Quantidade de eixos',
+          _v(data, [
+            'quantidadeeixos',
+            'quantidade_eixos',
+            'eixos',
+            'qtdeixos',
+            'numeixos'
+          ])
+        ],
+        [
+          'UF de jurisdição',
+          _v(data, ['ufjurisdicao', 'uf_jurisdicao']),
+          'Data de emissão CRV',
+          _v(data, ['dataemissaocrv', 'data_emissao_crv'])
+        ],
+        [
+          'Data Ultima Atualizacao',
+          _v(data, [
+            'dataultimaatualizacao',
+            'data_ultima_atualizacao',
+            'data_atualizacao'
+          ]),
+          'Natureza Faturado',
+          _v(data, ['naturezafaturado', 'natureza_faturado'])
+        ],
+        [
+          'UF Faturado',
+          _v(data, ['uffaturado', 'uf_faturado']),
+          'Natureza do importador',
+          _v(data, ['naturezaimportador', 'natureza_importador'])
+        ],
+        [
+          'Documento do importandor',
+          _v(data, ['documentoimportador', 'documento_importador']),
+          'País tranferência',
+          _v(data, ['paistransferencia', 'pais_transferencia'])
+        ],
+        [
+          'Documento do proprietário indicado',
+          _v(data, [
+            'documentoproprietarioindicado',
+            'documento_proprietario_indicado'
+          ]),
+          'Declaração de importação',
+          _v(data, ['declaracaoimportacao', 'declaracao_importacao'])
+        ],
+        [
+          'Identificação do faturamento',
+          _v(data, ['identificacaofaturamento', 'identificacao_faturamento']),
+          'Identificação do importador',
+          _v(data, ['identificacaoimportador', 'identificacao_importador'])
+        ],
+        [
+          'Possuidor',
+          'Nome: ' +
+              _v(data, ['nomepossuidor', 'nome_possuidor'], fallback: '-') +
+              '\nDocumento: ' +
+              _v(data, ['documentoposuidort', 'documento_possuidor'],
+                  fallback: '-'),
+          'Registro Aduaneiro',
+          _v(data, ['registroaduaneiro', 'registro_aduaneiro'])
+        ],
+        [
+          'Permite Baixar CRV Digital?',
+          _v(data, ['permitebaixarcrvdigital', 'crv_digital'], fallback: 'Não'),
+          '',
+          ''
+        ],
+      ]),
     ];
   }
 
   static List<pw.Widget> _buildSenatranRestricoes(Map<String, dynamic> data) {
     return [
-        _buildSectionHeader('SENATRAN Detalhado Restrições - Online',
-            svgIcon: _svgCar),
-        ..._buildDataGrid([
-          [
-            'Possui Leilão',
-            _v(data, ['possuileilao', 'leilao'], fallback: 'Não'),
-            'Possui Multa Renainf',
-            _v(data, ['possuimultarenainf', 'multarenainf'])
-          ],
-          [
-            'Possui Pendência de emissão',
-            _v(data, ['pendenciaemissao'], fallback: 'Não'),
-            'Possui restrição RENAJUD',
-            _v(data, ['possuirestricaorenajud', 'renajud'], fallback: 'Não')
-          ],
-          [
-            'Possui Restrição RFB',
-            _v(data, ['possuirestricaorfb', 'rfb']),
-            'Órgão RFB',
-            _v(data, ['orgaorfb'])
-          ],
-          [
-            'Restricao 1',
-            _v(data, ['restricaosenatran1'], fallback: '- SEM RESTRICAO'),
-            'Restricao 2',
-            _v(data, ['restricaosenatran2'], fallback: '- SEM RESTRICAO')
-          ],
-          [
-            'Restricao 3',
-            _v(data, ['restricaosenatran3'], fallback: '- SEM RESTRICAO'),
-            'Restricao 4',
-            _v(data, ['restricaosenatran4'], fallback: '- SEM RESTRICAO')
-          ],
-          [
-            'Alarme',
-            _v(data, ['alarme'], fallback: 'Não'),
-            '',
-            ''
-          ],
-        ]),
+      _buildSectionHeader('SENATRAN Detalhado Restrições - Online',
+          svgIcon: _svgCar),
+      ..._buildDataGrid([
+        [
+          'Possui Leilão',
+          _v(data, ['possuileilao', 'leilao'], fallback: 'Não'),
+          'Possui Multa Renainf',
+          _v(data, ['possuimultarenainf', 'multarenainf'])
+        ],
+        [
+          'Possui Pendência de emissão',
+          _v(data, ['pendenciaemissao'], fallback: 'Não'),
+          'Possui restrição RENAJUD',
+          _v(data, ['possuirestricaorenajud', 'renajud'], fallback: 'Não')
+        ],
+        [
+          'Possui Restrição RFB',
+          _v(data, ['possuirestricaorfb', 'rfb']),
+          'Órgão RFB',
+          _v(data, ['orgaorfb'])
+        ],
+        [
+          'Restricao 1',
+          _v(data, ['restricaosenatran1'], fallback: '- SEM RESTRICAO'),
+          'Restricao 2',
+          _v(data, ['restricaosenatran2'], fallback: '- SEM RESTRICAO')
+        ],
+        [
+          'Restricao 3',
+          _v(data, ['restricaosenatran3'], fallback: '- SEM RESTRICAO'),
+          'Restricao 4',
+          _v(data, ['restricaosenatran4'], fallback: '- SEM RESTRICAO')
+        ],
+        [
+          'Alarme',
+          _v(data, ['alarme'], fallback: 'Não'),
+          '',
+          ''
+        ],
+      ]),
     ];
   }
 
@@ -1818,7 +1861,6 @@ class PdfRadarGenerator {
               fallback: 'Nenhum registro encontrado.')
         ]
       ]),
-
       ..._buildHistoricoRouboFurto(data),
       pw.SizedBox(height: 10),
       _buildSectionHeader('Detalhes de Multa Renainf'),
@@ -2172,7 +2214,8 @@ class PdfRadarGenerator {
     return [];
   }
 
-  static List<pw.Widget> _buildGenericGrid(List<List<String>> rows, List<int> flexes) {
+  static List<pw.Widget> _buildGenericGrid(
+      List<List<String>> rows, List<int> flexes) {
     return List.generate(rows.length, (index) {
       final isHeader = index == 0;
       final isEven = index % 2 == 0;
@@ -2204,13 +2247,16 @@ class PdfRadarGenerator {
   }
 
   static List<pw.Widget> _buildRecallTable(Map<String, dynamic> data) {
-    List<dynamic> recalls = _findList(data, ['recall', 'recalls', 'lista_recall']);
-    
+    List<dynamic> recalls =
+        _findList(data, ['recall', 'recalls', 'lista_recall']);
+
     if (recalls.isEmpty) {
       return [
         _buildSectionHeader('Recall', svgIcon: _svgWrench),
         ..._buildDataGrid([
-          ['O VEÍCULO PESQUISADO NÃO POSSUI RECALL PENDENTE OU NÃO PERTENCE A NENHUM RECALL DIVULGADO PELAS MONTADORAS.']
+          [
+            'O VEÍCULO PESQUISADO NÃO POSSUI RECALL PENDENTE OU NÃO PERTENCE A NENHUM RECALL DIVULGADO PELAS MONTADORAS.'
+          ]
         ]),
       ];
     }
@@ -2221,14 +2267,13 @@ class PdfRadarGenerator {
 
     for (var item in recalls) {
       if (item is Map) {
-        final codigo = item['codigo'] ?? item['numero_campanha'] ?? item['campanha'] ?? '-';
+        final codigo = item['codigo'] ??
+            item['numero_campanha'] ??
+            item['campanha'] ??
+            '-';
         final descricao = item['descricao'] ?? item['motivo'] ?? '-';
         final dataReg = item['data_registro'] ?? item['data'] ?? '-';
-        rows.add([
-          codigo.toString(),
-          descricao.toString(),
-          dataReg.toString()
-        ]);
+        rows.add([codigo.toString(), descricao.toString(), dataReg.toString()]);
       }
     }
 
@@ -2238,14 +2283,15 @@ class PdfRadarGenerator {
     ];
   }
 
-  static List<pw.Widget> _buildMultasTable(Map<String, dynamic> data, String title) {
+  static List<pw.Widget> _buildMultasTable(
+      Map<String, dynamic> data, String title) {
     List<dynamic> multas = [];
     if (data['multas'] is List && (data['multas'] as List).isNotEmpty) {
       multas = data['multas'] as List;
     } else {
       multas = _findList(data, ['multas', 'multa', 'infracoes']);
     }
-    
+
     if (multas.isEmpty) {
       return [
         _buildSectionHeader(title),
@@ -2261,26 +2307,26 @@ class PdfRadarGenerator {
 
     for (var item in multas) {
       if (item is Map) {
-        final auto = item['autoInfracao'] ?? item['auto_infracao'] ?? item['auto'] ?? '-';
+        final auto = item['autoInfracao'] ??
+            item['auto_infracao'] ??
+            item['auto'] ??
+            '-';
         final renainf = item['autoRenainf'] ?? item['renainf'] ?? '-';
         final situacao = item['situacao'] ?? item['status'] ?? '-';
-        
+
         final autoText = '$auto\n(Renainf: $renainf)\nSituação: $situacao';
         final descricao = item['descricao'] ?? item['motivo'] ?? '-';
-        
+
         final dataInfracao = item['dataInfracao'] ?? item['data'] ?? '-';
         final local = item['local'] ?? '-';
         final localText = 'Em $dataInfracao\n$local';
-        
-        final valor = item['valor'] ?? '-';
-        final valorText = valor.toString().startsWith('R\$') ? valor.toString() : 'R\$ $valor';
 
-        rows.add([
-          autoText,
-          descricao.toString(),
-          localText,
-          valorText
-        ]);
+        final valor = item['valor'] ?? '-';
+        final valorText = valor.toString().startsWith('R\$')
+            ? valor.toString()
+            : 'R\$ $valor';
+
+        rows.add([autoText, descricao.toString(), localText, valorText]);
       }
     }
 
@@ -2291,7 +2337,8 @@ class PdfRadarGenerator {
   }
 
   static List<pw.Widget> _buildProcessos(Map<String, dynamic> data) {
-    final processos = _findList(data, ['ultimo_processo', 'processo', 'processos']);
+    final processos =
+        _findList(data, ['ultimo_processo', 'processo', 'processos']);
     if (processos.isEmpty) return [];
 
     List<List<String>> rows = [
@@ -2317,20 +2364,22 @@ class PdfRadarGenerator {
   }
 
   static List<pw.Widget> _buildImpedimentos(Map<String, dynamic> data) {
-    final impedimentos = _findList(data, ['historico_impedimentos', 'impedimentos']);
+    final impedimentos =
+        _findList(data, ['historico_impedimentos', 'impedimentos']);
     if (impedimentos.isEmpty) return [];
 
     List<pw.Widget> widgets = [];
     int idx = 1;
     for (var item in impedimentos) {
       if (item is Map) {
-        widgets.add(_buildSectionHeader('Histórico Impedimentos Veículo #$idx'));
-        
+        widgets
+            .add(_buildSectionHeader('Histórico Impedimentos Veículo #$idx'));
+
         List<List<String>> grid = [];
         for (var key in item.keys) {
-           grid.add([key, item[key].toString()]);
+          grid.add([key, item[key].toString()]);
         }
-        
+
         widgets.addAll(_buildDataGrid(grid));
         widgets.add(pw.SizedBox(height: 10));
         idx++;
@@ -2362,9 +2411,13 @@ class PdfRadarGenerator {
 
     searchIpvaList(data);
 
-    final temValor = _v(data, ['ipva_valor', 'valor'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
-    final temBase = _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
-    final temApurado = _v(data, ['ipva_apurado', 'apurado'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
+    final temValor =
+        _v(data, ['ipva_valor', 'valor'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
+    final temBase =
+        _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'NÃO_TEM') !=
+            'NÃO_TEM';
+    final temApurado =
+        _v(data, ['ipva_apurado', 'apurado'], fallback: 'NÃO_TEM') != 'NÃO_TEM';
 
     if (ipvaList == null || ipvaList!.isEmpty) {
       if (!temValor && !temBase && !temApurado) {
@@ -2376,46 +2429,47 @@ class PdfRadarGenerator {
         _buildSectionHeader('IPVA (SEFAZ)'),
         ..._buildDataGrid([
           [
-          'Base calculo',
-          _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'R\$ 0,00'),
-          'Aliquota',
-          _v(data, ['ipva_aliquota', 'aliquota'], fallback: 'R\$ 0,00')
-        ],
-        [
-          'Apurado',
-          _v(data, ['ipva_apurado', 'apurado'], fallback: 'R\$ 0,00'),
-          'Credito Nota Fiscal Paulista',
-          _v(data, ['ipva_nfp', 'credito_nfp', 'nfp'], fallback: 'R\$ 0,00')
-        ],
-        [
-          'Devido',
-          _v(data, ['ipva_devido', 'devido'], fallback: 'R\$ 0,00'),
-          'Pagamento efetuado',
-          _v(data, ['ipva_pagamento', 'pagamento_efetuado', 'pagamento'],
-              fallback: 'R\$ 0,00')
-        ],
-        [
-          'Descontos',
-          _v(data, ['ipva_desconto', 'descontos', 'desconto'],
-              fallback: 'R\$ 0,00'),
-          'Saldo devido',
-          _v(data, ['ipva_saldo', 'saldo_devido', 'saldo'],
-              fallback: 'R\$ 0,00')
-        ],
-        [
-          'Acrescimos',
-          _v(data, ['ipva_acrescimo', 'acrescimos', 'acrescimo'],
-              fallback: 'R\$ 0,00'),
-          'Competência',
-          _v(data, ['ipva_competencia', 'competencia'], fallback: '-')
-        ],
-        [
-          'Valor',
-          _v(data, ['ipva_valor', 'valor'], fallback: 'R\$ 0,00'),
-          '',
-          ''
-        ],
-      ])];
+            'Base calculo',
+            _v(data, ['ipva_basecalculo', 'basecalculo'], fallback: 'R\$ 0,00'),
+            'Aliquota',
+            _v(data, ['ipva_aliquota', 'aliquota'], fallback: 'R\$ 0,00')
+          ],
+          [
+            'Apurado',
+            _v(data, ['ipva_apurado', 'apurado'], fallback: 'R\$ 0,00'),
+            'Credito Nota Fiscal Paulista',
+            _v(data, ['ipva_nfp', 'credito_nfp', 'nfp'], fallback: 'R\$ 0,00')
+          ],
+          [
+            'Devido',
+            _v(data, ['ipva_devido', 'devido'], fallback: 'R\$ 0,00'),
+            'Pagamento efetuado',
+            _v(data, ['ipva_pagamento', 'pagamento_efetuado', 'pagamento'],
+                fallback: 'R\$ 0,00')
+          ],
+          [
+            'Descontos',
+            _v(data, ['ipva_desconto', 'descontos', 'desconto'],
+                fallback: 'R\$ 0,00'),
+            'Saldo devido',
+            _v(data, ['ipva_saldo', 'saldo_devido', 'saldo'],
+                fallback: 'R\$ 0,00')
+          ],
+          [
+            'Acrescimos',
+            _v(data, ['ipva_acrescimo', 'acrescimos', 'acrescimo'],
+                fallback: 'R\$ 0,00'),
+            'Competência',
+            _v(data, ['ipva_competencia', 'competencia'], fallback: '-')
+          ],
+          [
+            'Valor',
+            _v(data, ['ipva_valor', 'valor'], fallback: 'R\$ 0,00'),
+            '',
+            ''
+          ],
+        ])
+      ];
     }
 
     List<List<String>> rows = [
@@ -2532,7 +2586,7 @@ class PdfRadarGenerator {
 
   static List<pw.Widget> _buildHistoricoRouboFurto(Map<String, dynamic> data) {
     List<dynamic> rf = _findList(data, ['rf']);
-    
+
     if (rf.isEmpty) {
       return [];
     }
@@ -2544,11 +2598,13 @@ class PdfRadarGenerator {
     for (var item in rf) {
       if (item is Map) {
         final dataOco = item['data_ocorrencia'] ?? item['data'] ?? '-';
-        final categoria = item['categoria_ocorrencia'] ?? item['categoria'] ?? '-';
-        final municipio = item['municipio_ocorrencia'] ?? item['municipio'] ?? '-';
+        final categoria =
+            item['categoria_ocorrencia'] ?? item['categoria'] ?? '-';
+        final municipio =
+            item['municipio_ocorrencia'] ?? item['municipio'] ?? '-';
         final uf = item['uf_ocorrencia'] ?? item['uf'] ?? '-';
         final bo = item['boletim'] ?? '-';
-        
+
         rows.add([
           dataOco.toString(),
           categoria.toString(),
@@ -2559,18 +2615,20 @@ class PdfRadarGenerator {
     }
 
     return [
-      _buildSectionHeader('Histórico Roubo e Furto', svgIcon: _svgWarning, bgColor: _kOrange, textColor: PdfColors.white),
+      _buildSectionHeader('Histórico Roubo e Furto',
+          svgIcon: _svgWarning, bgColor: _kOrange, textColor: PdfColors.white),
       ..._buildGenericGrid(rows, [2, 3, 3, 2]),
     ];
   }
 
   static List<pw.Widget> _buildSecoesDinamicas(Map<String, dynamic> data) {
-    if (data['resultados_completos'] == null || data['resultados_completos'] is! List) {
+    if (data['resultados_completos'] == null ||
+        data['resultados_completos'] is! List) {
       return [];
     }
 
     final List<dynamic> resultados = data['resultados_completos'];
-    
+
     final knownTitles = [
       'BIN **',
       'BASE ESTADUAL **',
@@ -2607,34 +2665,34 @@ class PdfRadarGenerator {
 
     for (var sec in resultados) {
       if (sec is! Map) continue;
-      
+
       final title = sec['title']?.toString().toUpperCase() ?? '';
       if (title.isEmpty || knownTitles.contains(title)) {
         continue;
       }
-      
+
       var retorno = sec['retorno'];
       if (retorno == null) continue;
-      
+
       if (retorno is Map && retorno.containsKey('data')) {
         retorno = retorno['data'];
       }
-      
+
       if (retorno is! Map || retorno.isEmpty) continue;
-      
+
       dynamicWidgets.add(pw.SizedBox(height: 10));
       dynamicWidgets.add(_buildSectionHeader(sec['title'].toString()));
-      
+
       List<List<String>> gridRows = [];
       List<String> currentRow = [];
-      
+
       for (var entry in (retorno as Map).entries) {
         String keyStr = entry.key.toString();
         String valStr = '';
-        
+
         final val = entry.value;
         if (val == null) continue;
-        
+
         if (val is Map) {
           if (val.containsKey('descricao') && val['descricao'] != null) {
             valStr = val['descricao'].toString();
@@ -2644,38 +2702,43 @@ class PdfRadarGenerator {
             valStr = val.toString();
           }
         } else if (val is List) {
-           valStr = 'Lista de registros (\${val.length})';
+          valStr = 'Lista de registros (\${val.length})';
         } else {
           valStr = val.toString();
         }
-        
+
         final lowerVal = valStr.toLowerCase();
-        if (valStr.isEmpty || lowerVal == 'não informado' || lowerVal == 'nao informado' || lowerVal == 'null') {
+        if (valStr.isEmpty ||
+            lowerVal == 'não informado' ||
+            lowerVal == 'nao informado' ||
+            lowerVal == 'null') {
           continue;
         }
-        
+
         currentRow.add(keyStr);
         currentRow.add(valStr);
-        
+
         if (currentRow.length == 4) {
           gridRows.add(List.from(currentRow));
           currentRow.clear();
         }
       }
-      
+
       if (currentRow.isNotEmpty) {
         if (currentRow.length == 2) {
-           gridRows.add([currentRow[0], currentRow[1], '', '']);
+          gridRows.add([currentRow[0], currentRow[1], '', '']);
         }
       }
-      
+
       if (gridRows.isNotEmpty) {
         dynamicWidgets.addAll(_buildDataGrid(gridRows));
       } else {
-        dynamicWidgets.addAll(_buildDataGrid([['Nenhum dado retornado para esta sessão.']]));
+        dynamicWidgets.addAll(_buildDataGrid([
+          ['Nenhum dado retornado para esta sessão.']
+        ]));
       }
     }
-    
+
     return dynamicWidgets;
   }
 }

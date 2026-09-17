@@ -22,6 +22,11 @@ import 'features/vistoria/presentation/screens/clientes_screen.dart';
 import 'features/wallet/presentation/screens/carteira_screen.dart';
 import 'features/wallet/presentation/screens/adicionar_saldo_screen.dart';
 import 'features/wallet/presentation/screens/minhas_recargas_screen.dart';
+import 'injection_container.dart';
+import 'core/services/device_security_service.dart';
+import 'features/master/presentation/screens/painel_master_screen.dart';
+import 'features/master/presentation/screens/dispositivo_pendente_screen.dart';
+import 'features/relatorios/presentation/screens/relatorios_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -32,13 +37,31 @@ GoRouter buildRouter(AuthBloc authBloc) {
     redirect: (context, state) {
       final authState = authBloc.state;
       final isAuth = authState is AuthAuthenticated;
+      final isMaster = isAuth && authState.user.isMaster;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
       final isRegister = state.matchedLocation == '/register';
+      final isDispositivo = state.matchedLocation == '/dispositivo-pendente';
 
       if (isSplash) return null;
-      if (!isAuth && !isLogin && !isRegister) return '/login';
-      if (isAuth && (isLogin || isRegister)) return '/home';
+      if (isDispositivo) return null;
+
+      // Allow unauthenticated users to access login and register
+      if (!isAuth) {
+        if (isLogin || isRegister) return null;
+        return '/login';
+      }
+
+      // If they ARE authenticated, check device security
+      final deviceSec = sl<DeviceSecurityService>();
+      final isApproved = isMaster || deviceSec.isCachedApproved;
+      if (!isApproved) {
+        if (isDispositivo) return null;
+        return '/dispositivo-pendente';
+      }
+
+      // Se está autenticado e aprovado, não deve ficar no login, registro ou tela de pendente
+      if (isLogin || isRegister || isDispositivo) return '/home';
       return null;
     },
     refreshListenable: GoRouterRefreshStream(authBloc.stream),
@@ -46,6 +69,10 @@ GoRouter buildRouter(AuthBloc authBloc) {
       GoRoute(
         path: '/splash',
         builder: (ctx, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: '/dispositivo-pendente',
+        builder: (ctx, state) => const DispositivoPendenteScreen(),
       ),
       GoRoute(
         path: '/login',
@@ -101,6 +128,16 @@ GoRouter buildRouter(AuthBloc authBloc) {
       GoRoute(
         path: '/carteira/recargas',
         builder: (ctx, state) => const MinhasRecargasScreen(),
+      ),
+      // Relatórios e Dashboard Executivo
+      GoRoute(
+        path: '/relatorios',
+        builder: (ctx, state) => const RelatoriosScreen(),
+      ),
+      // Painel Master (Admin Master)
+      GoRoute(
+        path: '/master/painel',
+        builder: (ctx, state) => const PainelMasterScreen(),
       ),
       // Etapas da vistoria
       GoRoute(

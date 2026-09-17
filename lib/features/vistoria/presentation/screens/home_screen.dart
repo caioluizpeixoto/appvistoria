@@ -13,6 +13,9 @@ import '../../../../injection_container.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
 import 'package:drift/drift.dart' as drift;
+import 'package:intl/intl.dart';
+import '../../../wallet/data/repositories/wallet_repository.dart';
+import '../../../wallet/domain/models/wallet_model.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -87,14 +90,26 @@ class HomeScreen extends StatelessWidget {
               _PesquisaCard(
                 titulo: 'AUTO BIN (Simples)',
                 codigo: 'auto_bin',
+                preco: 7.66,
                 onTap: () {
                   Navigator.pop(ctx);
                   _abrirModalCautelar(context, 'auto_bin');
                 },
               ),
               _PesquisaCard(
+                titulo: 'PESQUISA DE MOTOR',
+                codigo: 'bin_por_motor',
+                preco: 7.90,
+                icone: Icons.tune_rounded,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _abrirModalCautelar(context, 'bin_por_motor');
+                },
+              ),
+              _PesquisaCard(
                 titulo: 'AUTO PERÍCIA',
                 codigo: 'auto_pericia',
+                preco: 35.80,
                 onTap: () {
                   Navigator.pop(ctx);
                   _abrirModalCautelar(context, 'auto_pericia');
@@ -103,6 +118,7 @@ class HomeScreen extends StatelessWidget {
               _PesquisaCard(
                 titulo: 'AUTO PERÍCIA HRF',
                 codigo: 'auto_pericia_hrf',
+                preco: 28.90,
                 onTap: () {
                   Navigator.pop(ctx);
                   _abrirModalCautelar(context, 'auto_pericia_hrf');
@@ -111,6 +127,7 @@ class HomeScreen extends StatelessWidget {
               _PesquisaCard(
                 titulo: 'AUTO COMPLETA',
                 codigo: 'auto_completa',
+                preco: 60.91,
                 onTap: () {
                   Navigator.pop(ctx);
                   _abrirModalCautelar(context, 'auto_completa');
@@ -119,6 +136,7 @@ class HomeScreen extends StatelessWidget {
               _PesquisaCard(
                 titulo: 'AUTO LEILÃO',
                 codigo: 'auto_leilao',
+                preco: 21.24,
                 onTap: () {
                   Navigator.pop(ctx);
                   _abrirModalCautelar(context, 'auto_leilao');
@@ -130,7 +148,145 @@ class HomeScreen extends StatelessWidget {
                 icone: Icons.block_rounded,
                 onTap: () {
                   Navigator.pop(ctx);
-                  _abrirModalCautelar(context, null);
+                  _abrirModalCautelar(context, 'nenhuma');
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _abrirModalPesquisaAvulsa(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.background,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'Pesquisa Avulsa - Selecione o Tipo',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO BIN (Placa ou Chassi)',
+                codigo: 'auto_bin',
+                preco: 7.66,
+                icone: Icons.directions_car_rounded,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'produtoSelecionado': 'auto_bin',
+                      'modoEntrada': 'placa',
+                      'precoPesquisa': 7.66,
+                    },
+                  );
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'PESQUISA DE MOTOR',
+                codigo: 'bin_por_motor',
+                preco: 7.90,
+                icone: Icons.tune_rounded,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'somenteMotor': true,
+                      'produtoSelecionado': 'bin_por_motor',
+                      'modoEntrada': 'motor',
+                      'precoPesquisa': 7.90,
+                    },
+                  );
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO PERÍCIA (Placa)',
+                codigo: 'auto_pericia',
+                preco: 35.80,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'produtoSelecionado': 'auto_pericia',
+                      'modoEntrada': 'placa',
+                      'precoPesquisa': 35.80,
+                    },
+                  );
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO PERÍCIA HRF (Placa)',
+                codigo: 'auto_pericia_hrf',
+                preco: 28.90,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'produtoSelecionado': 'auto_pericia_hrf',
+                      'modoEntrada': 'placa',
+                      'precoPesquisa': 28.90,
+                    },
+                  );
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO COMPLETA (Placa)',
+                codigo: 'auto_completa',
+                preco: 60.91,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'produtoSelecionado': 'auto_completa',
+                      'modoEntrada': 'placa',
+                      'precoPesquisa': 60.91,
+                    },
+                  );
+                },
+              ),
+              _PesquisaCard(
+                titulo: 'AUTO LEILÃO (Placa ou Chassi)',
+                codigo: 'auto_leilao',
+                preco: 21.24,
+                onTap: () {
+                  Navigator.pop(ctx);
+                  context.push(
+                    '/identificacao/${TipoVistoria.cautelarCarro.slug}',
+                    extra: {
+                      'somentePesquisa': true,
+                      'produtoSelecionado': 'auto_leilao',
+                      'modoEntrada': 'placa',
+                      'precoPesquisa': 21.24,
+                    },
+                  );
                 },
               ),
               const SizedBox(height: 16),
@@ -144,11 +300,8 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Supabase.instance.client.auth.currentUser;
-    final email = user?.email ?? '';
-    final isMaster = email.contains('42136154800');
-    final role = isMaster
-        ? 'empresa'
-        : (user?.userMetadata?['role'] as String? ?? 'empresa');
+    final isMaster = user?.isMaster ?? false;
+    final role = user?.appRole ?? 'empresa';
     final isUsuarioOnly = !isMaster && role == 'usuario';
 
     return Scaffold(
@@ -164,10 +317,40 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.account_balance_wallet_outlined),
-            tooltip: 'Minha Carteira',
-            onPressed: () => context.push('/carteira'),
+          StreamBuilder<WalletModel?>(
+            stream: sl<WalletRepository>().streamWallet(),
+            builder: (context, snapshot) {
+              String balanceText = '';
+              double currentBalance = 0;
+              if (snapshot.hasData && snapshot.data != null) {
+                currentBalance = snapshot.data!.balance;
+                balanceText = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(currentBalance);
+              }
+              
+              return InkWell(
+                onTap: () => context.push('/carteira'),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      if (balanceText.isNotEmpty) ...[
+                        Text(
+                          balanceText,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: currentBalance < 0 ? Colors.redAccent : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded),
@@ -209,6 +392,20 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                // 0. CARD LIBERAR APARELHOS (Exclusivo para Master)
+                if (isMaster) ...[
+                  _MainActionCard(
+                    title: 'Liberar Aparelhos',
+                    subtitle:
+                        'Autorizar e gerenciar aparelhos para acesso ao sistema',
+                    icon: Icons.phonelink_lock_rounded,
+                    badgeColor: const Color(0xFFFEF3C7),
+                    iconColor: const Color(0xFFD97706),
+                    onTap: () => context.push('/master/painel'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // 1. CARD CAUTELAR (Oculto se for apenas 'usuario')
                 if (!isUsuarioOnly) ...[
                   _MainActionCard(
@@ -226,18 +423,13 @@ class HomeScreen extends StatelessWidget {
                 // 2. CARD PESQUISA (Oculto se for apenas 'usuario')
                 if (!isUsuarioOnly) ...[
                   _MainActionCard(
-                    title: 'Pesquisa',
+                    title: 'Pesquisa Avulsa',
                     subtitle:
-                        'Realizar consulta rápida de dados veiculares, histórico e BIN',
+                        'Realizar consulta rápida de dados veiculares, histórico, BIN ou Motor',
                     icon: Icons.manage_search_rounded,
                     badgeColor: const Color(0xFFFFF3E0),
                     iconColor: const Color(0xFFF57C00),
-                    onTap: () {
-                      context.push(
-                        '/identificacao/${TipoVistoria.cautelarCarro.slug}',
-                        extra: {'somentePesquisa': true},
-                      );
-                    },
+                    onTap: () => _abrirModalPesquisaAvulsa(context),
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -289,6 +481,18 @@ class HomeScreen extends StatelessWidget {
                       ),
                     );
                   },
+                ),
+                const SizedBox(height: 16),
+
+                // 4. CARD RELATÓRIOS & DASHBOARD
+                _MainActionCard(
+                  title: 'Relatórios & Dashboard',
+                  subtitle:
+                      'Acompanhe produção, faturamento, gráficos e fechamento por cliente',
+                  icon: Icons.insights_rounded,
+                  badgeColor: const Color(0xFFEDE9FE),
+                  iconColor: const Color(0xFF7C3AED),
+                  onTap: () => context.push('/relatorios'),
                 ),
                 const SizedBox(height: 16),
               ]),
@@ -437,14 +641,39 @@ class _WelcomeBanner extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      displayValue,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            displayValue,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        if (state is AuthAuthenticated && state.user.isMaster) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'MASTER',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
@@ -590,8 +819,15 @@ class _VistoriaCard extends StatelessWidget {
             } else {
               Navigator.of(context).pop(); // fecha o modal
               context.push('/identificacao/${tipo.slug}', extra: {
-                if (produtoPesquisa != null)
+                if (produtoPesquisa != null) ...{
                   'produtoSelecionado': produtoPesquisa,
+                  'precoPesquisa': produtoPesquisa == 'auto_bin' ? 7.66 :
+                                   produtoPesquisa == 'bin_por_motor' ? 7.90 :
+                                   produtoPesquisa == 'auto_pericia' ? 35.80 :
+                                   produtoPesquisa == 'auto_pericia_hrf' ? 28.90 :
+                                   produtoPesquisa == 'auto_completa' ? 60.91 :
+                                   produtoPesquisa == 'auto_leilao' ? 21.24 : 0.00,
+                }
               });
             }
           },
@@ -659,16 +895,19 @@ class _PesquisaCard extends StatelessWidget {
   final String codigo;
   final IconData? icone;
   final VoidCallback onTap;
+  final double? preco;
 
   const _PesquisaCard({
     required this.titulo,
     required this.codigo,
     required this.onTap,
     this.icone,
+    this.preco,
   });
 
   @override
   Widget build(BuildContext context) {
+    final formatador = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
@@ -698,13 +937,29 @@ class _PesquisaCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Text(
-                    titulo,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.textPrimary,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        titulo,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      if (preco != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          formatador.format(preco),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ]
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),

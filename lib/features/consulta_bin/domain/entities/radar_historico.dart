@@ -46,8 +46,28 @@ class RadarHistorico {
     );
   }
 
-  bool get permiteRetificacao {
-    final diff = DateTime.now().difference(createdAt);
-    return diff.inHours <= 72;
+  bool get permiteRetificacao => true;
+
+  String get tokenRadarOficial {
+    if (dadosTratados['tokenConsulta'] != null &&
+        dadosTratados['tokenConsulta'].toString().isNotEmpty) {
+      return dadosTratados['tokenConsulta'].toString();
+    }
+    if (dadosTratados['token'] != null &&
+        dadosTratados['token'].toString().isNotEmpty) {
+      return dadosTratados['token'].toString();
+    }
+    if (arquivoPesquisaUrl != null && arquivoPesquisaUrl!.isNotEmpty) {
+      final uri = Uri.tryParse(arquivoPesquisaUrl!);
+      if (uri != null) {
+        final segments = uri.pathSegments;
+        final resIdx = segments.indexOf('resultado');
+        if (resIdx != -1 && segments.length > resIdx + 1) {
+          final t = segments[resIdx + 1];
+          if (t.length >= 30) return t;
+        }
+      }
+    }
+    return idPesquisaRadar;
   }
 }

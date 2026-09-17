@@ -175,7 +175,8 @@ class RadarRepository {
   Future<List<Map<String, dynamic>>> buscarConsultasRecentesNuvem(
       String coluna, String valor) async {
     final lista = <Map<String, dynamic>>[];
-    final valorLimpo = valor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final valorLimpo =
+        valor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     final valorOriginal = valor.trim().toUpperCase();
 
     // 1. Busca no banco local (Drift/SQLite)
@@ -189,7 +190,9 @@ class RadarRepository {
         local = await localDao.buscarConsultaPorMotor(valorLimpo);
       }
 
-      if (local != null && local.dadosTratadosJson != null && local.dadosTratadosJson!.isNotEmpty) {
+      if (local != null &&
+          local.dadosTratadosJson != null &&
+          local.dadosTratadosJson!.isNotEmpty) {
         try {
           final dados = jsonDecode(local.dadosTratadosJson!);
           lista.add({
@@ -221,17 +224,20 @@ class RadarRepository {
         final comTraco = valorLimpo.length == 7
             ? '${valorLimpo.substring(0, 3)}-${valorLimpo.substring(3)}'
             : valorLimpo;
-        query = query.or('placa.ilike.$valorLimpo,placa.ilike.$comTraco,placa.ilike.$valorOriginal');
+        query = query.or(
+            'placa.ilike.$valorLimpo,placa.ilike.$comTraco,placa.ilike.$valorOriginal');
       } else {
         query = query.ilike(coluna, '%$valorLimpo%');
       }
 
-      final response = await query.order('created_at', ascending: false).limit(10);
+      final response =
+          await query.order('created_at', ascending: false).limit(10);
 
       if (response != null && response is List) {
         for (var item in response) {
           final jaExiste = lista.any((l) =>
-              (l['id_pesquisa_radar'] != null && l['id_pesquisa_radar'] == item['id_pesquisa_autocred']) ||
+              (l['id_pesquisa_radar'] != null &&
+                  l['id_pesquisa_radar'] == item['id_pesquisa_autocred']) ||
               l['id'] == item['id']);
           if (!jaExiste) {
             lista.add(Map<String, dynamic>.from(item));
@@ -246,6 +252,34 @@ class RadarRepository {
   }
 
   Future<bool> existeConsultaPendente(String coluna, String valor) async {
+    final token = await buscarTokenConsultaPendente(coluna, valor);
+    return token != null;
+  }
+
+  Future<String?> buscarTokenConsultaPendente(
+      String coluna, String valor) async {
+    // 1. Checa localmente primeiro (rápido e offline-first)
+    try {
+      ConsultasAutocredData? localItem;
+      if (coluna == 'motor') {
+        localItem = await localDao.buscarConsultaPorMotor(valor);
+      } else if (coluna == 'placa') {
+        localItem = await localDao.buscarConsultaPorPlaca(valor);
+      } else if (coluna == 'chassi') {
+        localItem = await localDao.buscarConsultaPorChassi(valor);
+      }
+
+      if (localItem != null && localItem.status == 'pendente') {
+        final now = DateTime.now();
+        if (now.difference(localItem.createdAt).inMinutes < 60) {
+          return localItem.idPesquisaAutocred;
+        }
+      }
+    } catch (e) {
+      print('Erro ao checar pendente local: $e');
+    }
+
+    // 2. Checa no Supabase
     try {
       final response = await supabase
           .from('autocred_consultas')
@@ -256,17 +290,17 @@ class RadarRepository {
           .limit(1);
 
       if (response != null && response is List && response.isNotEmpty) {
-        final createdAt = DateTime.parse(response.first['created_at'].toString());
+        final createdAt =
+            DateTime.parse(response.first['created_at'].toString());
         final now = DateTime.now();
-        if (now.difference(createdAt).inMinutes < 5) {
-          return true;
+        if (now.difference(createdAt).inMinutes < 60) {
+          return response.first['id_pesquisa_autocred']?.toString();
         }
       }
-      return false;
+      return null;
     } catch (e) {
       print('Erro ao verificar consultas pendentes: $e');
-      return false;
+      return null;
     }
   }
 }
-

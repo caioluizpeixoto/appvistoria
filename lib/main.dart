@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/services/device_security_service.dart';
 import 'features/auth/presentation/blocs/auth_bloc.dart';
 import 'injection_container.dart';
 import 'router.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   );
 
   await initDependencies();
+  await sl<DeviceSecurityService>().init();
 
   runApp(const CautelarApp());
 }

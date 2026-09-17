@@ -490,27 +490,37 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Continuar Aguardando'),
+              onPressed: () => Navigator.pop(ctx, 'continuar'),
+              child: const Text('Continuar Aguardando', style: TextStyle(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.conforme,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.pop(ctx, 'verificar'),
+              child: const Text('Verificar Status'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.naoConforme,
                 foregroundColor: Colors.white,
               ),
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: () => Navigator.pop(ctx, 'forcar'),
               child: const Text('Forçar Nova Consulta'),
             ),
           ],
         ),
       );
 
-      if (forcar == true) {
+      if (forcar == 'forcar') {
         final result = await _showSelectProdutoDialog(hideForcarNova: true);
         if (result != null) {
           final produto = result['produto'] as String;
           await _executarNovaConsulta(produto: produto, placa: placa, blockUI: blockUI);
         }
+      } else if (forcar == 'verificar') {
+        await _verificarStatusManual(placa);
       }
       return;
     }
@@ -780,6 +790,93 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     }
   }
 
+  Future<void> _verificarStatusManual(String placa) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Verificando status na Radar...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final service = sl<RadarService>();
+      final radarConsultas = await service.listarConsultasRadar(param: 'placa', value: placa);
+      
+      if (mounted) Navigator.pop(context); // Fechar loading de verificação
+
+      bool encontrouPronta = false;
+      if (radarConsultas.isNotEmpty) {
+        Map<String, dynamic>? pronta;
+        for (var c in radarConsultas) {
+          if (c['token'] != null && c['token'].toString().isNotEmpty) {
+            pronta = c;
+            break;
+          }
+        }
+        
+        if (pronta != null) {
+          encontrouPronta = true;
+          // Mostra loading aplicando
+          if (mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx) => const AlertDialog(
+                content: Row(
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(width: 20),
+                    Text('Baixando dados do veículo...'),
+                  ],
+                ),
+              ),
+            );
+          }
+          await _aplicarDadosConsulta(
+            fonte: 'radar',
+            tokenConsulta: pronta['token'],
+            produto: pronta['codigo_produto'] ?? 'auto_bin',
+            placa: placa,
+          );
+          if (mounted) Navigator.pop(context); // fecha loading de aplicar
+          if (mounted) {
+            setState(() {
+              _wizardState.setStatusConsulta('concluida');
+            });
+            _wizardState.forceUpdate();
+          }
+        }
+      }
+
+      if (!encontrouPronta && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A pesquisa ainda está em análise pelo Detran. Tente novamente em breve.'),
+            backgroundColor: AppTheme.comObs,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Fechar loading de erro
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao verificar status: $e'),
+            backgroundColor: AppTheme.naoConforme,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _executarNovaConsulta({
     required String produto,
     required String placa,
@@ -807,10 +904,16 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
 
     try {
       final service = sl<RadarService>();
+      final isMotor = produto == 'bin_por_motor';
+      final paramBusca = isMotor ? 'motor' : 'placa';
+      final valorBusca = isMotor && _wizardState.motorVeiculo.isNotEmpty
+          ? _wizardState.motorVeiculo
+          : placa;
+
       final veiculoApi = await service.consultarVeiculo(
         produto: produto,
-        param: 'placa',
-        value: placa,
+        param: paramBusca,
+        value: valorBusca,
         vistoriaId: widget.vistoriaId,
         forcarNova: true,
       );
@@ -889,6 +992,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       ctx, {'produto': 'auto_bin', 'forcarNova': forcarNova}),
                 ),
                 ListTile(
+                  title: const Text('PESQUISA DE MOTOR'),
+                  onTap: () => Navigator.pop(
+                      ctx, {'produto': 'bin_por_motor', 'forcarNova': forcarNova}),
+                ),
+                ListTile(
                   title: const Text('AUTO PERÍCIA'),
                   onTap: () => Navigator.pop(ctx,
                       {'produto': 'auto_pericia', 'forcarNova': forcarNova}),
@@ -962,6 +1070,11 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         } else {
           _wizardState.tipoVistoria = vistoria.tipoVistoria!;
         }
+      }
+
+      final preco = await _dao.obterValorVistoria(widget.vistoriaId);
+      if (preco != null) {
+        _wizardState.valorLaudo = preco;
       }
     }
 
@@ -1133,6 +1246,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         etapaAtual: drift.Value(s.currentStep),
         updatedAt: drift.Value(DateTime.now()),
       ));
+
+      if (s.valorLaudo != null) {
+        await _dao.salvarValorVistoria(widget.vistoriaId, s.valorLaudo!);
+      }
 
       // Atualiza veículo
       final veiculo = await _dao.buscarVeiculoPorVistoria(widget.vistoriaId);
@@ -1707,6 +1824,24 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                               padding: EdgeInsets.all(4.0),
                               child: Icon(Icons.cloud_off_rounded,
                                   color: Colors.redAccent, size: 22),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else if (_wizardState.statusConsulta == 'nenhuma')
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: Tooltip(
+                          message: 'Realizar Consulta',
+                          child: InkWell(
+                            onTap: _retryRadarConsulta,
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.cloud_queue_rounded,
+                                  color: Colors.white70, size: 22),
                             ),
                           ),
                         ),

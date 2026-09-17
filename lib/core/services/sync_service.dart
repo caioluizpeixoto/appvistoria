@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -8,6 +7,7 @@ import '../../database/daos/vistoria_dao.dart';
 import '../../database/app_database.dart' as import_app_database;
 import '../../database/daos/autocred_dao.dart';
 import '../../injection_container.dart';
+import 'empresa_rodape_helper.dart';
 
 class SyncService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -130,6 +130,10 @@ class SyncService {
     if (pdfCloudUrl != null && pdfCloudUrl.isNotEmpty) {
       vistoriaMap['pdfUrl'] = pdfCloudUrl;
     }
+    final precoLocal = await _dao.obterValorVistoria(id);
+    if (precoLocal != null) {
+      vistoriaMap['valor'] = precoLocal;
+    }
 
     final veiculoMap = veiculo?.toJson() as Map<String, dynamic>?;
     if (veiculoMap != null) {
@@ -148,6 +152,26 @@ class SyncService {
     };
 
     // 5. Enviar para a tabela `vistorias_cloud`
+    final currentUser = _supabase.auth.currentUser;
+    var cnpj = (currentUser?.userMetadata?['cnpj'] as String?) ?? '';
+    if (cnpj.isEmpty && currentUser?.email != null) {
+      final emailPrefix = currentUser!.email!.split('@').first.replaceAll(RegExp(r'[^0-9]'), '');
+      if (emailPrefix.length == 14) cnpj = emailPrefix;
+    }
+
+    final empresaInfo = EmpresaRodapeInfo.obterAtual();
+    var empresaNome = empresaInfo.razaoSocial;
+    if (empresaNome.contains('NÃO CADASTRADA') || empresaNome.contains('CARREGANDO') || empresaNome == 'APP VISTORIA') {
+      if (cnpj == '11977969000133') {
+        empresaNome = 'SUMARÉ VISTORIAS';
+      } else {
+        final metaName = (currentUser?.userMetadata?['name'] as String? ?? '').trim();
+        if (metaName.isNotEmpty) {
+          empresaNome = metaName.toUpperCase();
+        }
+      }
+    }
+
     await _supabase.from('vistorias_cloud').upsert({
       'id': vistoria.id,
       'user_id': userId,
@@ -156,6 +180,8 @@ class SyncService {
       'chassi': veiculo?.chassiVeiculo,
       'status': vistoria.status,
       'tipo_vistoria': vistoria.tipoVistoria,
+      'empresa_nome': empresaNome,
+      'empresa_cnpj': cnpj,
       'dados_completos': dadosCompletos,
       'updated_at': DateTime.now().toIso8601String(),
     });
@@ -194,15 +220,133 @@ class SyncService {
     return List<Map<String, dynamic>>.from(res);
   }
 
+  /// Lista todas as vistorias de todas as empresas (Acesso exclusivo Master)
+  Future<List<Map<String, dynamic>>> listarTodasVistoriasMaster({
+    String? empresaFiltro,
+    String? statusFiltro,
+    String? queryBusca,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) throw Exception('Usuário não autenticado');
+
+    var query = _supabase.from('vistorias_cloud').select();
+
+    if (empresaFiltro != null &&
+        empresaFiltro.isNotEmpty &&
+        empresaFiltro != 'todas') {
+      query = query.ilike('empresa_nome', empresaFiltro);
+    }
+
+    if (statusFiltro != null &&
+        statusFiltro.isNotEmpty &&
+        statusFiltro != 'todos') {
+      query = query.eq('status', statusFiltro);
+    }
+
+    if (queryBusca != null && queryBusca.trim().isNotEmpty) {
+      final term = queryBusca.trim().toUpperCase();
+      query = query.or('placa.ilike.%$term%,chassi.ilike.%$term%,numero_laudo.ilike.%$term%');
+    }
+
+    final res = await query
+        .order('created_at', ascending: false)
+        .range(offset, offset + limit - 1);
+
+    return List<Map<String, dynamic>>.from(res);
+  }
+
+  /// Retorna lista de empresas que já emitiram laudos
+  Future<List<String>> listarEmpresasComLaudos() async {
+    try {
+      final res = await _supabase
+          .from('empresas')
+          .select('razao_social');
+
+      final Set<String> empresas = {};
+      for (final item in res) {
+        String? nome = item['razao_social'] as String?;
+        if (nome != null && nome.trim().isNotEmpty) {
+          empresas.add(nome.trim());
+        }
+      }
+      return empresas.toList()..sort();
+    } catch (e) {
+      print('Erro ao listar empresas: $e');
+      return [];
+    }
+  }
+
+  /// Retorna métricas consolidadas para o Painel Master
+  Future<Map<String, int>> obterMetricasMaster() async {
+    try {
+      final res = await _supabase
+          .from('vistorias_cloud')
+          .select('status, empresa_nome');
+
+      int total = res.length;
+      int aprovados = 0;
+      int reprovados = 0;
+      int apontamentos = 0;
+      int emAndamento = 0;
+      final Set<String> empresas = {};
+
+      for (final row in res) {
+        final st = (row['status'] as String? ?? '').toLowerCase();
+        if (st.contains('aprovado') && !st.contains('apontamento')) {
+          aprovados++;
+        } else if (st.contains('reprovado')) {
+          reprovados++;
+        } else if (st.contains('apontamento')) {
+          apontamentos++;
+        } else {
+          emAndamento++;
+        }
+
+        String? emp = row['empresa_nome'] as String?;
+        if (emp != null && emp.trim().isNotEmpty) {
+          empresas.add(emp.trim().toUpperCase());
+        }
+      }
+
+      return {
+        'total': total,
+        'aprovados': aprovados,
+        'reprovados': reprovados,
+        'apontamentos': apontamentos,
+        'emAndamento': emAndamento,
+        'totalEmpresas': empresas.length,
+      };
+    } catch (e) {
+      print('Erro ao obter métricas master: $e');
+      return {
+        'total': 0,
+        'aprovados': 0,
+        'reprovados': 0,
+        'apontamentos': 0,
+        'emAndamento': 0,
+        'totalEmpresas': 0,
+      };
+    }
+  }
+
+  bool _isSyncing = false;
+
   Future<void> excluirVistoriaNuvem(String vistoriaId) async {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
     try {
       // 1. Deleta do banco de dados na nuvem
-      await _supabase.from('vistorias_cloud').delete().eq('id', vistoriaId);
+      final res = await _supabase
+          .from('vistorias_cloud')
+          .delete()
+          .eq('id', vistoriaId)
+          .select();
+      print('Vistoria $vistoriaId excluída da nuvem: ${res.length} registro(s) afetado(s).');
 
-      // 2. Remove arquivos do storage associados
+      // 2. Remove arquivos do storage associados (pasta do usuário e pasta direta)
       try {
         final folderPath = '${user.id}/$vistoriaId';
         final files = await _supabase.storage.from('laudos-pdf').list(path: folderPath);
@@ -212,7 +356,15 @@ class SyncService {
         }
       } catch (_) {}
 
-      print('Vistoria $vistoriaId excluída da nuvem com sucesso.');
+      try {
+        final files = await _supabase.storage.from('laudos-pdf').list(path: vistoriaId);
+        if (files.isNotEmpty) {
+          final paths = files.map((f) => '$vistoriaId/${f.name}').toList();
+          await _supabase.storage.from('laudos-pdf').remove(paths);
+        }
+      } catch (_) {}
+
+      print('Arquivos de $vistoriaId limpos do storage.');
     } catch (e) {
       print('Erro ao excluir vistoria da nuvem: $e');
     }
@@ -318,6 +470,12 @@ class SyncService {
     final user = _supabase.auth.currentUser;
     if (user == null) return;
 
+    if (_isSyncing) {
+      print('SyncService: autoSync já está em execução. Ignorando.');
+      return;
+    }
+    _isSyncing = true;
+
     try {
       // 1. Enviar vistorias pendentes (se houver offline)
       await syncVistoriasPendentes();
@@ -328,6 +486,19 @@ class SyncService {
             .from('vistorias_cloud')
             .select()
             .order('created_at', ascending: false);
+
+        // 2a. Reconciliação: se uma vistoria local já foi sincronizada, mas não existe mais na nuvem, foi excluída
+        final cloudIds = vistoriasCloud
+            .map((e) => e['id']?.toString())
+            .whereType<String>()
+            .toSet();
+        final vistoriasLocais = await _dao.listarVistorias();
+        for (final local in vistoriasLocais) {
+          if (local.sincronizado && !cloudIds.contains(local.id)) {
+            print('Removendo vistoria local excluída da nuvem: ${local.id}');
+            await _dao.excluirVistoriaCompleta(local.id);
+          }
+        }
 
         for (final vc in vistoriasCloud) {
           final dadosCompletos = vc['dados_completos'] as Map<String, dynamic>?;
@@ -347,6 +518,11 @@ class SyncService {
                   companion = companion.copyWith(pdfUrl: import_drift.Value(cloudPdf));
                 }
                 await _dao.upsertVistoria(companion);
+                final valorCloud = (vistoriaJson['valor'] as num?)?.toDouble() ??
+                    (vc['valor'] as num?)?.toDouble();
+                if (valorCloud != null && valorCloud > 0) {
+                  await _dao.salvarValorVistoria(vc['id'], valorCloud);
+                }
               } catch (e) {
                 print('Erro ao importar vistoria ${vc['id']}: $e');
               }
@@ -499,6 +675,100 @@ class SyncService {
       print('Auto-sync finalizado com sucesso.');
     } catch (e) {
       print('Erro no autoSync: $e');
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  // ── Gestão de Dispositivos (Master) ──────────────────────────────────────────
+
+  /// Lista todos os aparelhos registrados para análise do Master
+  Future<List<Map<String, dynamic>>> listarDispositivosMaster() async {
+    try {
+      final res = await _supabase.rpc('listar_dispositivos_master');
+      if (res is List) {
+        return res.cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (e) {
+      print('Erro ao listar dispositivos master: $e');
+      try {
+        final res = await _supabase
+            .from('dispositivos_autorizados')
+            .select('*')
+            .order('created_at', ascending: false);
+        return List<Map<String, dynamic>>.from(res);
+      } catch (e2) {
+        print('Erro no fallback de listar dispositivos: $e2');
+        return [];
+      }
+    }
+  }
+
+  /// Aprova um dispositivo pelo seu device_id
+  Future<bool> aprovarDispositivoMaster(String deviceId) async {
+    try {
+      final res = await _supabase.rpc('aprovar_dispositivo', params: {
+        'p_device_id': deviceId,
+      });
+      return res == true;
+    } catch (e) {
+      print('Erro ao aprovar dispositivo via RPC: $e');
+      try {
+        await _supabase.from('dispositivos_autorizados').update({
+          'status': 'aprovado',
+          'aprovado_em': DateTime.now().toIso8601String(),
+          'aprovado_por': _supabase.auth.currentUser?.id,
+          'motivo_bloqueio': null,
+        }).eq('device_id', deviceId);
+        return true;
+      } catch (e2) {
+        print('Erro ao aprovar dispositivo direto na tabela: $e2');
+        return false;
+      }
+    }
+  }
+
+  /// Bloqueia/revoga o acesso de um aparelho
+  Future<bool> bloquearDispositivoMaster(String deviceId, {String? motivo}) async {
+    try {
+      final res = await _supabase.rpc('bloquear_dispositivo', params: {
+        'p_device_id': deviceId,
+        'p_motivo': motivo ?? 'Acesso revogado pelo Administrador Master',
+      });
+      return res == true;
+    } catch (e) {
+      print('Erro ao bloquear dispositivo via RPC: $e');
+      try {
+        await _supabase.from('dispositivos_autorizados').update({
+          'status': 'bloqueado',
+          'motivo_bloqueio': motivo ?? 'Acesso revogado pelo Administrador Master',
+        }).eq('device_id', deviceId);
+        return true;
+      } catch (e2) {
+        print('Erro ao bloquear dispositivo direto na tabela: $e2');
+        return false;
+      }
+    }
+  }
+
+  /// Remove permanentemente o registro de um aparelho
+  Future<bool> removerDispositivoMaster(String deviceId) async {
+    try {
+      final res = await _supabase.rpc('remover_dispositivo_master', params: {
+        'p_device_id': deviceId,
+      });
+      return res == true;
+    } catch (e) {
+      print('Erro ao remover dispositivo: $e');
+      try {
+        await _supabase.from('dispositivos_autorizados').delete().eq('device_id', deviceId);
+        return true;
+      } catch (e2) {
+        print('Erro no fallback ao deletar dispositivo: $e2');
+        return false;
+      }
     }
   }
 }
+

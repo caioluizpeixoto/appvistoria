@@ -66,7 +66,7 @@ class StepMotorCambio extends StatelessWidget {
         const InspecaoItemWidget(
           itemId: 'cambio_gravacao',
           label: 'Gravação do Câmbio',
-          obrigatoria: true,
+          obrigatoria: false,
           statusOptions: [
             'Original',
             'Divergente',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/blocs/auth_bloc.dart';
@@ -10,6 +11,8 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final isMaster = user?.isMaster ?? false;
 
     return Drawer(
       backgroundColor: AppTheme.surface,
@@ -20,6 +23,42 @@ class AppDrawer extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
+                if (isMaster) ...[
+                  ListTile(
+                    tileColor: Colors.amber.shade50.withValues(alpha: 0.5),
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.shade100,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.phonelink_lock_rounded,
+                          color: Color(0xFFD97706), size: 20),
+                    ),
+                    title: const Text(
+                      'Liberar Aparelhos',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFB45309),
+                        fontSize: 15,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Autorizar e gerenciar aparelhos',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        size: 20, color: Color(0xFFB45309)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/master/painel');
+                    },
+                  ),
+                  const Divider(),
+                ],
                 ListTile(
                   leading: const Icon(Icons.account_balance_wallet_rounded,
                       color: AppTheme.primary),
@@ -43,6 +82,31 @@ class AppDrawer extends StatelessWidget {
                   onTap: () {
                     Navigator.pop(context);
                     context.push('/carteira');
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.insights_rounded,
+                      color: AppTheme.primary),
+                  title: const Text(
+                    'Relatórios & Dashboard',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.primary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Produção, faturamento e gráficos',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right_rounded,
+                      size: 20, color: AppTheme.textHint),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.push('/relatorios');
                   },
                 ),
                 const Divider(),

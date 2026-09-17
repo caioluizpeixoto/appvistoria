@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_vistoria/injection_container.dart';
 import 'package:app_vistoria/database/app_database.dart' as import_app_database;
 import 'package:app_vistoria/core/services/sync_service.dart' as import_sync_service;
+import 'package:app_vistoria/core/services/device_security_service.dart' as import_device_sec;
+import 'package:app_vistoria/core/services/empresa_rodape_helper.dart' as import_rodape;
 
 // ── Events ────────────────────────────────────────────────────────────────────
 abstract class AuthEvent extends Equatable {
@@ -61,6 +63,17 @@ class AuthAuthenticated extends AuthBlocState {
   List<Object?> get props => [user.id];
 }
 
+extension UserRoleExtension on User {
+  String get appRole =>
+      (userMetadata?['role'] as String?)?.toLowerCase() ?? 'empresa';
+  bool get isMaster =>
+      appRole == 'master' ||
+      appRole == 'admin_master' ||
+      (email != null && email!.contains('42136154800'));
+  String get displayName =>
+      (userMetadata?['name'] as String?) ?? email ?? 'Usuário';
+}
+
 class AuthUnauthenticated extends AuthBlocState {}
 
 class AuthError extends AuthBlocState {
@@ -87,9 +100,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
     });
   }
 
-  void _onCheckSession(AuthCheckSession event, Emitter<AuthBlocState> emit) {
+  Future<void> _onCheckSession(AuthCheckSession event, Emitter<AuthBlocState> emit) async {
     final user = _supabase.auth.currentUser;
     if (user != null) {
+      if (user.isMaster) {
+        sl<import_device_sec.DeviceSecurityService>().setMasterBypass(true);
+      } else {
+        await sl<import_device_sec.DeviceSecurityService>()
+            .isDeviceApproved(forceRemote: true, userId: user.id);
+      }
+      await import_rodape.EmpresaRodapeInfo.carregarAsync();
       emit(AuthAuthenticated(user));
     } else {
       emit(AuthUnauthenticated());
@@ -98,7 +118,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
 
   String _buildEmail(String username) {
     final clean = username.replaceAll(RegExp(r'[^0-9]'), '');
-    return '$clean@appvistoria.com.br';
+    final userPart = clean.isNotEmpty ? clean : username.trim().toLowerCase();
+    return '$userPart@appvistoria.com.br';
   }
 
   Future<void> _onLogin(
@@ -110,7 +131,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
         password: event.password,
       );
       if (response.user != null) {
+        if (response.user!.isMaster) {
+          sl<import_device_sec.DeviceSecurityService>().setMasterBypass(true);
+        } else {
+          // Atualiza status do aparelho diretamente com o Supabase antes de emitir autenticado
+          await sl<import_device_sec.DeviceSecurityService>()
+              .isDeviceApproved(forceRemote: true, userId: response.user!.id);
+        }
+        await import_rodape.EmpresaRodapeInfo.carregarAsync();
         emit(AuthAuthenticated(response.user!));
+        sl<import_sync_service.SyncService>().autoSync();
       } else {
         emit(AuthError('Credenciais inválidas.'));
       }
@@ -131,6 +161,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
         data: {'role': event.role, 'name': event.name},
       );
       if (response.user != null) {
+        if (response.user!.isMaster) {
+          sl<import_device_sec.DeviceSecurityService>().setMasterBypass(true);
+        }
+        await import_rodape.EmpresaRodapeInfo.carregarAsync();
         emit(AuthAuthenticated(response.user!));
       } else {
         emit(AuthError('Erro ao criar conta.'));
@@ -145,6 +179,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
   Future<void> _onLogout(AuthLogoutRequested event, Emitter<AuthBlocState> emit) async {
     emit(AuthLoading());
     try {
+      sl<import_device_sec.DeviceSecurityService>().setMasterBypass(false);
       await _supabase.auth.signOut();
       
       // Limpa banco local no logout
@@ -157,13 +192,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
     }
   }
 
-  void _onAuthStateChanged(AuthStateChanged event, Emitter<AuthBlocState> emit) {
+  Future<void> _onAuthStateChanged(AuthStateChanged event, Emitter<AuthBlocState> emit) async {
     final session = event.supabaseAuthState.session;
     if (session != null) {
+      if (session.user.isMaster) {
+        sl<import_device_sec.DeviceSecurityService>().setMasterBypass(true);
+      } else {
+        await sl<import_device_sec.DeviceSecurityService>()
+            .isDeviceApproved(forceRemote: true, userId: session.user.id);
+      }
+      await import_rodape.EmpresaRodapeInfo.carregarAsync();
       emit(AuthAuthenticated(session.user));
       // Dispara sync em background (não aguarda (await) para não travar a tela)
       sl<import_sync_service.SyncService>().autoSync();
     } else {
+      sl<import_device_sec.DeviceSecurityService>().setMasterBypass(false);
       emit(AuthUnauthenticated());
     }
   }

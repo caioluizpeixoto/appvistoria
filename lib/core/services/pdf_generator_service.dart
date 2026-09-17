@@ -22,6 +22,7 @@ import 'dart:ui' as ui;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image/image.dart' as img;
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'pdf_radar_generator.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -447,7 +448,6 @@ class PdfGeneratorService {
           'caixa_ar_esquerda',
           'assoalho_esquerdo',
           'coluna_central_esquerda',
-          'longarina_centro_esquerda',
           'coluna_traseira_esquerda',
           'caixa_roda_traseira_esquerda',
           'longarina_traseira_esquerda',
@@ -456,7 +456,6 @@ class PdfGeneratorService {
           'longarina_traseira_direita',
           'caixa_roda_traseira_direita',
           'coluna_traseira_direita',
-          'longarina_centro_direita',
           'coluna_central_direita',
           'assoalho_direito',
           'caixa_ar_direita',
@@ -584,6 +583,29 @@ class PdfGeneratorService {
         hasAnyPhoto = true;
       }
 
+      // PRÉ-COMPRESSÃO DAS IMAGENS PARA EVITAR OUT OF MEMORY NO PDF MANTENDO ALTA QUALIDADE
+      for (final secao in allSections) {
+        final fotos = secao['fotos'] as List<Map<String, dynamic>>? ?? [];
+        for (final f in fotos) {
+          final pathStr = f['path'] as String?;
+          if (pathStr != null && pathStr.isNotEmpty && File(pathStr).existsSync()) {
+            try {
+              final bytes = await FlutterImageCompress.compressWithFile(
+                pathStr,
+                minWidth: 1920,
+                minHeight: 1920,
+                quality: 95,
+              );
+              if (bytes != null) {
+                f['pdf_bytes'] = bytes;
+              }
+            } catch (e) {
+              print('Erro ao comprimir imagem para o PDF: $e');
+            }
+          }
+        }
+      }
+
       void addFotosMultiPage(List<Map<String, dynamic>> sectionsToPrint, {bool addResumoEParecer = false}) {
         if (sectionsToPrint.isEmpty && !addResumoEParecer) return;
 
@@ -606,7 +628,10 @@ class PdfGeneratorService {
 
                 try {
                   final pathStr = f['path'] as String? ?? '';
-                  if (f['base64'] != null &&
+                  if (f['pdf_bytes'] != null) {
+                    final bytes = f['pdf_bytes'] as Uint8List;
+                    imageWidget = pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.cover);
+                  } else if (f['base64'] != null &&
                       (f['base64'] as String).isNotEmpty) {
                     final bytes = base64Decode(f['base64'] as String);
                     imageWidget =
@@ -995,38 +1020,34 @@ class PdfGeneratorService {
           pdf.addPage(_buildPageAnalise(
             titulo: 'ANÁLISE ESTRUTURAL',
             itens: const [
-              'painel_frontal',
-              'painel_corta_fogo',
-              'torre_amortecedor_esquerda',
               'longarina_dianteira_esquerda',
-              'caixa_roda_dianteira_esquerda',
+              'torre_amortecedor_esquerda',
               'coluna_dianteira_esquerda',
-              'caixa_ar_esquerda',
-              'assoalho_esquerdo',
               'coluna_central_esquerda',
-              'longarina_centro_esquerda',
               'coluna_traseira_esquerda',
-              'caixa_roda_traseira_esquerda',
               'longarina_traseira_esquerda',
               'painel_traseiro',
-              'caixa_estepe',
               'longarina_traseira_direita',
-              'caixa_roda_traseira_direita',
               'coluna_traseira_direita',
-              'longarina_centro_direita',
               'coluna_central_direita',
+              'coluna_dianteira_direita',
+              'longarina_dianteira_direita',
+              'painel_frontal',
+              'painel_corta_fogo',
+              'caixa_roda_dianteira_esquerda',
+              'caixa_ar_esquerda',
+              'assoalho_esquerdo',
+              'caixa_roda_traseira_esquerda',
+              'caixa_estepe',
+              'caixa_roda_traseira_direita',
               'assoalho_direito',
               'caixa_ar_direita',
-              'coluna_dianteira_direita',
               'caixa_roda_dianteira_direita',
-              'longarina_dianteira_direita',
               'torre_amortecedor_direita',
             ],
             labels: const {
               'longarina_dianteira_direita': 'Longarina Dianteira Direita',
               'longarina_dianteira_esquerda': 'Longarina Dianteira Esquerda',
-              'longarina_centro_direita': 'Longarina Centro Direita',
-              'longarina_centro_esquerda': 'Longarina Centro Esquerda',
               'longarina_traseira_direita': 'Longarina Traseira Direita',
               'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
               'painel_frontal': 'Painel Frontal',
@@ -2317,7 +2338,6 @@ class PdfGeneratorService {
           s.contains('obstruído') ||
           s.contains('alongado') ||
           s.contains('consideração') ||
-          s.contains('sem acesso') ||
           s.contains('inexistente') ||
           s.contains('remarcad')) return 1;
       return 0;
@@ -2935,24 +2955,24 @@ class PdfGeneratorService {
                                           pw.SizedBox(height: 0.8),
                                           pw.Text(
                                             'CLIENTE: ${clienteNomeStr.toUpperCase()}',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
                                             maxLines: 1,
                                             overflow: pw.TextOverflow.clip,
                                           ),
                                           pw.SizedBox(height: 0.6),
                                           pw.Text(
                                             'CÓDIGO: ${vistoria.numeroLaudo}',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
                                           ),
                                           pw.SizedBox(height: 0.6),
                                           pw.Text(
-                                            'KM: $kmStr | DATA: $dataVistoriaStr',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                            'DATA: $dataVistoriaStr',
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
                                           ),
                                           pw.SizedBox(height: 0.6),
                                           pw.Text(
                                             'PERITO: $peritoNome',
-                                            style: pw.TextStyle(font: styles.bold, fontSize: 5.4, color: PdfColors.black),
+                                            style: pw.TextStyle(font: styles.bold, fontSize: 6.0, color: PdfColors.black),
                                           ),
                                         ],
                                       ),
@@ -3167,7 +3187,7 @@ class PdfGeneratorService {
                                       children: [
                                         _buildVehicleInfoField('Nº CHASSI:', valChassi, styles),
                                         _buildVehicleInfoField('Nº MOTOR:', valMotor, styles),
-                                        _buildVehicleInfoField('PLACA:', valPlaca, styles),
+                                        _buildVehicleInfoField('KM:', kmStr, styles),
                                       ],
                                     ),
                                   ),
@@ -4909,7 +4929,6 @@ class PdfGeneratorService {
         'coluna_central_esquerda',
         'coluna_traseira_esquerda',
         'caixa_ar_esquerda',
-        'longarina_centro_esquerda',
       ],
       'ESTRUTURA - PARTE TRASEIRA': [
         'painel_traseiro',
@@ -4924,7 +4943,6 @@ class PdfGeneratorService {
         'coluna_central_direita',
         'coluna_traseira_direita',
         'caixa_ar_direita',
-        'longarina_centro_direita',
       ],
       'ASSOALHO': [
         'assoalho_esquerdo',
@@ -4945,7 +4963,6 @@ class PdfGeneratorService {
       'coluna_central_esquerda': 'COLUNA CENTRAL',
       'coluna_traseira_esquerda': 'COLUNA TRASEIRA',
       'caixa_ar_esquerda': 'CAIXA DE AR',
-      'longarina_centro_esquerda': 'LONGARINA CENTRAL',
       'painel_traseiro': 'PAINEL TRASEIRO',
       'caixa_estepe': 'CAIXA DO ESTEPE',
       'longarina_traseira_esquerda': 'LONGARINA TRASEIRA ESQUERDA',
@@ -4956,7 +4973,6 @@ class PdfGeneratorService {
       'coluna_central_direita': 'COLUNA CENTRAL',
       'coluna_traseira_direita': 'COLUNA TRASEIRA',
       'caixa_ar_direita': 'CAIXA DE AR',
-      'longarina_centro_direita': 'LONGARINA CENTRAL',
       'assoalho_esquerdo': 'ASSOALHO LADO ESQUERDO',
       'assoalho_direito': 'ASSOALHO LADO DIREITO',
     };
@@ -6691,7 +6707,6 @@ class PdfGeneratorService {
       'caixa_ar_esquerda',
       'assoalho_esquerdo',
       'coluna_central_esquerda',
-      'longarina_centro_esquerda',
       'coluna_traseira_esquerda',
       'caixa_roda_traseira_esquerda',
       'longarina_traseira_esquerda',
@@ -6700,7 +6715,6 @@ class PdfGeneratorService {
       'longarina_traseira_direita',
       'caixa_roda_traseira_direita',
       'coluna_traseira_direita',
-      'longarina_centro_direita',
       'coluna_central_direita',
       'assoalho_direito',
       'caixa_ar_direita',

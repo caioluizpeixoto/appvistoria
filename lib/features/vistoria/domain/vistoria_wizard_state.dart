@@ -20,6 +20,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String vistoriadorNome = '';
   String vistoriadorCpf = '';
   String status = 'Em andamento';
+  double? valorLaudo;
 
   // ── Dados do Veículo (Step 2) ──────────────────────────────────────────────
   String placa = '';
@@ -392,7 +393,6 @@ class VistoriaWizardState extends ChangeNotifier {
       'painel_hodometro',
       'chassi_gravacao',
       'motor_gravacao',
-      'cambio_gravacao',
     ];
     if (!isCaminhao) {
       list.addAll([

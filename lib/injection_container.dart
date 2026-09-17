@@ -12,9 +12,11 @@ import 'core/services/image_service.dart';
 import 'core/services/ocr_service.dart';
 import 'core/services/pdf_generator_service.dart';
 import 'core/services/sync_service.dart';
+import 'core/services/device_security_service.dart';
 import 'features/wallet/data/payment/mock_pix_payment_service.dart';
 import 'features/wallet/data/payment/payment_provider.dart';
 import 'features/wallet/data/repositories/wallet_repository.dart';
+import 'features/relatorios/data/repositories/relatorios_repository.dart';
 
 final sl = GetIt.instance;
 
@@ -68,6 +70,9 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<SyncService>(
     () => SyncService(),
   );
+  sl.registerLazySingleton<DeviceSecurityService>(
+    () => DeviceSecurityService(supabase: sl<SupabaseClient>()),
+  );
 
   // ── Carteira Financeira e Pagamentos ──────────────────────────────────────
   sl.registerLazySingleton<PaymentProvider>(
@@ -77,6 +82,13 @@ Future<void> initDependencies() async {
     () => WalletRepository(
       supabase: sl<SupabaseClient>(),
       paymentProvider: sl<PaymentProvider>(),
+    ),
+  );
+
+  // ── Relatórios e Dashboard Executivo ──────────────────────────────────────
+  sl.registerLazySingleton<RelatoriosRepository>(
+    () => RelatoriosRepository(
+      supabase: sl<SupabaseClient>(),
     ),
   );
 }

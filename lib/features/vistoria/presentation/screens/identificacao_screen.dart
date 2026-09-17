@@ -11,6 +11,7 @@ import '../../../../injection_container.dart';
 import '../../../../features/consulta_bin/data/services/radar_service.dart';
 import '../../../../features/consulta_bin/data/repositories/radar_repository.dart';
 import '../../../../features/consulta_bin/domain/entities/radar_veiculo.dart';
+import '../../../../features/consulta_bin/domain/radar_produtos.dart';
 import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/daos/autocred_dao.dart';
 import '../../../../database/app_database.dart';
@@ -20,6 +21,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+
+import '../../../../features/wallet/data/repositories/wallet_repository.dart';
 
 class IdentificacaoScreen extends StatefulWidget {
   final TipoVistoria tipo;
@@ -63,29 +66,35 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   String? _arquivoPesquisaUrl;
   String? _situacaoVeiculo;
   Map<String, dynamic>? _dadosPesquisaCarregada;
+  String? _vincularVistoriaId;
 
   // Modo de entrada da busca: 'placa', 'chassi', ou 'motor'
   String _modoEntrada = 'placa';
   bool _somentePesquisa = false;
+  bool _somenteMotor = false;
 
   // Tipos de consulta disponíveis (Radar Consultas)
-  final List<Map<String, dynamic>> _tiposConsulta = [
-    {'nome': 'AUTO BIN', 'codigo': 'auto_bin'},
-    {'nome': 'AUTO PERÍCIA', 'codigo': 'auto_pericia'},
-    {'nome': 'AUTO PERÍCIA HRF', 'codigo': 'auto_pericia_hrf'},
-    {'nome': 'AUTO COMPLETA', 'codigo': 'auto_completa'},
-    {'nome': 'AUTO LEILÃO', 'codigo': 'auto_leilao'},
-    {'nome': 'AUTO BASE ESTADUAL', 'codigo': 'auto_base_estadual'},
-    {'nome': 'AUTO DÉBITOS E RECALL', 'codigo': 'auto_debitos_recall'},
-  ];
+  final List<Map<String, dynamic>> _tiposConsulta =
+      RadarProdutos.listaParaSelecao;
   String _produtoSelecionado = 'auto_bin';
 
   @override
   void initState() {
     super.initState();
     if (widget.dadosIniciais != null && widget.dadosIniciais!.isNotEmpty) {
-      if (widget.dadosIniciais!.containsKey('produtoSelecionado')) {
+      if (widget.dadosIniciais!.containsKey('somenteMotor')) {
+        _somenteMotor = widget.dadosIniciais!['somenteMotor'] == true;
+      }
+      if (widget.dadosIniciais!.containsKey('modoEntrada')) {
+        _modoEntrada = widget.dadosIniciais!['modoEntrada'];
+      }
+      if (_somenteMotor) {
+        _modoEntrada = 'motor';
+        _produtoSelecionado = 'bin_por_motor';
+      } else if (widget.dadosIniciais!.containsKey('produtoSelecionado')) {
         _produtoSelecionado = widget.dadosIniciais!['produtoSelecionado'];
+      } else if (_modoEntrada == 'motor') {
+        _produtoSelecionado = 'bin_por_motor';
       }
       if (widget.dadosIniciais!.containsKey('somentePesquisa')) {
         _somentePesquisa = widget.dadosIniciais!['somentePesquisa'] == true;
@@ -95,13 +104,18 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         _placaEditCtrl.text = widget.dadosIniciais!['placa'] ?? '';
         _chassiEditCtrl.text = widget.dadosIniciais!['chassi'] ?? '';
         _motorEditCtrl.text = widget.dadosIniciais!['motor'] ?? '';
-        
+
         final rawMarcaModelo = widget.dadosIniciais!['marcaModelo'] ??
             widget.dadosIniciais!['marcamodelo'] ??
-            '${widget.dadosIniciais!['marca'] ?? ''} ${widget.dadosIniciais!['modelo'] ?? ''}'.trim();
+            '${widget.dadosIniciais!['marca'] ?? ''} ${widget.dadosIniciais!['modelo'] ?? ''}'
+                .trim();
         final mm = VeiculoParser.extrairMarcaModelo(rawMarcaModelo);
-        _marcaEditCtrl.text = mm.marca.isNotEmpty ? mm.marca : (widget.dadosIniciais!['marca'] ?? '');
-        _modeloEditCtrl.text = mm.modelo.isNotEmpty ? mm.modelo : (widget.dadosIniciais!['modelo'] ?? '');
+        _marcaEditCtrl.text = mm.marca.isNotEmpty
+            ? mm.marca
+            : (widget.dadosIniciais!['marca'] ?? '');
+        _modeloEditCtrl.text = mm.modelo.isNotEmpty
+            ? mm.modelo
+            : (widget.dadosIniciais!['modelo'] ?? '');
 
         _anoFabEditCtrl.text = widget.dadosIniciais!['anoFabricacao'] ?? '';
         _anoModEditCtrl.text = widget.dadosIniciais!['anoModelo'] ?? '';
@@ -111,6 +125,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         _ufEditCtrl.text = widget.dadosIniciais!['uf'] ?? '';
         _restricoesEditCtrl.text = widget.dadosIniciais!['restricoes'] ?? '';
         _situacaoVeiculo = widget.dadosIniciais!['situacao'];
+      }
+
+      if (widget.dadosIniciais!.containsKey('vincularVistoriaId')) {
+        _vincularVistoriaId = widget.dadosIniciais!['vincularVistoriaId'];
       }
     }
   }
@@ -159,9 +177,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       _mensagemCarregamento = 'Consulta carregada com sucesso';
       _veiculoEncontrado = true;
 
-      _placaEditCtrl.text = veiculo.placa;
-      _chassiEditCtrl.text = veiculo.chassi;
-      _motorEditCtrl.text = veiculo.motor;
+      _placaEditCtrl.text = veiculo.placa.isNotEmpty
+          ? veiculo.placa
+          : (_modoEntrada == 'placa'
+              ? _buscaCtrl.text.trim().toUpperCase()
+              : '');
+      _chassiEditCtrl.text = veiculo.chassi.isNotEmpty
+          ? veiculo.chassi
+          : (_modoEntrada == 'chassi'
+              ? _buscaCtrl.text.trim().toUpperCase()
+              : '');
+      _motorEditCtrl.text = veiculo.motor.isNotEmpty
+          ? veiculo.motor
+          : (_modoEntrada == 'motor'
+              ? _buscaCtrl.text.trim().toUpperCase()
+              : '');
 
       final mm = VeiculoParser.extrairMarcaModelo(veiculo.marcaModelo);
       _marcaEditCtrl.text = mm.marca;
@@ -182,8 +212,102 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     });
   }
 
+  void _mostrarDialogPesquisaEmAndamento(String valor, String? token) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.hourglass_top_rounded,
+                  color: Color(0xFFD97706), size: 28),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Pesquisa em Andamento',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'A pesquisa para "$valor" foi aberta na Radar e está em análise técnica pelo Detran.',
+              style: const TextStyle(fontSize: 14, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFD97706), size: 22),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ATENÇÃO: Não realize uma nova consulta agora! Isso consumiria outro crédito desnecessariamente.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Assim que o Detran concluir o retorno, você poderá puxar os dados pelo Histórico de Pesquisas (ícone do relógio no topo direito) sem custo adicional.',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child:
+                const Text('Entendido', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.push('/historico-consultas');
+            },
+            icon: const Icon(Icons.history_rounded, size: 18),
+            label: const Text('Ver no Histórico'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<Map<String, dynamic>?> _verificarNuvem(String rawValor) async {
-    final valor = rawValor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final valor =
+        rawValor.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     final repo = sl<RadarRepository>();
     final service = sl<RadarService>();
 
@@ -196,45 +320,84 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     final hasPending = await repo.existeConsultaPendente(_modoEntrada, valor);
     if (hasPending) {
       if (!mounted) return null;
-      setState(() { _buscandoVeiculo = false; });
-      final querForcar = await showDialog<bool>(
+      setState(() {
+        _buscandoVeiculo = false;
+      });
+      final opcao = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary.withValues(alpha: 0.1),
+                  color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.hourglass_top_rounded, color: AppTheme.primary, size: 24),
+                child: const Icon(Icons.hourglass_top_rounded,
+                    color: Color(0xFFD97706), size: 24),
               ),
               const SizedBox(width: 12),
-              const Expanded(child: Text('Pesquisa em Andamento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
+              const Expanded(
+                  child: Text('Pesquisa em Andamento',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.bold))),
             ],
           ),
-          content: const Text('Já existe uma pesquisa em andamento para este veículo.\n\nSe a tentativa anterior falhou ou travou, você pode forçar uma nova consulta.'),
+          content: const Text(
+              'Já existe uma pesquisa em andamento/análise técnica para este veículo.\n\n⚠️ Evite cobranças duplicadas de saldo! Você pode verificar se a pesquisa anterior já foi concluída pelo Histórico.'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Aguardar', style: TextStyle(color: Colors.grey)),
+              onPressed: () => Navigator.of(ctx).pop('cancelar'),
+              child:
+                  const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.history_rounded, size: 16),
+              onPressed: () => Navigator.of(ctx).pop('historico'),
+              label: const Text('Ver no Histórico'),
+            ),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () => Navigator.of(ctx).pop('verificar'),
+              label: const Text('Verificar Status'),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
               ),
-              onPressed: () => Navigator.of(ctx).pop(true),
+              onPressed: () => Navigator.of(ctx).pop('forcar'),
               child: const Text('Forçar Nova'),
             )
           ],
-        )
+        ),
       );
 
-      if (querForcar != true) {
+      if (opcao == 'historico') {
+        if (mounted) context.push('/historico-consultas');
+        return null;
+      } else if (opcao == 'verificar') {
+        final token =
+            await repo.buscarTokenConsultaPendente(_modoEntrada, valor);
+        if (token != null && token.isNotEmpty) {
+          return {
+            'forcarNova': false,
+            'fonte': 'radar',
+            'tokenConsulta': token
+          };
+        }
+      } else if (opcao != 'forcar') {
         return {'forcarNova': false, 'fonte': 'local', 'dados_tratados': null};
       }
       // Se forçar nova, ignoramos que está pendente e o fluxo continua para as concluídas ou nova.
@@ -273,7 +436,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
     if (combinadas.isEmpty) {
       if (!mounted) {
-        setState(() { _buscandoVeiculo = false; });
+        setState(() {
+          _buscandoVeiculo = false;
+        });
         return {'forcarNova': true};
       }
       final querNova = await showDialog<bool>(
@@ -473,6 +638,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
   Future<bool> _buscarVeiculo() async {
     if (_buscandoVeiculo) return false;
+    if (_produtoSelecionado == 'nenhuma') return false;
 
     final rawValor = _buscaCtrl.text.trim();
     if (rawValor.isEmpty) return false;
@@ -482,7 +648,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
     final escolhida = await _verificarNuvem(valor);
     if (escolhida == null) {
-      setState(() { _buscandoVeiculo = false; });
+      setState(() {
+        _buscandoVeiculo = false;
+      });
       return false; // Cancelou
     }
 
@@ -491,9 +659,12 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     if (escolhida['forcarNova'] != true) {
       if (escolhida['fonte'] == 'local') {
         if (escolhida['dados_tratados'] == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('A pesquisa ainda está em andamento. Aguarde a conclusão ou acesse pelo histórico.')));
-          setState(() { _buscandoVeiculo = false; });
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'A pesquisa ainda está em andamento. Aguarde a conclusão ou acesse pelo histórico.')));
+          setState(() {
+            _buscandoVeiculo = false;
+          });
           return false;
         }
         // Reaproveitar dados antigos locais/nuvem supabase
@@ -520,6 +691,23 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           : 'Consultando veículo...';
     });
 
+    // Lógica pronta para descontar do saldo (Desativada por enquanto)
+    /*
+    if (escolhida['forcarNova'] == true) {
+      try {
+        final walletRepo = sl<WalletRepository>();
+        await walletRepo.authorizePaidOperation(
+          serviceCode: _produtoSelecionado,
+          referenceType: 'consulta',
+          referenceId: valor,
+          description: 'Consulta $_produtoSelecionado ($valor)',
+        );
+      } catch (e) {
+        // Ignora erro para não travar (conforme solicitado: sem trava de saldo)
+      }
+    }
+    */
+
     try {
       final service = sl<RadarService>();
       final veiculo = await service.consultarVeiculo(
@@ -537,15 +725,35 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       return true;
     } catch (e) {
       if (mounted) {
+        final erroMsg = e.toString().replaceAll('Exception: ', '').trim();
+        final bool isEmAndamento = erroMsg.contains('análise técnica') ||
+            erroMsg.contains('em andamento') ||
+            erroMsg.contains('processamento') ||
+            erroMsg.contains('aberta na Radar');
+
         setState(() {
-          _mensagemCarregamento = 'Erro na consulta';
+          _mensagemCarregamento =
+              isEmAndamento ? 'Pesquisa em andamento' : 'Erro na consulta';
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll('Exception: ', '')),
-            backgroundColor: AppTheme.naoConforme,
-          ),
-        );
+
+        String? novoToken = tokenConsulta;
+        if (erroMsg.contains('Pesquisa em andamento:')) {
+          final parts = erroMsg.split('Pesquisa em andamento:');
+          if (parts.length > 1 && parts[1].trim().isNotEmpty) {
+            novoToken = parts[1].trim();
+          }
+        }
+
+        if (isEmAndamento) {
+          _mostrarDialogPesquisaEmAndamento(valor, novoToken);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(erroMsg),
+              backgroundColor: AppTheme.naoConforme,
+            ),
+          );
+        }
       }
       return false;
     } finally {
@@ -574,8 +782,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         if (mounted) {
           if (vistoria.status == 'concluido') {
             final diff = DateTime.now().difference(vistoria.updatedAt);
-            const bool _enableTimeLimit = false; // Deixado falso a pedido do usuário (sem tempo)
-            
+            const bool _enableTimeLimit =
+                false; // Deixado falso a pedido do usuário (sem tempo)
+
             if (_enableTimeLimit && diff.inHours > 72) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -589,10 +798,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             // Retificar
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(
-                    _enableTimeLimit 
-                        ? 'Modo Retificação ativado. (${72 - diff.inHours}h restantes)'
-                        : 'Modo Retificação ativado.'),
+                content: Text(_enableTimeLimit
+                    ? 'Modo Retificação ativado. (${72 - diff.inHours}h restantes)'
+                    : 'Modo Retificação ativado.'),
                 backgroundColor: AppTheme.comObs,
               ),
             );
@@ -646,7 +854,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             await dao.buscarPorId(veiculoExistente.vistoriaId);
         if (vistoriaAnterior != null) {
           final diff = DateTime.now().difference(vistoriaAnterior.createdAt);
-          const bool _enableTimeLimit = false; // Deixado falso a pedido do usuário (sem tempo)
+          const bool _enableTimeLimit =
+              false; // Deixado falso a pedido do usuário (sem tempo)
           if (!_enableTimeLimit || diff.inHours <= 72) {
             reuse = true;
           }
@@ -775,28 +984,35 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
       String? tokenConsulta;
       Map<String, dynamic>? dadosReaproveitados;
 
-      final escolhida = await _verificarNuvem(valor);
-      if (escolhida == null) {
-        setState(() { _buscandoVeiculo = false; });
-        return; // Cancela se o usuário fechar o Dialog
-      }
-
-      if (escolhida['forcarNova'] == true) {
-        forcarNova = true;
-      } else {
-        if (escolhida['fonte'] == 'local') {
-          dadosReaproveitados = escolhida;
-          reuse = true; // trata como reuso para pular a chamada à Radar API
-        } else if (escolhida['fonte'] == 'radar') {
-          // Se for via buscar histórico radar, a gente força nova local para bater na API com token
-          forcarNova = true;
-          tokenConsulta = escolhida['tokenConsulta'];
+      if (_produtoSelecionado != 'nenhuma') {
+        final escolhida = await _verificarNuvem(valor);
+        if (escolhida == null) {
+          return; // Cancela se o usuário fechar o Dialog
         }
+
+        if (escolhida['forcarNova'] == true) {
+          forcarNova = true;
+        } else {
+          if (escolhida['fonte'] == 'local') {
+            dadosReaproveitados = escolhida;
+            reuse = true; // trata como reuso para pular a chamada à Radar API
+          } else if (escolhida['fonte'] == 'radar') {
+            // Se for via buscar histórico radar, reaproveitamos o token sem forçar nova consulta
+            forcarNova = false; // Corrigido: antes era true e gerava duplicidade
+            tokenConsulta = escolhida['tokenConsulta'];
+          }
+        }
+      } else {
+        // Se for "SEM PESQUISA PRÉVIA", apenas criamos a vistoria vazia sem consultar o histórico
+        forcarNova = true;
       }
 
       if (reuse && dadosReaproveitados == null) {
         // Reuso local puro
         vistoriaId = veiculoExistente!.vistoriaId;
+      } else if (_vincularVistoriaId != null) {
+        // Vinculando a uma vistoria existente (chamada por dentro do wizard)
+        vistoriaId = _vincularVistoriaId!;
       } else {
         // Nova vistoria local, mas com ou sem dados da nuvem
         vistoriaId = DateTime.now().millisecondsSinceEpoch.toString();
@@ -808,31 +1024,47 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           vistoriadorId: 'local-user', // TODO: obter ID real do usuário
           tipoVistoria: drift.Value(widget.tipo.titulo),
         ));
+      }
 
-        // Prepara objeto com dados que o usuário digitou ou que vieram da nuvem
-        String chassi = _modoEntrada == 'chassi'
-            ? valor
-            : (veiculoExistente?.chassiVeiculo ?? '');
-        String motor = _modoEntrada == 'motor'
-            ? valor
-            : (veiculoExistente?.motorVeiculo ?? '');
-        String placa =
-            _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
+      // Prepara objeto com dados que o usuário digitou ou que vieram da nuvem
+      String chassi = _modoEntrada == 'chassi'
+          ? valor
+          : (veiculoExistente?.chassiVeiculo ?? '');
+      String motor = _modoEntrada == 'motor'
+          ? valor
+          : (veiculoExistente?.motorVeiculo ?? '');
+      String placa =
+          _modoEntrada == 'placa' ? valor : (veiculoExistente?.placa ?? '');
 
-        String combustivel = (veiculoExistente?.combustivel ?? '');
+      String combustivel = (veiculoExistente?.combustivel ?? '');
 
-        if (dadosReaproveitados != null &&
-            dadosReaproveitados['dados_tratados'] != null) {
-          try {
-            final veiculoNuvem =
-                RadarVeiculo.fromJson(dadosReaproveitados['dados_tratados']);
-            if (veiculoNuvem.placa.isNotEmpty) placa = veiculoNuvem.placa;
-            if (veiculoNuvem.chassi.isNotEmpty) chassi = veiculoNuvem.chassi;
-            if (veiculoNuvem.motor.isNotEmpty) motor = veiculoNuvem.motor;
-            if (veiculoNuvem.combustivel.isNotEmpty) combustivel = veiculoNuvem.combustivel;
-          } catch (_) {}
+      if (dadosReaproveitados != null &&
+          dadosReaproveitados['dados_tratados'] != null) {
+        try {
+          final veiculoNuvem =
+              RadarVeiculo.fromJson(dadosReaproveitados['dados_tratados']);
+          if (veiculoNuvem.placa.isNotEmpty) placa = veiculoNuvem.placa;
+          if (veiculoNuvem.chassi.isNotEmpty) chassi = veiculoNuvem.chassi;
+          if (veiculoNuvem.motor.isNotEmpty) motor = veiculoNuvem.motor;
+          if (veiculoNuvem.combustivel.isNotEmpty) {
+            combustivel = veiculoNuvem.combustivel;
+          }
+        } catch (_) {}
+      }
+
+      if (_vincularVistoriaId != null || (reuse && dadosReaproveitados == null)) {
+        // A vistoria e o veículo já existem, apenas atualiza
+        final vExistente = await dao.buscarVeiculoPorVistoria(vistoriaId);
+        if (vExistente != null) {
+          await dao.atualizarVeiculo(VeiculosCompanion(
+            id: drift.Value(vExistente.id),
+            vistoriaId: drift.Value(vistoriaId),
+            placa: drift.Value(placa.isNotEmpty ? placa : vExistente.placa),
+            chassiVeiculo: drift.Value(chassi.isNotEmpty ? chassi : vExistente.chassiVeiculo),
+            motorVeiculo: drift.Value(motor.isNotEmpty ? motor : vExistente.motorVeiculo),
+          ));
         }
-
+      } else {
         await dao.inserirVeiculo(VeiculosCompanion.insert(
           id: vistoriaId,
           vistoriaId: vistoriaId,
@@ -843,19 +1075,21 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         ));
       }
 
-      // Inicia consulta em segundo plano sem await apenas se for nova!
-      if (!reuse && forcarNova) {
-        final service = sl<RadarService>();
-        service
-            .consultarVeiculo(
-          produto: _produtoSelecionado,
-          param: _modoEntrada,
-          value: valor,
-          vistoriaId: vistoriaId,
-          forcarNova: forcarNova,
-          tokenConsulta: tokenConsulta,
-        )
-            .then((veiculoApi) async {
+      // Inicia consulta em segundo plano sem await, independentemente de ser reuso ou nova,
+      // desde que tenhamos a placa para consultar. No reuso, envia forcarNova=false e tokenConsulta.
+      if (!reuse || (reuse && tokenConsulta != null)) {
+        if (_produtoSelecionado != 'nenhuma') {
+          final service = sl<RadarService>();
+          service
+              .consultarVeiculo(
+            produto: _produtoSelecionado,
+            param: _modoEntrada,
+            value: valor,
+            vistoriaId: vistoriaId,
+            forcarNova: forcarNova,
+            tokenConsulta: tokenConsulta,
+          )
+              .then((veiculoApi) async {
           final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
           if (veiculoDb != null) {
             final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
@@ -907,10 +1141,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         }).catchError((_) {
           // Erros de background não interrompem a vistoria
         });
+        }
       }
 
       if (mounted) {
-        context.push('/vistoria-wizard/$vistoriaId');
+        if (_vincularVistoriaId != null) {
+          Navigator.of(context).pop(); // Volta para o wizard
+        } else {
+          context.push('/vistoria-wizard/$vistoriaId');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -920,6 +1159,12 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             backgroundColor: AppTheme.naoConforme,
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _buscandoVeiculo = false;
+        });
       }
     }
   }
@@ -941,8 +1186,9 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
-        title:
-            Text(_somentePesquisa ? 'Pesquisa Veicular' : widget.tipo.titulo),
+        title: Text(_somenteMotor
+            ? 'Pesquisa de Motor'
+            : (_somentePesquisa ? 'Pesquisa Avulsa' : widget.tipo.titulo)),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
@@ -962,37 +1208,110 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Dropdown Tipo de Consulta
-              DropdownButtonFormField<String>(
-                initialValue: _produtoSelecionado,
-                decoration: const InputDecoration(
-                  labelText: 'Tipo de Consulta',
-                  prefixIcon: Icon(Icons.api_rounded, color: AppTheme.primary),
+              if (_somenteMotor) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                        color: AppTheme.primary.withValues(alpha: 0.15)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primary,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.tune_rounded,
+                            color: Colors.white, size: 24),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Pesquisa de Motor',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Informe o número do motor para consultar o cadastro oficial e histórico.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondary,
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                items: _tiposConsulta.map((tipo) {
-                  return DropdownMenuItem<String>(
-                    value: tipo['codigo'],
-                    child: Text('${tipo['nome']}',
-                        style: const TextStyle(fontSize: 14)),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) setState(() => _produtoSelecionado = val);
-                },
-              ),
-              const SizedBox(height: 14),
+                const SizedBox(height: 16),
+              ] else if (_produtoSelecionado != 'nenhuma') ...[
+                // Dropdown Tipo de Consulta
+                DropdownButtonFormField<String>(
+                  value: _produtoSelecionado,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Consulta',
+                    prefixIcon:
+                        Icon(Icons.api_rounded, color: AppTheme.primary),
+                  ),
+                  items: _tiposConsulta.map((tipo) {
+                    return DropdownMenuItem<String>(
+                      value: tipo['codigo'] as String,
+                      child: Text('${tipo['nome']}',
+                          style: const TextStyle(fontSize: 14)),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _produtoSelecionado = val;
+                        if (val == 'bin_por_motor') {
+                          _modoEntrada = 'motor';
+                        } else if (val == 'auto_decodificador_chassi' ||
+                            val == 'auto_gravame') {
+                          _modoEntrada = 'chassi';
+                        } else if (_modoEntrada == 'motor') {
+                          _modoEntrada = 'placa';
+                        }
+                        _buscaCtrl.clear();
+                        _veiculoEncontrado = false;
+                        _modoOffline = false;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
 
-              // Toggle Placa / Chassi
-              _ModoToggle2(
-                modo: _modoEntrada,
-                onChanged: (v) => setState(() {
-                  _modoEntrada = v;
-                  _buscaCtrl.clear();
-                  _veiculoEncontrado = false;
-                  _modoOffline = false;
-                }),
-              ),
-              const SizedBox(height: 14),
+                // Toggle Placa / Chassi / Motor
+                _ModoToggle3(
+                  modo: _modoEntrada,
+                  onChanged: (v) => setState(() {
+                    _modoEntrada = v;
+                    if (v == 'motor') {
+                      _produtoSelecionado = 'bin_por_motor';
+                    } else if (_produtoSelecionado == 'bin_por_motor') {
+                      _produtoSelecionado = 'auto_bin';
+                    }
+                    _buscaCtrl.clear();
+                    _veiculoEncontrado = false;
+                    _modoOffline = false;
+                  }),
+                ),
+                const SizedBox(height: 14),
+              ],
 
               // Campo de busca
               Row(
@@ -1008,17 +1327,22 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                         ] else ...[
                           FilteringTextInputFormatter.allow(
                               RegExp(r'[A-Za-z0-9\-]')),
-                          LengthLimitingTextInputFormatter(25),
+                          LengthLimitingTextInputFormatter(30),
                         ]
                       ],
                       decoration: InputDecoration(
+                        labelText: _somenteMotor ? 'Número do Motor' : null,
                         hintText: _modoEntrada == 'placa'
                             ? 'Ex: ABC-1234'
-                            : 'Ex: 9BWZZZ...',
+                            : (_modoEntrada == 'chassi'
+                                ? 'Ex: 9BWZZZ...'
+                                : 'Ex: Digite o número do motor'),
                         prefixIcon: Icon(
                           _modoEntrada == 'placa'
                               ? Icons.credit_card_rounded
-                              : Icons.tag_rounded,
+                              : (_modoEntrada == 'chassi'
+                                  ? Icons.tag_rounded
+                                  : Icons.tune_rounded),
                           color: AppTheme.primary,
                         ),
                       ),
@@ -1037,16 +1361,19 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: _buscandoVeiculo
+                  onPressed: (_buscandoVeiculo && _somentePesquisa)
                       ? null
                       : () async {
                           if (_somentePesquisa) {
                             await _buscarVeiculo();
                           } else {
-                            setState(() => _buscandoVeiculo = true);
+                            if (!_buscandoVeiculo) {
+                              setState(() => _buscandoVeiculo = true);
+                            }
                             await _iniciarVistoriaEmBackground();
-                            if (mounted)
+                            if (mounted) {
                               setState(() => _buscandoVeiculo = false);
+                            }
                           }
                         },
                   icon: _buscandoVeiculo
@@ -1060,12 +1387,18 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           ? Icons.search_rounded
                           : Icons.play_arrow_rounded),
                   label: Text(_buscandoVeiculo
-                      ? (_somentePesquisa
-                          ? 'Consultando...'
-                          : 'Iniciando Vistoria...')
-                      : (_somentePesquisa
-                          ? 'Realizar Pesquisa'
-                          : 'Consultar Veículo e Iniciar')),
+                      ? (_somenteMotor
+                          ? 'Consultando Motor...'
+                          : (_somentePesquisa
+                              ? 'Consultando...'
+                              : 'Pular Espera e Iniciar Vistoria'))
+                      : (_produtoSelecionado == 'nenhuma'
+                          ? 'Iniciar Vistoria'
+                          : (_somenteMotor
+                              ? 'Pesquisar Motor'
+                              : (_somentePesquisa
+                                  ? 'Realizar Pesquisa'
+                                  : 'Consultar Veículo e Iniciar')))),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1120,10 +1453,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               if (_veiculoEncontrado || _modoOffline) ...[
                 if (_somentePesquisa && !_modoOffline) ...[
                   const SizedBox(height: 28),
-                  const _SectionHeader(
-                    icon: Icons.check_circle_outline_rounded,
-                    title: 'Pesquisa Concluída',
-                    subtitle: 'A consulta veicular foi realizada com sucesso.',
+                  _SectionHeader(
+                    icon: _somenteMotor
+                        ? Icons.tune_rounded
+                        : Icons.check_circle_outline_rounded,
+                    title: _somenteMotor
+                        ? 'Motor Localizado'
+                        : 'Pesquisa Concluída',
+                    subtitle: _somenteMotor
+                        ? 'Cadastro oficial e dados vinculados a este motor localizados com sucesso.'
+                        : 'A consulta veicular foi realizada com sucesso.',
                   ),
                   const SizedBox(height: 20),
 
@@ -1176,22 +1515,24 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                             ),
                           ),
                           onPressed: () async {
-                            final dados = _dadosPesquisaCarregada ?? {
-                              'placa': _placaEditCtrl.text,
-                              'chassi': _chassiEditCtrl.text,
-                              'motor': _motorEditCtrl.text,
-                              'marca': _marcaEditCtrl.text,
-                              'modelo': _modeloEditCtrl.text,
-                              'marcamodelo': '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
-                              'anoFabricacao': _anoFabEditCtrl.text,
-                              'anoModelo': _anoModEditCtrl.text,
-                              'cor': _corEditCtrl.text,
-                              'renavam': _renavamEditCtrl.text,
-                              'municipio': _municipioEditCtrl.text,
-                              'uf': _ufEditCtrl.text,
-                              'restricoes1': _restricoesEditCtrl.text,
-                              'situacao': _situacaoVeiculo ?? '',
-                            };
+                            final dados = _dadosPesquisaCarregada ??
+                                {
+                                  'placa': _placaEditCtrl.text,
+                                  'chassi': _chassiEditCtrl.text,
+                                  'motor': _motorEditCtrl.text,
+                                  'marca': _marcaEditCtrl.text,
+                                  'modelo': _modeloEditCtrl.text,
+                                  'marcamodelo':
+                                      '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
+                                  'anoFabricacao': _anoFabEditCtrl.text,
+                                  'anoModelo': _anoModEditCtrl.text,
+                                  'cor': _corEditCtrl.text,
+                                  'renavam': _renavamEditCtrl.text,
+                                  'municipio': _municipioEditCtrl.text,
+                                  'uf': _ufEditCtrl.text,
+                                  'restricoes1': _restricoesEditCtrl.text,
+                                  'situacao': _situacaoVeiculo ?? '',
+                                };
                             await PdfRadarGenerator.visualizarPesquisaPdf(
                               context: context,
                               dadosPesquisa: dados,
@@ -1199,7 +1540,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                               placa: _placaEditCtrl.text,
                             );
                           },
-                          icon: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 20),
+                          icon: const Icon(Icons.picture_as_pdf_rounded,
+                              color: Colors.white, size: 20),
                           label: const Text(
                             'Visualizar Pesquisa',
                             style: TextStyle(
@@ -1347,20 +1689,22 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                           horizontal: 12, vertical: 8),
                     ),
                     onPressed: () async {
-                      final dados = _dadosPesquisaCarregada ?? {
-                        'placa': _placaEditCtrl.text,
-                        'chassi': _chassiEditCtrl.text,
-                        'motor': _motorEditCtrl.text,
-                        'marca': _marcaEditCtrl.text,
-                        'modelo': _modeloEditCtrl.text,
-                        'marcamodelo': '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
-                        'anoFabricacao': _anoFabEditCtrl.text,
-                        'anoModelo': _anoModEditCtrl.text,
-                        'cor': _corEditCtrl.text,
-                        'renavam': _renavamEditCtrl.text,
-                        'municipio': _municipioEditCtrl.text,
-                        'uf': _ufEditCtrl.text,
-                      };
+                      final dados = _dadosPesquisaCarregada ??
+                          {
+                            'placa': _placaEditCtrl.text,
+                            'chassi': _chassiEditCtrl.text,
+                            'motor': _motorEditCtrl.text,
+                            'marca': _marcaEditCtrl.text,
+                            'modelo': _modeloEditCtrl.text,
+                            'marcamodelo':
+                                '${_marcaEditCtrl.text}/${_modeloEditCtrl.text}',
+                            'anoFabricacao': _anoFabEditCtrl.text,
+                            'anoModelo': _anoModEditCtrl.text,
+                            'cor': _corEditCtrl.text,
+                            'renavam': _renavamEditCtrl.text,
+                            'municipio': _municipioEditCtrl.text,
+                            'uf': _ufEditCtrl.text,
+                          };
                       await PdfRadarGenerator.visualizarPesquisaPdf(
                         context: context,
                         dadosPesquisa: dados,
@@ -1553,10 +1897,10 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _ModoToggle2 extends StatelessWidget {
+class _ModoToggle3 extends StatelessWidget {
   final String modo;
   final ValueChanged<String> onChanged;
-  const _ModoToggle2({required this.modo, required this.onChanged});
+  const _ModoToggle3({required this.modo, required this.onChanged});
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1572,6 +1916,7 @@ class _ModoToggle2 extends StatelessWidget {
               value: 'chassi',
               current: modo,
               onTap: onChanged),
+          _Tab(label: 'Motor', value: 'motor', current: modo, onTap: onChanged),
         ],
       ),
     );

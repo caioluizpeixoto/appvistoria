@@ -82,8 +82,47 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
           .go();
       await (delete(veiculos)..where((t) => t.vistoriaId.equals(vistoriaId)))
           .go();
+      await (delete(attachedDatabase.consultasAutocred)
+            ..where((t) => t.vistoriaId.equals(vistoriaId)))
+          .go();
+      try {
+        await customStatement(
+          'DELETE FROM vistoria_precos WHERE vistoria_id = ?',
+          [vistoriaId],
+        );
+      } catch (_) {}
       await (delete(vistorias)..where((t) => t.id.equals(vistoriaId))).go();
     });
+  }
+
+  Future<void> _garantirTabelaPrecos() async {
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS vistoria_precos (
+        vistoria_id TEXT PRIMARY KEY,
+        valor REAL NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    ''');
+  }
+
+  Future<void> salvarValorVistoria(String vistoriaId, double valor) async {
+    await _garantirTabelaPrecos();
+    await customStatement(
+      'INSERT OR REPLACE INTO vistoria_precos (vistoria_id, valor) VALUES (?, ?)',
+      [vistoriaId, valor],
+    );
+  }
+
+  Future<double?> obterValorVistoria(String vistoriaId) async {
+    await _garantirTabelaPrecos();
+    final rows = await customSelect(
+      'SELECT valor FROM vistoria_precos WHERE vistoria_id = ?',
+      variables: [Variable.withString(vistoriaId)],
+    ).get();
+    if (rows.isNotEmpty) {
+      return rows.first.read<double>('valor');
+    }
+    return null;
   }
 
   Future<void> marcarSincronizado(String id) =>

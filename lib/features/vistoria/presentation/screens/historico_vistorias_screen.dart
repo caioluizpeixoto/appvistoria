@@ -13,6 +13,7 @@ import 'dart:convert';
 
 import '../../../../core/services/image_service.dart';
 import '../../../../core/services/sync_service.dart';
+import '../../../auth/presentation/blocs/auth_bloc.dart';
 
 class HistoricoVistoriasScreen extends StatefulWidget {
   const HistoricoVistoriasScreen({super.key});
@@ -86,6 +87,12 @@ class _HistoricoVistoriasScreenState extends State<HistoricoVistoriasScreen> {
       appBar: AppBar(
         title: const Text('Histórico de Laudos'),
         actions: [
+          if (Supabase.instance.client.auth.currentUser?.isMaster ?? false)
+            IconButton(
+              icon: const Icon(Icons.shield_rounded, color: Colors.amber),
+              tooltip: 'Ver Todos os Laudos (Master)',
+              onPressed: () => context.push('/master/painel'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Sincronizar',
@@ -338,32 +345,65 @@ class _VistoriaCard extends StatelessWidget {
                                   backgroundColor: AppTheme.naoConforme),
                               onPressed: () async {
                                 Navigator.pop(ctx);
-                                final dao = sl<VistoriaDao>();
-                                final syncService = sl<SyncService>();
-                                final imgService = sl<ImageService>();
-                                
-                                // Limpar imagens do Supabase antes de excluir a vistoria
-                                final fotos = await dao.listarFotosPorVistoria(vistoria.id);
-                                final pathsToDel = <String>[];
-                                for (final f in fotos) {
-                                  if (f.urlSupabase != null) {
-                                    final p = imgService.extractStoragePath(f.urlSupabase);
-                                    if (p != null) pathsToDel.add(p);
-                                  }
-                                }
-                                if (pathsToDel.isNotEmpty) {
-                                  await imgService.deleteImages(pathsToDel);
-                                }
+                                final messenger = ScaffoldMessenger.of(context);
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text('Excluindo laudo...'),
+                                      ],
+                                    ),
+                                    duration: Duration(seconds: 15),
+                                  ),
+                                );
 
-                                await dao.excluirVistoriaCompleta(vistoria.id);
-                                await syncService.excluirVistoriaNuvem(vistoria.id);
-                                onDelete();
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                try {
+                                  final dao = sl<VistoriaDao>();
+                                  final syncService = sl<SyncService>();
+                                  final imgService = sl<ImageService>();
+                                  
+                                  // Limpar imagens do Supabase antes de excluir a vistoria
+                                  try {
+                                    final fotos = await dao.listarFotosPorVistoria(vistoria.id);
+                                    final pathsToDel = <String>[];
+                                    for (final f in fotos) {
+                                      if (f.urlSupabase != null) {
+                                        final p = imgService.extractStoragePath(f.urlSupabase);
+                                        if (p != null) pathsToDel.add(p);
+                                      }
+                                    }
+                                    if (pathsToDel.isNotEmpty) {
+                                      await imgService.deleteImages(pathsToDel);
+                                    }
+                                  } catch (_) {}
+
+                                  await dao.excluirVistoriaCompleta(vistoria.id);
+                                  await syncService.excluirVistoriaNuvem(vistoria.id);
+                                  onDelete();
+
+                                  messenger.hideCurrentSnackBar();
+                                  messenger.showSnackBar(
                                     const SnackBar(
-                                      content: Text(
-                                          'Vistoria excluída com sucesso.'),
+                                      content: Text('Vistoria excluída com sucesso.'),
                                       backgroundColor: AppTheme.conforme,
+                                    ),
+                                  );
+                                } catch (e) {
+                                  print('Erro ao excluir vistoria: $e');
+                                  messenger.hideCurrentSnackBar();
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Erro ao excluir vistoria: $e'),
+                                      backgroundColor: AppTheme.naoConforme,
                                     ),
                                   );
                                 }

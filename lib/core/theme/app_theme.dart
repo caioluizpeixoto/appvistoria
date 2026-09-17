@@ -24,6 +24,10 @@ class AppTheme {
   static const Color emAndamento = Color(0xFF455A64);
   static const Color emAndamentoLight = Color(0xFFECEFF1);
 
+  static const Color success = conforme;
+  static const Color error = naoConforme;
+  static const Color warning = comRestricao;
+
   static const Color divergencia = Color(0xFFB71C1C);
   static const Color divergenciaLight = Color(0xFFFFCDD2);
 

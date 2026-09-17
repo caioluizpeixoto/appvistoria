@@ -147,41 +147,40 @@ class WalletRepository {
   }
 
   /// Solicita uma recarga via Pix
+  /// Solicita uma recarga via Pix através do Backend
   Future<Map<String, dynamic>> requestRecharge(double amount) async {
     final userId = currentUserId;
     if (userId == null) {
       throw Exception('Usuário não autenticado.');
     }
 
-    final wallet = await getOrCreateWallet();
-
-    // 1. Registra a recarga como pendente no Supabase
-    final inserted = await supabase
-        .from('recharges')
-        .insert({
-          'company_id': userId,
-          'user_id': userId,
-          'wallet_id': wallet.id,
-          'amount': amount,
-          'status': 'pending',
-          'payment_method': 'pix',
-          'provider': paymentProvider.providerName,
-        })
-        .select()
-        .single();
-
-    final recharge = RechargeModel.fromJson(inserted);
-
-    // 2. Aciona o provedor de pagamento configurado
-    final chargeResult = await paymentProvider.createPixCharge(
-      rechargeId: recharge.id,
-      amount: amount,
-      companyId: userId,
+    // Chama a Edge Function que centraliza as regras de segurança e criação
+    final response = await supabase.functions.invoke(
+      'create-pix-charge',
+      body: {'amount': amount},
     );
 
+    if (response.status != 200) {
+      final data = response.data;
+      throw Exception(data != null && data is Map && data['error'] != null
+          ? data['error']
+          : 'Falha ao processar pagamento Pix.');
+    }
+
+    final data = response.data as Map<String, dynamic>;
+
     return {
-      'recharge': recharge,
-      'charge_result': chargeResult,
+      'recharge': RechargeModel.fromJson({
+        'id': data['recharge_id'],
+        'amount': data['amount'],
+        'status': 'pending',
+        'company_id': userId,
+      }),
+      'charge_result': {
+        'txid': data['txid'],
+        'pixCopyPaste': data['pixCopyPaste'],
+        'qrCodeData': data['qrCodeData'],
+      },
     };
   }
 

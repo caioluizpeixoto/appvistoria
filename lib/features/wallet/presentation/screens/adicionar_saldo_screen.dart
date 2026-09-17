@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
@@ -72,13 +73,27 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _walletRepository.requestRecharge(amount);
+      final res = await _walletRepository.requestRecharge(amount);
+      final chargeResult = res['charge_result'] as Map<String, dynamic>;
+      
+      final qrCodeData = chargeResult['qrCodeData'] as String?;
+      final pixCopyPaste = chargeResult['pixCopyPaste'] as String?;
 
       if (!mounted) return;
 
       setState(() => _isLoading = false);
 
-      // Exibe diálogo informando com clareza a situação do Pix e que a solicitação foi registrada
+      if (qrCodeData == null || pixCopyPaste == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('A integração com Pix ainda está em preparação.'),
+            backgroundColor: AppTheme.comObs,
+          ),
+        );
+        return;
+      }
+
+      // Exibe diálogo com o QR Code
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -86,11 +101,11 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: const [
-              Icon(Icons.info_outline_rounded, color: AppTheme.primary, size: 26),
+              Icon(Icons.pix_rounded, color: AppTheme.primary, size: 26),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Solicitação de Recarga',
+                  'Pagamento via Pix',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -102,56 +117,54 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Valor selecionado: ${_currencyFormat.format(amount)}',
+                'Valor: ${_currencyFormat.format(amount)}',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.textPrimary,
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
-                'Forma de pagamento: Pix',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'Status: Aguardando integração bancária',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.comObs,
-                ),
-              ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppTheme.border),
                 ),
-                child: const Text(
-                  'Pagamento Pix ainda não disponível. A integração bancária está sendo preparada.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppTheme.textPrimary,
-                    height: 1.4,
-                  ),
+                child: QrImageView(
+                  data: qrCodeData,
+                  version: QrVersions.auto,
+                  size: 200.0,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               const Text(
-                'Sua solicitação de recarga foi registrada e ficará listada em "Minhas Recargas".',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
+                'Abra o aplicativo do seu banco e escaneie o QR Code acima ou copie o código abaixo.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: pixCopyPaste));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Código Pix copiado!'),
+                      backgroundColor: AppTheme.conforme,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.copy, size: 18),
+                label: const Text('Copiar código Pix'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ],
@@ -160,11 +173,11 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(ctx).pop();
-                context.pop(); // Volta para a tela da carteira
+                context.pop();
               },
               child: const Text(
-                'OK',
-                style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.bold),
+                'Fechar',
+                style: TextStyle(color: AppTheme.textSecondary),
               ),
             ),
             ElevatedButton(
@@ -177,7 +190,7 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
               child: const Text(
-                'Ver Minhas Recargas',
+                'Ver Status',
                 style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),

@@ -12,39 +12,32 @@ class StepEstrutura extends StatelessWidget {
   const StepEstrutura({super.key});
 
   static const List<String> _itens = [
-    // Frente
-    'painel_frontal',
-    'painel_corta_fogo',
-    // Frente Esquerda
-    'torre_amortecedor_esquerda',
+    // --- Itens Principais (Ordem Obrigatória) ---
     'longarina_dianteira_esquerda',
-    'caixa_roda_dianteira_esquerda',
-    // Lateral Esquerda
+    'torre_amortecedor_esquerda',
     'coluna_dianteira_esquerda',
+    'coluna_central_esquerda',
+    'coluna_traseira_esquerda',
+    'longarina_traseira_esquerda',
+    'painel_traseiro',
+    'longarina_traseira_direita',
+    'coluna_traseira_direita',
+    'coluna_central_direita',
+    'coluna_dianteira_direita',
+    'longarina_dianteira_direita',
+    'painel_frontal',
+
+    // --- Demais Itens ---
+    'painel_corta_fogo',
+    'caixa_roda_dianteira_esquerda',
     'caixa_ar_esquerda',
     'assoalho_esquerdo',
-    'coluna_central_esquerda',
-    'longarina_centro_esquerda',
-    'coluna_traseira_esquerda',
-    // Traseira Esquerda
     'caixa_roda_traseira_esquerda',
-    'longarina_traseira_esquerda',
-    // Traseira
-    'painel_traseiro',
     'caixa_estepe',
-    // Traseira Direita
-    'longarina_traseira_direita',
     'caixa_roda_traseira_direita',
-    // Lateral Direita
-    'coluna_traseira_direita',
-    'longarina_centro_direita',
-    'coluna_central_direita',
     'assoalho_direito',
     'caixa_ar_direita',
-    'coluna_dianteira_direita',
-    // Frente Direita
     'caixa_roda_dianteira_direita',
-    'longarina_dianteira_direita',
     'torre_amortecedor_direita',
   ];
 
@@ -58,7 +51,6 @@ class StepEstrutura extends StatelessWidget {
     'caixa_ar_esquerda': 'Caixa de Ar Esquerda',
     'assoalho_esquerdo': 'Assoalho Esquerdo',
     'coluna_central_esquerda': 'Coluna Central Esquerda',
-    'longarina_centro_esquerda': 'Longarina Centro Esquerda',
     'coluna_traseira_esquerda': 'Coluna Traseira Esquerda',
     'caixa_roda_traseira_esquerda': 'Caixa de Roda Traseira Esquerda',
     'longarina_traseira_esquerda': 'Longarina Traseira Esquerda',
@@ -67,7 +59,6 @@ class StepEstrutura extends StatelessWidget {
     'longarina_traseira_direita': 'Longarina Traseira Direita',
     'caixa_roda_traseira_direita': 'Caixa de Roda Traseira Direita',
     'coluna_traseira_direita': 'Coluna Traseira Direita',
-    'longarina_centro_direita': 'Longarina Centro Direita',
     'coluna_central_direita': 'Coluna Central Direita',
     'assoalho_direito': 'Assoalho Direito',
     'caixa_ar_direita': 'Caixa de Ar Direita',
@@ -107,25 +98,16 @@ class StepEstrutura extends StatelessWidget {
           const SizedBox(height: 16),
         ],
         ..._itens.map((id) {
-          final isLongarinaCentro = id == 'longarina_centro_esquerda' ||
-              id == 'longarina_centro_direita';
           return InspecaoItemWidget(
             itemId: id,
             label: _labels[id]!,
             statusOptions: _statusOpcoes,
             obrigatoria: false,
-            sugestoesObs: isLongarinaCentro
-                ? const [
-                    'Não aplicável',
-                    'Dentro dos padrões de fábrica',
-                    'Veículo tipo monobloco (sem longarina central)',
-                    'Sem vestígios de reparo ou deformação',
-                  ]
-                : const [
-                    'Dentro dos padrões de fábrica',
-                    'Não aplicável',
-                    'Sem vestígios de reparo ou deformação',
-                  ],
+            sugestoesObs: const [
+              'Dentro dos padrões de fábrica',
+              'Não aplicável',
+              'Sem vestígios de reparo ou deformação',
+            ],
           );
         }),
         const SizedBox(height: 24),

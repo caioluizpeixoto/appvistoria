@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../injection_container.dart';
+import '../../../../core/services/device_security_service.dart';
 import '../blocs/auth_bloc.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -23,11 +25,30 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthBloc, AuthBlocState>(
-      listener: (context, state) {
+      listener: (context, state) async {
         if (state is AuthAuthenticated) {
-          context.go('/home');
+          // Se for Master, bypass imediato
+          if (state.user.isMaster) {
+            context.go('/home');
+            return;
+          }
+          final isApproved = await sl<DeviceSecurityService>()
+              .isDeviceApproved(userId: state.user.id);
+          if (!context.mounted) return;
+          if (isApproved) {
+            context.go('/home');
+          } else {
+            context.go('/dispositivo-pendente');
+          }
         } else if (state is AuthUnauthenticated) {
-          context.go('/login');
+          final isApproved =
+              await sl<DeviceSecurityService>().isDeviceApproved();
+          if (!context.mounted) return;
+          if (isApproved) {
+            context.go('/login');
+          } else {
+            context.go('/dispositivo-pendente');
+          }
         }
       },
       child: Scaffold(

@@ -20,7 +20,17 @@ class RadarNormalizer {
       'Ofertas de Leilão *',
       'Leilão Corporativo - Remarketing Automotivo / Venda Direta (Cortesia)'
     ],
-    'bin': ['Bin **', 'Bin'],
+    'bin': [
+      'Bin **',
+      'Bin',
+      'Bin por Motor',
+      'Bin por motor',
+      'BIN por Motor',
+      'Bin Por Motor',
+      'Veiculos Agregados',
+      'Veículos Agregados',
+      'veiculos agregados',
+    ],
   };
 
   static String _normalizeTitle(String title) {

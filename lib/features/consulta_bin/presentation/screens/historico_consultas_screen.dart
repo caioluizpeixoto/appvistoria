@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
@@ -48,20 +47,162 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
     }
   }
 
-  void _retificarConsulta(RadarHistorico item) {
-    if (!item.permiteRetificacao) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Prazo de 72h expirado. É necessário realizar nova consulta.'),
-          backgroundColor: AppTheme.naoConforme,
+  Future<void> _verificarOuRetificar(RadarHistorico item) async {
+    final hasDados = (item.placa != null && item.placa!.isNotEmpty) ||
+        (item.chassi != null && item.chassi!.isNotEmpty);
+    final isPendente = item.status == 'pendente' || !hasDados;
+
+    if (isPendente) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: Dialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                  SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Checando status na Radar...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       );
-      return;
+
+      try {
+        final service = sl<RadarService>();
+        final tokenParaConsultar = item.tokenRadarOficial;
+        final veiculo = await service.consultarVeiculo(
+          produto: item.motor != null && item.motor!.isNotEmpty
+              ? 'bin_por_motor'
+              : 'auto_bin',
+          param: item.motor != null && item.motor!.isNotEmpty
+              ? 'motor'
+              : (item.placa != null && item.placa!.isNotEmpty
+                  ? 'placa'
+                  : 'chassi'),
+          value: item.motor ?? item.placa ?? item.chassi ?? '',
+          tokenConsulta: tokenParaConsultar,
+        );
+
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // fecha dialog
+          await _carregarHistorico();
+          context.push('/identificacao/cautelar-carro',
+              extra: veiculo.resultadoCompleto);
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+          final erroMsg = e.toString().replaceAll('Exception: ', '');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(erroMsg),
+              backgroundColor: erroMsg.contains('análise técnica')
+                  ? const Color(0xFFD97706)
+                  : AppTheme.naoConforme,
+            ),
+          );
+        }
+      }
+    } else {
+      context.push('/identificacao/cautelar-carro', extra: item.dadosTratados);
+    }
+  }
+
+  Widget _buildStatusBadge(String status, bool hasDados) {
+    if (status == 'pendente' || !hasDados) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF3C7),
+          borderRadius: BorderRadius.circular(8),
+          border:
+              Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            SizedBox(
+              width: 10,
+              height: 10,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFD97706),
+              ),
+            ),
+            SizedBox(width: 5),
+            Text(
+              'EM ANDAMENTO',
+              style: TextStyle(
+                color: Color(0xFFB45309),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
-    // Passamos os dadosTratados como 'extra' para a rota de Identificacao
-    context.push('/identificacao/cautelar-carro', extra: item.dadosTratados);
+    if (status == 'erro') {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppTheme.naoConformeLight,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          'ERRO',
+          style: TextStyle(
+            color: AppTheme.naoConforme,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppTheme.conformeLight,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'CONCLUÍDA',
+        style: TextStyle(
+          color: AppTheme.conforme,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
   }
 
   @override
@@ -82,6 +223,24 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                     final item = _historico[index];
                     final formatador = DateFormat('dd/MM/yyyy HH:mm');
 
+                    final hasDados =
+                        (item.placa != null && item.placa!.isNotEmpty) ||
+                            (item.chassi != null && item.chassi!.isNotEmpty);
+                    final isPendente = item.status == 'pendente' || !hasDados;
+
+                    final String tituloCard;
+                    if (item.placa?.isNotEmpty == true) {
+                      tituloCard = item.placa!;
+                    } else if (item.motor?.isNotEmpty == true) {
+                      tituloCard = 'MOTOR: ${item.motor}';
+                    } else if (item.chassi?.isNotEmpty == true) {
+                      tituloCard = item.chassi!;
+                    } else {
+                      tituloCard = item.codigoConsulta > 0
+                          ? 'Consulta #${item.codigoConsulta}'
+                          : 'Pesquisa Realizada';
+                    }
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       shape: RoundedRectangleBorder(
@@ -91,7 +250,7 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                       elevation: 0,
                       color: AppTheme.surface,
                       child: InkWell(
-                        onTap: () => _retificarConsulta(item),
+                        onTap: () => _verificarOuRetificar(item),
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -102,38 +261,18 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    item.placa?.isNotEmpty == true
-                                        ? item.placa!
-                                        : (item.chassi ?? 'Sem Placa/Chassi'),
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 1.5,
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: item.permiteRetificacao
-                                          ? AppTheme.conformeLight
-                                          : AppTheme.naoConformeLight,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
+                                  Expanded(
                                     child: Text(
-                                      item.permiteRetificacao
-                                          ? 'No Prazo (72h)'
-                                          : 'Expirado',
-                                      style: TextStyle(
-                                        color: item.permiteRetificacao
-                                            ? AppTheme.conforme
-                                            : AppTheme.naoConforme,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
+                                      tituloCard,
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 1.5,
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
+                                  _buildStatusBadge(item.status, hasDados),
                                 ],
                               ),
                               const SizedBox(height: 8),
@@ -144,8 +283,24 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                   color: AppTheme.textSecondary,
                                 ),
                               ),
-                              if (item.permiteRetificacao) ...[
-                                const SizedBox(height: 12),
+                              const SizedBox(height: 12),
+                              if (isPendente) ...[
+                                Row(
+                                  children: const [
+                                    Icon(Icons.refresh_rounded,
+                                        size: 16, color: Color(0xFFD97706)),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      'Verificar Status / Puxar Veículo',
+                                      style: TextStyle(
+                                        color: Color(0xFFD97706),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ] else ...[
                                 Row(
                                   children: const [
                                     Icon(Icons.edit_document,
@@ -173,7 +328,8 @@ class _HistoricoConsultasScreenState extends State<HistoricoConsultasScreen> {
                                     } else if (item.retornoBruto != null &&
                                         item.retornoBruto!.isNotEmpty) {
                                       try {
-                                        final dec = jsonDecode(item.retornoBruto!);
+                                        final dec =
+                                            jsonDecode(item.retornoBruto!);
                                         if (dec is Map<String, dynamic>) {
                                           dados = dec;
                                         }
