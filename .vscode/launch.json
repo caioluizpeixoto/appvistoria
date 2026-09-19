@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "App Vistoria (Windows)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "-d",
+                "windows",
+                "--dart-define=PIX_BACKEND_URL=https://ultraprime.vercel.app"
+            ]
+        },
+        {
+            "name": "App Vistoria (Mobile)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/main.dart",
+            "args": [
+                "--dart-define=PIX_BACKEND_URL=https://ultraprime.vercel.app"
+            ]
+        }
+    ]
+}

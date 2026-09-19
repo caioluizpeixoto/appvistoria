@@ -1,6 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/bloc/background_tasks/background_tasks_cubit.dart';
+
 import 'core/mock/mock_consulta_bin.dart';
 import 'database/app_database.dart';
 import 'database/daos/vistoria_dao.dart';
@@ -22,6 +24,10 @@ final sl = GetIt.instance;
 
 Future<void> initDependencies() async {
   await sl.reset();
+
+  sl.registerLazySingleton<BackgroundTasksCubit>(
+    () => BackgroundTasksCubit(),
+  );
   // ── Supabase ───────────────────────────────────────────────────────────────
   sl.registerLazySingleton<SupabaseClient>(
     () => Supabase.instance.client,

@@ -116,12 +116,9 @@ class _CarteiraScreenState extends State<CarteiraScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<WalletModel?>(
-        stream: _walletRepository.streamWallet(),
-        initialData: _wallet,
-        builder: (context, snapshot) {
-          final currentWallet = snapshot.data ?? _wallet;
-
+      body: ValueListenableBuilder<WalletModel?>(
+        valueListenable: _walletRepository.getWalletNotifier(),
+        builder: (context, currentWallet, child) {
           if (_isLoading && currentWallet == null) {
             return const Center(
               child: CircularProgressIndicator(color: AppTheme.primary),

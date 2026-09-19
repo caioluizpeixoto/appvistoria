@@ -4,6 +4,8 @@ import 'package:app_vistoria/features/wallet/domain/models/wallet_transaction_mo
 import 'package:app_vistoria/features/wallet/domain/models/recharge_model.dart';
 import 'package:app_vistoria/features/wallet/domain/models/service_price_model.dart';
 import 'package:app_vistoria/features/wallet/data/payment/payment_provider.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 class OperationAuthorizationResult {
   final bool allowed;
@@ -31,9 +33,11 @@ class OperationAuthorizationResult {
       allowed: json['allowed'] as bool? ?? false,
       enforcementEnabled: json['enforcement_enabled'] as bool? ?? false,
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
-      graceOperationsUsed: (json['grace_operations_used'] as num?)?.toInt() ?? 0,
+      graceOperationsUsed:
+          (json['grace_operations_used'] as num?)?.toInt() ?? 0,
       usedGraceOperation: json['used_grace_operation'] as bool? ?? false,
-      graceOperationsRemaining: (json['grace_operations_remaining'] as num?)?.toInt(),
+      graceOperationsRemaining:
+          (json['grace_operations_remaining'] as num?)?.toInt(),
       consumedAmount: (json['consumed_amount'] as num?)?.toDouble() ?? 0.0,
       reason: json['reason'] as String?,
     );
@@ -61,7 +65,9 @@ class WalletRepository {
     try {
       final res = await supabase.rpc('get_or_create_wallet');
       if (res != null && res is Map<String, dynamic>) {
-        return WalletModel.fromJson(res);
+        final wallet = WalletModel.fromJson(res);
+        walletNotifier.value = wallet;
+        return wallet;
       }
     } catch (_) {
       // Fallback para consulta direta caso o RPC retorne formato alternativo
@@ -74,7 +80,9 @@ class WalletRepository {
         .maybeSingle();
 
     if (query != null) {
-      return WalletModel.fromJson(query);
+      final wallet = WalletModel.fromJson(query);
+      walletNotifier.value = wallet;
+      return wallet;
     }
 
     // Se ainda não existir registro, insere
@@ -88,24 +96,48 @@ class WalletRepository {
         .select()
         .single();
 
-    return WalletModel.fromJson(inserted);
+    final newWallet = WalletModel.fromJson(inserted);
+    walletNotifier.value = newWallet;
+    return newWallet;
   }
 
-  /// Escuta atualizações da carteira em tempo real via Supabase Realtime
-  Stream<WalletModel?> streamWallet() {
-    final userId = currentUserId;
-    if (userId == null) {
-      return Stream.value(null);
-    }
+  final ValueNotifier<WalletModel?> walletNotifier = ValueNotifier(null);
+  RealtimeChannel? _walletChannel;
 
-    return supabase
-        .from('wallets')
-        .stream(primaryKey: ['id'])
-        .eq('company_id', userId)
-        .map((rows) {
-          if (rows.isEmpty) return null;
-          return WalletModel.fromJson(rows.first);
-        });
+  /// Retorna o ValueNotifier da carteira para a UI reagir instantaneamente
+  ValueNotifier<WalletModel?> getWalletNotifier() {
+    final userId = currentUserId;
+    if (userId == null) return walletNotifier;
+
+    // Se já estiver escutando, apenas retorna o notifier
+    if (_walletChannel != null) return walletNotifier;
+
+    // Busca o valor inicial e notifica
+    getOrCreateWallet().then((wallet) {
+      walletNotifier.value = wallet;
+    });
+
+    // Configura o listener do Supabase
+    _walletChannel = supabase
+        .channel('public:wallets')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'wallets',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'company_id',
+            value: userId,
+          ),
+          callback: (payload) {
+            if (payload.newRecord.isNotEmpty) {
+              walletNotifier.value = WalletModel.fromJson(payload.newRecord);
+            }
+          },
+        )
+        .subscribe();
+
+    return walletNotifier;
   }
 
   /// Lista o extrato de movimentações da carteira com filtro opcional
@@ -115,10 +147,8 @@ class WalletRepository {
     final userId = currentUserId;
     if (userId == null) return [];
 
-    var query = supabase
-        .from('wallet_transactions')
-        .select()
-        .eq('company_id', userId);
+    var query =
+        supabase.from('wallet_transactions').select().eq('company_id', userId);
 
     if (filterType != null) {
       query = query.eq('type', filterType.name);
@@ -126,7 +156,8 @@ class WalletRepository {
 
     final data = await query.order('created_at', ascending: false);
     return (data as List)
-        .map((item) => WalletTransactionModel.fromJson(item as Map<String, dynamic>))
+        .map((item) =>
+            WalletTransactionModel.fromJson(item as Map<String, dynamic>))
         .toList();
   }
 
@@ -147,41 +178,90 @@ class WalletRepository {
   }
 
   /// Solicita uma recarga via Pix
-  /// Solicita uma recarga via Pix através do Backend
+  /// Solicita uma recarga via Pix através do Backend Node.js
   Future<Map<String, dynamic>> requestRecharge(double amount) async {
     final userId = currentUserId;
-    if (userId == null) {
+    final session = supabase.auth.currentSession;
+
+    if (userId == null || session == null) {
       throw Exception('Usuário não autenticado.');
     }
 
-    // Chama a Edge Function que centraliza as regras de segurança e criação
-    final response = await supabase.functions.invoke(
-      'create-pix-charge',
-      body: {'amount': amount},
-    );
+    final dio = Dio();
 
-    if (response.status != 200) {
-      final data = response.data;
-      throw Exception(data != null && data is Map && data['error'] != null
-          ? data['error']
-          : 'Falha ao processar pagamento Pix.');
+    // URL base do backend Node.js
+    // Usa localhost (ou 10.0.2.2 no android) dependendo da plataforma
+    final isAndroidEmulator =
+        defaultTargetPlatform == TargetPlatform.android && !kIsWeb;
+    final baseUrl = const String.fromEnvironment('PIX_BACKEND_URL',
+        defaultValue: 'http://localhost:3000');
+    final endpointUrl =
+        (baseUrl == 'http://localhost:3000' && isAndroidEmulator)
+            ? 'http://10.0.2.2:3000/api/pix/create-charge'
+            : '$baseUrl/api/pix/create-charge';
+
+    try {
+      final response = await dio.post(
+        endpointUrl,
+        data: {'amount': amount},
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${session.accessToken}',
+          },
+        ),
+      );
+
+      final data = response.data ?? {};
+
+      return {
+        'recharge': RechargeModel.fromJson({
+          'id': data['id']?.toString() ?? '',
+          'amount': data['amount'] ?? amount,
+          'status': data['status']?.toString() ?? 'pending',
+          'company_id': userId,
+          'wallet_id': data['wallet_id']?.toString() ?? '',
+        }),
+        'charge_result': {
+          'txid': data['txid']?.toString() ?? '',
+          'pixCopyPaste': (data['pixCopyPaste'] ?? data['pixCopiaECola'])?.toString(),
+          'qrCodeData': (data['pixCopyPaste'] ?? data['pixCopiaECola'])?.toString(),
+          'expiresAt': data['expiresAt']?.toString() ?? data['expiracao']?.toString(),
+        },
+      };
+    } on DioException catch (e) {
+      String errorMsg = 'Falha ao processar pagamento Pix.';
+      if (e.response?.data is Map<String, dynamic>) {
+        errorMsg = e.response?.data['error'] ?? errorMsg;
+      } else if (e.response?.data is String) {
+        errorMsg = 'Erro do servidor: ${e.response?.statusCode}';
+      }
+      throw Exception(errorMsg);
     }
+  }
 
-    final data = response.data as Map<String, dynamic>;
+  /// Verifica ativamente o status de uma recarga no backend Node.js
+  /// Isso força o backend a consultar o Sicredi e atualizar o banco (fallback para webhooks)
+  Future<void> checkRechargeStatus(String txid) async {
+    final session = supabase.auth.currentSession;
+    if (session == null || txid.isEmpty) return;
 
-    return {
-      'recharge': RechargeModel.fromJson({
-        'id': data['recharge_id'],
-        'amount': data['amount'],
-        'status': 'pending',
-        'company_id': userId,
-      }),
-      'charge_result': {
-        'txid': data['txid'],
-        'pixCopyPaste': data['pixCopyPaste'],
-        'qrCodeData': data['qrCodeData'],
-      },
-    };
+    final dio = Dio();
+    final isAndroidEmulator = defaultTargetPlatform == TargetPlatform.android && !kIsWeb;
+    final baseUrl = const String.fromEnvironment('PIX_BACKEND_URL', defaultValue: 'http://localhost:3000');
+    final endpointUrl = (baseUrl == 'http://localhost:3000' && isAndroidEmulator)
+        ? 'http://10.0.2.2:3000/api/pix/charge/$txid'
+        : '$baseUrl/api/pix/charge/$txid';
+
+    try {
+      await dio.get(
+        endpointUrl,
+        options: Options(
+          headers: {'Authorization': 'Bearer ${session.accessToken}'},
+        ),
+      );
+    } catch (_) {
+      // Falhas silenciosas aqui pois é apenas um processo em background de sincronização
+    }
   }
 
   /// Autoriza uma operação paga de forma segura e atômica no backend Supabase
@@ -202,7 +282,27 @@ class WalletRepository {
     );
 
     if (res is Map<String, dynamic>) {
-      return OperationAuthorizationResult.fromJson(res);
+      final authResult = OperationAuthorizationResult.fromJson(res);
+      
+      // Se a operação foi permitida (cobrada), atualiza a UI localmente e em background
+      if (authResult.allowed) {
+        final currentWallet = walletNotifier.value;
+        if (currentWallet != null) {
+          // Atualiza instantaneamente a UI para não ter delay nenhum
+          walletNotifier.value = WalletModel(
+            id: currentWallet.id,
+            companyId: currentWallet.companyId,
+            balance: authResult.balance,
+            graceOperationsUsed: authResult.graceOperationsUsed,
+            createdAt: currentWallet.createdAt,
+            updatedAt: DateTime.now(),
+          );
+        }
+        // Dispara uma busca real no banco para garantir consistência em background
+        getOrCreateWallet().catchError((_) => currentWallet); // Ignora erros do background
+      }
+      
+      return authResult;
     }
 
     return const OperationAuthorizationResult(

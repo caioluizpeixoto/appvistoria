@@ -7,6 +7,8 @@ import '../../../../injection_container.dart';
 import '../../data/repositories/wallet_repository.dart';
 import '../../domain/models/recharge_model.dart';
 
+import '../../domain/models/wallet_model.dart';
+
 class MinhasRecargasScreen extends StatefulWidget {
   const MinhasRecargasScreen({super.key});
 
@@ -21,6 +23,7 @@ class _MinhasRecargasScreenState extends State<MinhasRecargasScreen> {
   final DateFormat _dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
   List<RechargeModel> _recharges = [];
+  WalletModel? _wallet;
   bool _isLoading = true;
 
   @override
@@ -30,14 +33,39 @@ class _MinhasRecargasScreenState extends State<MinhasRecargasScreen> {
   }
 
   Future<void> _loadRecharges() async {
+    // 1. Carrega os dados locais instantaneamente para a tela não travar
     setState(() => _isLoading = true);
     try {
-      final list = await _walletRepository.getRecharges();
+      final wallet = await _walletRepository.getOrCreateWallet();
+      var list = await _walletRepository.getRecharges();
+
       if (mounted) {
         setState(() {
+          _wallet = wallet;
           _recharges = list;
           _isLoading = false;
         });
+      }
+
+      // 2. Roda a sincronização com o banco em background de forma concorrente
+      final pendingRecharges = list.where((r) => r.status == RechargeStatus.pending && r.txid != null && r.txid!.isNotEmpty).toList();
+      
+      if (pendingRecharges.isNotEmpty) {
+        // Roda todas as verificações ao mesmo tempo
+        await Future.wait(
+          pendingRecharges.map((r) => _walletRepository.checkRechargeStatus(r.txid!))
+        );
+
+        // Busca a lista atualizada depois de sincronizar tudo
+        final updatedList = await _walletRepository.getRecharges();
+        final updatedWallet = await _walletRepository.getOrCreateWallet();
+
+        if (mounted) {
+          setState(() {
+            _wallet = updatedWallet;
+            _recharges = updatedList;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -229,6 +257,27 @@ class _MinhasRecargasScreenState extends State<MinhasRecargasScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         actions: [
+          if (_wallet != null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _currencyFormat.format(_wallet!.balance),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),
             tooltip: 'Atualizar',

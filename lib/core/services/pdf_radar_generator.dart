@@ -20,7 +20,7 @@ class PdfRadarGenerator {
   static const _kValueBlue = PdfColor.fromInt(0xFF0066CC);
   static const _kTeal = PdfColor.fromInt(0xFF008298);
   static const _kOrange = PdfColor.fromInt(0xFFEF7F1A);
-  static const _kGreen = PdfColor.fromInt(0xFF4DB848);
+  static const _kGreen = PdfColor.fromInt(0xFF183523);
   static const _kBorder = PdfColor.fromInt(0xFFDDDDDD);
 
   // SVGs Constants

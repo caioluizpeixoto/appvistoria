@@ -74,26 +74,26 @@ class RechargeModel {
 
   factory RechargeModel.fromJson(Map<String, dynamic> json) {
     return RechargeModel(
-      id: json['id'] as String,
-      companyId: json['company_id'] as String,
-      userId: json['user_id'] as String?,
-      walletId: json['wallet_id'] as String,
+      id: json['id']?.toString() ?? '',
+      companyId: json['company_id']?.toString() ?? '',
+      userId: json['user_id']?.toString(),
+      walletId: json['wallet_id']?.toString() ?? '',
       amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      status: RechargeStatus.fromString(json['status'] as String? ?? 'pending'),
-      paymentMethod: json['payment_method'] as String? ?? 'pix',
-      provider: json['provider'] as String? ?? 'sicredi_future',
-      externalId: json['external_id'] as String?,
-      txid: json['txid'] as String?,
-      pixCopyPaste: json['pix_copy_paste'] as String?,
-      qrCodeData: json['qr_code_data'] as String?,
+      status: RechargeStatus.fromString(json['status']?.toString() ?? 'pending'),
+      paymentMethod: json['payment_method']?.toString() ?? 'pix',
+      provider: json['provider']?.toString() ?? 'sicredi_future',
+      externalId: json['external_id']?.toString(),
+      txid: json['txid']?.toString(),
+      pixCopyPaste: json['pix_copy_paste']?.toString(),
+      qrCodeData: json['qr_code_data']?.toString(),
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now()
           : DateTime.now(),
       paidAt: json['paid_at'] != null
-          ? DateTime.parse(json['paid_at'] as String)
+          ? DateTime.tryParse(json['paid_at'].toString())
           : null,
       expiresAt: json['expires_at'] != null
-          ? DateTime.parse(json['expires_at'] as String)
+          ? DateTime.tryParse(json['expires_at'].toString())
           : null,
     );
   }

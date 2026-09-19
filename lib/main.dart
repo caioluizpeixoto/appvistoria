@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/services/device_security_service.dart';
 import 'features/auth/presentation/blocs/auth_bloc.dart';
+import 'core/bloc/background_tasks/background_tasks_cubit.dart';
 import 'injection_container.dart';
 import 'router.dart';
 
@@ -51,8 +52,11 @@ class _CautelarAppState extends State<CautelarApp> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _authBloc,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider.value(value: _authBloc),
+        BlocProvider(create: (_) => sl<BackgroundTasksCubit>()),
+      ],
       child: MaterialApp.router(
         title: 'Ultra Prime',
         debugShowCheckedModeBanner: false,

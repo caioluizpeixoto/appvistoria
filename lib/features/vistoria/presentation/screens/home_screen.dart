@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/presentation/blocs/auth_bloc.dart';
+import '../../../../core/bloc/background_tasks/background_tasks_cubit.dart';
+import '../../../../core/bloc/background_tasks/background_tasks_state.dart';
 import '../../domain/vistoria_type.dart';
 import '../widgets/app_drawer.dart';
 import '../../../../injection_container.dart';
@@ -317,13 +319,13 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          StreamBuilder<WalletModel?>(
-            stream: sl<WalletRepository>().streamWallet(),
-            builder: (context, snapshot) {
+          ValueListenableBuilder<WalletModel?>(
+            valueListenable: sl<WalletRepository>().getWalletNotifier(),
+            builder: (context, wallet, child) {
               String balanceText = '';
               double currentBalance = 0;
-              if (snapshot.hasData && snapshot.data != null) {
-                currentBalance = snapshot.data!.balance;
+              if (wallet != null) {
+                currentBalance = wallet.balance;
                 balanceText = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(currentBalance);
               }
               
@@ -352,11 +354,7 @@ class HomeScreen extends StatelessWidget {
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
-            tooltip: 'Notificações',
-            onPressed: () {},
-          ),
+          _NotificationBell(),
         ],
       ),
       body: CustomScrollView(
@@ -499,6 +497,162 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Botão de Notificações com Badge ──────────────────────────────────────────
+
+class _NotificationBell extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<BackgroundTasksCubit, BackgroundTasksState>(
+      builder: (context, state) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded),
+              tooltip: 'Notificações',
+              onPressed: () {
+                _abrirModalNotificacoes(context, state);
+              },
+            ),
+            if (state.hasRunningTasks)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: Colors.blueAccent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              )
+            else if (state.hasUnreadCompletedTasks)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.redAccent,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 16,
+                    minHeight: 16,
+                  ),
+                  child: Text(
+                    '${state.unreadCount}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _abrirModalNotificacoes(BuildContext context, BackgroundTasksState state) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.background,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          minChildSize: 0.4,
+          builder: (_, controller) {
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Tarefas e Pesquisas',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: state.tasks.isEmpty
+                      ? const Center(
+                          child: Text(
+                            'Nenhuma pesquisa na sessão atual.',
+                            style: TextStyle(color: AppTheme.textSecondary),
+                          ),
+                        )
+                      : ListView.builder(
+                          controller: controller,
+                          itemCount: state.tasks.length,
+                          itemBuilder: (context, index) {
+                            final task = state.tasks[index];
+                            IconData icon;
+                            Color color;
+
+                            if (task.status == BackgroundTaskStatus.running) {
+                              icon = Icons.hourglass_top_rounded;
+                              color = Colors.blueAccent;
+                            } else if (task.status == BackgroundTaskStatus.success) {
+                              icon = Icons.check_circle_rounded;
+                              color = AppTheme.primary;
+                            } else {
+                              icon = Icons.error_rounded;
+                              color = Colors.redAccent;
+                            }
+
+                            return ListTile(
+                              leading: Icon(icon, color: color),
+                              title: Text(task.title, style: TextStyle(fontWeight: task.isRead ? FontWeight.normal : FontWeight.bold)),
+                              subtitle: Text(task.subtitle),
+                              tileColor: task.isRead ? null : AppTheme.primary.withValues(alpha: 0.05),
+                              onTap: () {
+                                context.read<BackgroundTasksCubit>().marcarComoLida(task.id);
+                                if (task.status == BackgroundTaskStatus.success) {
+                                  Navigator.pop(ctx);
+                                  if (task.redirectPath != null) {
+                                    context.push(task.redirectPath!, extra: task.redirectExtra);
+                                  } else {
+                                    context.push('/historico-consultas');
+                                  }
+                                } else if (task.status == BackgroundTaskStatus.error) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(task.errorMessage ?? 'Erro')));
+                                }
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

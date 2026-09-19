@@ -99,7 +99,7 @@ const _kBlack = PdfColor.fromInt(0xFF222222);
 const _kWhite = PdfColors.white;
 const _kGreyLight = PdfColor.fromInt(0xFFF5F5F5);
 const _kGreyDark = PdfColor.fromInt(0xFF666666);
-const _kGreen = PdfColor.fromInt(0xFF8BC34A);
+const _kGreen = PdfColor.fromInt(0xFF183523);
 const _kOrange = PdfColor.fromInt(0xFFFFCA28);
 const _kRed = PdfColor.fromInt(0xFFEF5350);
 
@@ -609,7 +609,7 @@ class PdfGeneratorService {
       void addFotosMultiPage(List<Map<String, dynamic>> sectionsToPrint, {bool addResumoEParecer = false}) {
         if (sectionsToPrint.isEmpty && !addResumoEParecer) return;
 
-        final limeGreen = PdfColor.fromHex('8CC63F');
+        final limeGreen = PdfColor.fromHex('183523');
         pdf.addPage(pw.MultiPage(
             pageFormat: PdfPageFormat.a4,
             margin: const pw.EdgeInsets.all(16),
@@ -724,9 +724,9 @@ class PdfGeneratorService {
                     displayStatusText = 'COM OBSERVAÇÃO';
                   }
                 } else if (s.isNotEmpty) {
-                  labelColor = PdfColor.fromHex('8CC63F'); // Conforme
+                  labelColor = PdfColor.fromHex('183523'); // Conforme
                   statusIcon =
-                      '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                      '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
                 }
 
                 return pw.Container(
@@ -810,13 +810,13 @@ class PdfGeneratorService {
                       margin: const pw.EdgeInsets.only(top: 8, bottom: 4),
                       padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       decoration: pw.BoxDecoration(
-                        color: PdfColor.fromHex('1F5E3D'),
+                        color: PdfColor.fromHex('FDB22B'),
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
                       child: pw.Text(
                         title,
                         style: pw.TextStyle(
-                          color: PdfColors.white,
+                          color: PdfColors.black,
                           font: styles.bold,
                           fontSize: 9,
                         ),
@@ -1821,11 +1821,11 @@ class PdfGeneratorService {
   pw.Widget _buildBlackBar(String text, _PdfStyles styles) {
     return pw.Container(
       width: double.infinity,
-      color: _kBlack,
+      color: PdfColor.fromHex('FDB22B'),
       padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       margin: const pw.EdgeInsets.only(bottom: 6),
       child: pw.Text(text,
-          style: pw.TextStyle(font: styles.bold, fontSize: 8, color: _kWhite)),
+          style: pw.TextStyle(font: styles.bold, fontSize: 8, color: PdfColors.black)),
     );
   }
 
@@ -2057,13 +2057,13 @@ class PdfGeneratorService {
   }) {
     final borderColor = isAlert
         ? PdfColor.fromHex('EE4036')
-        : (isWarning ? PdfColor.fromHex('FBB03B') : PdfColor.fromHex('8CC63F'));
+        : (isWarning ? PdfColor.fromHex('FBB03B') : PdfColor.fromHex('183523'));
 
     final miniBadgeSvg = isAlert
         ? '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>'
         : (isWarning
             ? '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
-            : '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
+            : '<svg viewBox="0 0 24 24"><path fill="#183523" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>');
 
     return pw.Expanded(
       child: pw.Column(
@@ -2152,7 +2152,7 @@ class PdfGeneratorService {
             '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
       } else {
         statusSvg =
-            '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+            '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
       }
 
       return pw.Padding(
@@ -2267,7 +2267,7 @@ class PdfGeneratorService {
     RadarVeiculo? radarVeiculo,
     Map<String, dynamic>? dadosConsultaJson,
   }) async {
-    final limeGreen = PdfColor.fromHex('8CC63F');
+    final limeGreen = PdfColor.fromHex('183523');
     final warningYellow = PdfColor.fromHex('FBC02D'); // Amarelo para observação
     final warningOrange = PdfColor.fromHex('F97316'); // Laranja para restrição
     final dangerRed = PdfColor.fromHex('EE4036');
@@ -2415,7 +2415,7 @@ class PdfGeneratorService {
         '<svg viewBox="0 0 480.016 480.016"><path fill="#2D3136" d="M385.895,292.612c-15.111,0-27.694,11.014-29.872,25.906H272.81c-2.577-8.819-10.827-15.087-20.102-15.087h-55.461c-9.275,0-17.509,6.267-20.102,15.087h-69.743c-1.618-15.493-14.64-27.426-30.344-27.426c-16.883,0-30.62,13.745-30.62,30.653c0,16.891,13.729,30.628,30.62,30.628c14.607,0,26.938-10.161,29.889-24.394h69.727c1.699,10.047,10.291,17.436,20.573,17.436h55.461c10.291,0,18.866-7.381,20.565-17.436h82.822c2.43,14.566,14.965,25.337,29.791,25.337c16.753,0,30.352-13.599,30.352-30.32C416.255,306.227,402.648,292.612,385.895,292.612z M385.895,344.041c-11.632,0-21.077-9.454-21.077-21.061c0-11.656,9.445-21.102,21.077-21.102c11.624,0,21.086,9.445,21.086,21.102C406.98,334.588,397.519,344.041,385.895,344.041z M187.208,318.51c2.057-3.552,5.828-5.804,10.039-5.804h55.461c4.186,0,7.966,2.252,10.031,5.804H187.208z M252.716,336.116h-55.461c-5.105,0-9.551-3.39-11.079-8.153h77.628C262.276,332.726,257.813,336.116,252.716,336.116z M77.058,300.375c11.77,0,21.362,9.584,21.362,21.362c0,11.77-9.592,21.337-21.362,21.337s-21.338-9.567-21.338-21.337C55.72,309.95,65.288,300.375,77.058,300.375z"/><path fill="#2D3136" d="M427.822,272.047l52.194-5.373l-0.821-4.877c-5.771-34.4-0.496-47.642-0.285-48.137l0.878-1.91l-0.862-1.926c-0.707-1.569-18.509-38.627-123.644-38.627l-4.373,0.016c-9.307-8.502-53.51-44.512-135.601-44.512c-60.257,0-126.221,19.761-196.061,58.745l-2.934,1.674l0.667,3.308c0.545,2.715,1.333,11.486-2.122,15.704c-1.447,1.772-3.536,2.585-6.584,2.585H4.502l-0.772,3.69c-4.641,22.321-7.129,44.797,6.007,57.932l1.357,1.374h37.326l-1.244-5.633c-0.61-2.796-0.91-5.373-0.91-7.934c0-19.663,16.013-35.668,35.684-35.668c19.663,0,35.676,16.005,35.676,35.668c0,2.609-0.309,5.267-0.91,7.893l-1.292,5.674h239.858l-1.301-5.674c-0.593-2.617-0.902-5.275-0.902-7.893c0-19.013,17.688-35.668,37.847-35.668c13.9,0,22.882,7.145,27.97,13.152c7.503,8.876,11.502,21.086,9.941,30.401L427.822,272.047z M172.91,186.03H51.274l18.85-8.836c0.415-0.179,41.464-19.135,97.283-29.881l5.511-1.065v39.781H172.91z M184.501,186.03v-41.651l3.975-0.545c9.12-1.349,18.484-2.008,27.865-2.008c68.069,0,118.864,35.432,119.376,35.782l11.933,8.429H184.501V186.03z"/></svg>';
 
     final String miniCheckSvg =
-        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     final String miniWarningSvg =
         '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
     final String miniCrossSvg =
@@ -3520,7 +3520,7 @@ class PdfGeneratorService {
         computedStatus = state.statusSugerido;
       }
     }
-    final limeGreen = PdfColor.fromHex('8CC63F');
+    final limeGreen = PdfColor.fromHex('183523');
     final warningYellow = PdfColor.fromHex('FBC02D'); // Amarelo para observação
     final warningOrange = PdfColor.fromHex('F97316'); // Laranja para restrição
     final dangerRed = PdfColor.fromHex('EE4036');
@@ -3903,7 +3903,7 @@ class PdfGeneratorService {
     String svgIcon;
     if (isCheck) {
       svgIcon =
-          '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+          '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     } else if (isWarning) {
       svgIcon =
           '<svg viewBox="0 0 24 24"><path fill="#FBB03B" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>';
@@ -3994,7 +3994,7 @@ class PdfGeneratorService {
                               '<svg viewBox="0 0 24 24"><path fill="#EE4036" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>';
                         } else {
                           statusSvg =
-                              '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                              '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
                         }
 
                         return pw.Padding(
@@ -5006,7 +5006,7 @@ class PdfGeneratorService {
     final globalStatus = getGlobalStatus();
     PdfColor globalStatusColor = PdfColors.green;
     String globalIcon =
-        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+        '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
     if (globalStatus.contains('NÃO CONFORME')) {
       globalStatusColor = PdfColor.fromHex('EE4036'); // Red
       globalIcon =
@@ -5091,7 +5091,7 @@ class PdfGeneratorService {
 
                   PdfColor itemStatusColor = PdfColors.green;
                   String itemIcon =
-                      '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
+                      '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>';
 
                   if (status.contains('COLISÃO') ||
                       status.contains('SOLDADO') ||
@@ -5816,7 +5816,7 @@ class PdfGeneratorService {
     final borderRed = PdfColor.fromHex('#C5E1A5'); // Borda verde suave
     final textDark = PdfColor.fromHex('#222222');
     final textMuted = PdfColor.fromHex('#666666');
-    final mainGreen = PdfColor.fromHex('#8CC63F');
+    final mainGreen = PdfColor.fromHex('#183523');
     final blueColor = const PdfColor.fromInt(0xFF1976D2);
 
     pw.Widget buildRedBar(String text, {PdfColor? bgColor}) {
@@ -6521,7 +6521,7 @@ class PdfGeneratorService {
                       children: [
                         pw.SvgImage(
                                     svg:
-                                        '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'),
+                                        '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>'),
                         pw.SizedBox(width: 4),
                         pw.Text('CONFORME',
                             style:
@@ -6612,7 +6612,7 @@ class PdfGeneratorService {
                   pw.Row(children: [
                     pw.SvgImage(
                         svg:
-                            '<svg viewBox="0 0 24 24"><path fill="#8CC63F" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>',
+                            '<svg viewBox="0 0 24 24"><path fill="#183523" d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>',
                         width: 6,
                         height: 6),
                     pw.SizedBox(width: 4),

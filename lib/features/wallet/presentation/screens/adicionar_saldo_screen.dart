@@ -7,6 +7,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../injection_container.dart';
 import '../../data/repositories/wallet_repository.dart';
+import '../../domain/models/recharge_model.dart';
 
 class AdicionarSaldoScreen extends StatefulWidget {
   const AdicionarSaldoScreen({super.key});
@@ -93,108 +94,17 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
         return;
       }
 
-      // Exibe diálogo com o QR Code
+      final txid = chargeResult['txid']?.toString();
+
+      // Exibe diálogo com o QR Code e polling automático
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: const [
-              Icon(Icons.pix_rounded, color: AppTheme.primary, size: 26),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'Pagamento via Pix',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Valor: ${_currencyFormat.format(amount)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppTheme.border),
-                ),
-                child: QrImageView(
-                  data: qrCodeData,
-                  version: QrVersions.auto,
-                  size: 200.0,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Abra o aplicativo do seu banco e escaneie o QR Code acima ou copie o código abaixo.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: pixCopyPaste));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Código Pix copiado!'),
-                      backgroundColor: AppTheme.conforme,
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.copy, size: 18),
-                label: const Text('Copiar código Pix'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: AppTheme.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                context.pop();
-              },
-              child: const Text(
-                'Fechar',
-                style: TextStyle(color: AppTheme.textSecondary),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                context.pushReplacement('/carteira/recargas');
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text(
-                'Ver Status',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
+        builder: (ctx) => PixPaymentDialog(
+          amount: amount,
+          qrCodeData: qrCodeData,
+          pixCopyPaste: pixCopyPaste,
+          txid: txid,
         ),
       );
     } catch (e) {
@@ -449,6 +359,252 @@ class _AdicionarSaldoScreenState extends State<AdicionarSaldoScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class PixPaymentDialog extends StatefulWidget {
+  final double amount;
+  final String? qrCodeData;
+  final String? pixCopyPaste;
+  final String? txid;
+
+  const PixPaymentDialog({
+    super.key,
+    required this.amount,
+    this.qrCodeData,
+    this.pixCopyPaste,
+    this.txid,
+  });
+
+  @override
+  State<PixPaymentDialog> createState() => _PixPaymentDialogState();
+}
+
+class _PixPaymentDialogState extends State<PixPaymentDialog> {
+  final WalletRepository _walletRepository = sl<WalletRepository>();
+  final NumberFormat _currencyFormat = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$');
+  
+  bool _isPaid = false;
+  bool _isPolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _isPolling = false;
+    super.dispose();
+  }
+
+  void _startPolling() async {
+    if (widget.txid == null || widget.txid!.isEmpty) return;
+    
+    _isPolling = true;
+    
+    while (_isPolling && !_isPaid && mounted) {
+      await Future.delayed(const Duration(seconds: 3));
+      if (!mounted || !_isPolling) break;
+
+      try {
+        await _walletRepository.checkRechargeStatus(widget.txid!);
+        final list = await _walletRepository.getRecharges();
+        final currentRecharge = list.where((r) => r.txid == widget.txid).firstOrNull;
+        
+        if (currentRecharge != null && currentRecharge.status == RechargeStatus.paid) {
+          if (mounted) {
+            setState(() {
+              _isPaid = true;
+              _isPolling = false;
+            });
+          }
+        }
+      } catch (_) {
+        // Ignora erros silenciosos do polling
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isPaid) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.check_circle, color: AppTheme.conforme, size: 60),
+            const SizedBox(height: 16),
+            const Text(
+              'Pagamento Confirmado!',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.conforme),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Seu saldo de ${_currencyFormat.format(widget.amount)} já está disponível.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                context.pushReplacement('/carteira/recargas');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                minimumSize: const Size(double.infinity, 45),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Ver Minha Carteira', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return AlertDialog(
+      scrollable: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.pix_rounded, color: AppTheme.primary, size: 26),
+          SizedBox(width: 10),
+          Text(
+            'Pagamento via Pix',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Valor: ${_currencyFormat.format(widget.amount)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppTheme.conformeLight,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.conforme),
+                ),
+                const SizedBox(width: 8),
+                const Text('Aguardando pagamento...', style: TextStyle(fontSize: 12, color: AppTheme.conforme, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.border),
+            ),
+            child: (widget.qrCodeData == null || widget.qrCodeData!.length < 20)
+              ? const SizedBox(
+                  width: 200.0,
+                  height: 200.0,
+                  child: Center(
+                    child: Text(
+                      'QR Code não disponível',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.textSecondary),
+                    ),
+                  ),
+                )
+              : Image.network(
+                  'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${Uri.encodeComponent(widget.qrCodeData!)}',
+                  width: 200.0,
+                  height: 200.0,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const SizedBox(
+                      width: 200.0,
+                      height: 200.0,
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return const SizedBox(
+                      width: 200.0,
+                      height: 200.0,
+                      child: Center(
+                        child: Text(
+                          'Erro ao carregar imagem do QR Code. Use o botão abaixo.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Abra o aplicativo do seu banco e escaneie o QR Code acima ou copie o código abaixo.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: (widget.pixCopyPaste == null || widget.pixCopyPaste!.isEmpty) ? null : () {
+              Clipboard.setData(ClipboardData(text: widget.pixCopyPaste!));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Código Pix copiado!'),
+                  backgroundColor: AppTheme.conforme,
+                ),
+              );
+            },
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copiar código Pix'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primary,
+              side: const BorderSide(color: AppTheme.primary),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+            context.pop();
+          },
+          child: const Text(
+            'Fechar',
+            style: TextStyle(color: AppTheme.textSecondary),
+          ),
+        ),
+      ],
     );
   }
 }

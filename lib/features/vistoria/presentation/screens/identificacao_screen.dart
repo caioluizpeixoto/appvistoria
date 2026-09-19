@@ -21,6 +21,8 @@ import 'dart:convert';
 import 'package:drift/drift.dart' as drift;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/bloc/background_tasks/background_tasks_cubit.dart';
 
 import '../../../../features/wallet/data/repositories/wallet_repository.dart';
 
@@ -681,6 +683,28 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         // Obteve o token da Radar e vai consultar os detalhes
         tokenConsulta = escolhida['tokenConsulta'];
       }
+    }
+
+    if (_somentePesquisa && (escolhida['forcarNova'] == true || (escolhida['fonte'] == 'radar' && tokenConsulta != null))) {
+      // Send to background task
+      context.read<BackgroundTasksCubit>().iniciarPesquisaAvulsa(
+        produto: _produtoSelecionado,
+        parametro: _modoEntrada,
+        valor: valor,
+        titulo: 'Pesquisa $_produtoSelecionado ($valor)',
+        forcarNova: escolhida['forcarNova'] == true,
+        tokenConsulta: tokenConsulta,
+      );
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pesquisa iniciada em segundo plano. Acompanhe nas notificações (sininho).'),
+          backgroundColor: AppTheme.primary,
+        )
+      );
+      
+      if (mounted) context.pop();
+      return true;
     }
 
     setState(() {
