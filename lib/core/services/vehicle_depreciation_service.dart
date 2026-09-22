@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:math';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../features/vistoria/domain/entities/apontamento_avaria.dart';
 
 /// Representa um item/apontamento de avaria orçado.
 ///
@@ -10,6 +14,7 @@ class DepreciacaoItem {
   final String descricaoProblema;
   final double valorPeca;
   final double valorMaoDeObra;
+  final String? justificativa;
 
   const DepreciacaoItem({
     required this.apontamentoId,
@@ -17,6 +22,7 @@ class DepreciacaoItem {
     required this.descricaoProblema,
     required this.valorPeca,
     required this.valorMaoDeObra,
+    this.justificativa,
   });
 
   /// Custo total associado a este apontamento específico (peça + mão de obra).
@@ -29,6 +35,7 @@ class DepreciacaoItem {
       'descricaoProblema': descricaoProblema,
       'valorPeca': valorPeca,
       'valorMaoDeObra': valorMaoDeObra,
+      'justificativa': justificativa,
       'custoTotal': custoTotal,
     };
   }
@@ -44,6 +51,7 @@ class DepreciacaoItem {
       valorMaoDeObra: VehicleDepreciationService.normalizarValor(
         map['valorMaoDeObra'] ?? map['valor_mao_de_obra_estimado'] ?? map['valorEstimadoMaoDeObra'],
       ),
+      justificativa: map['justificativa'] as String?,
     );
   }
 }
@@ -216,6 +224,8 @@ class VehicleDepreciationService {
         item['valorEstimadoMaoDeObra'] ?? item['valor_mao_de_obra_estimado'] ?? item['valorMaoDeObra'],
       );
 
+      final justificativa = (item['justificativa'] ?? item['motivo'] ?? item['justificativaIa'] ?? '').toString();
+
       // Substituição se já existir para manter unicidade e idempotência
       if (idsProcessados.contains(id)) {
         final existingIndex = resultado.indexWhere((it) => it.apontamentoId == id);
@@ -226,6 +236,7 @@ class VehicleDepreciationService {
             descricaoProblema: desc,
             valorPeca: valorPeca,
             valorMaoDeObra: valorMaoDeObra,
+            justificativa: justificativa.isNotEmpty ? justificativa : null,
           );
         }
       } else {
@@ -236,11 +247,72 @@ class VehicleDepreciationService {
           descricaoProblema: desc,
           valorPeca: valorPeca,
           valorMaoDeObra: valorMaoDeObra,
+          justificativa: justificativa.isNotEmpty ? justificativa : null,
         ));
       }
     }
 
     return resultado;
+  }
+
+  /// Faz a requisição à Edge Function 'gerar-ficha-veiculo' em modo rápido exclusivamente para orçar apontamentos.
+  /// Retorna a lista de [DepreciacaoItem] com o valor da peça e mão de obra calculados por IA.
+  static Future<List<DepreciacaoItem>> orcarApontamentosComIa({
+    required List<ApontamentoAvaria> apontamentos,
+    String? brand,
+    String? model,
+    int? year,
+    String? version,
+    String? fuel,
+    String? engine,
+    String? uf,
+  }) async {
+    if (apontamentos.isEmpty) return const [];
+
+    final payload = {
+      'apenasAvarias': true,
+      'modo': 'orcamento_avarias',
+      'brand': (brand != null && brand.trim().isNotEmpty) ? brand.trim() : 'NÃO INFORMADA',
+      'model': (model != null && model.trim().isNotEmpty) ? model.trim() : 'NÃO INFORMADO',
+      'year': year ?? DateTime.now().year,
+      'version': version ?? '',
+      'fuel': fuel ?? '',
+      'engine': engine ?? '',
+      'uf': uf ?? '',
+      'apontamentos': apontamentos.map((a) => {
+        'id': a.id,
+        'apontamentoId': a.id,
+        'categoria': a.categoria,
+        'peca': a.peca,
+        'nomePeca': a.peca,
+        'motivoAvaria': a.motivoAvaria,
+        'descricaoProblema': '${a.motivoAvaria}${a.observacao.isNotEmpty ? " - ${a.observacao}" : ""}',
+        'observacao': a.observacao,
+        if (a.valorPeca != null) 'valor_peca_estimado': a.valorPeca,
+        if (a.valorMaoDeObra != null) 'valor_mao_de_obra_estimado': a.valorMaoDeObra,
+      }).toList(),
+    };
+
+    try {
+      final res = await Supabase.instance.client.functions.invoke(
+        'gerar-ficha-veiculo',
+        body: payload,
+      ).timeout(const Duration(seconds: 35));
+
+      if (res.status == 200 && res.data != null) {
+        final data = res.data is String ? jsonDecode(res.data) : res.data;
+        final innerData = data is Map ? (data['data'] ?? data) : null;
+        if (innerData != null && innerData['apontamentos_veiculo'] != null) {
+          return parseRespostaIa(innerData['apontamentos_veiculo']);
+        }
+      } else {
+        print('[VehicleDepreciationService] Erro Edge Function (Status ${res.status}): ${res.data}');
+      }
+    } catch (e) {
+      print('[VehicleDepreciationService] Falha ao orçar apontamentos com IA: $e');
+    }
+
+    return const [];
   }
 
   /// Formata um double para moeda brasileira (ex: R$ 80.000,00).

@@ -138,7 +138,7 @@ class RadarProdutos {
         {'nome': 'AUTO BIN (Placa / Chassi)', 'codigo': 'auto_bin', 'param': 'placa'},
         {'nome': 'PESQUISA DE MOTOR', 'codigo': 'bin_por_motor', 'param': 'motor'},
         {'nome': 'AUTO PERÍCIA', 'codigo': 'auto_pericia', 'param': 'placa'},
-        {'nome': 'AUTO PERÍCIA HRF', 'codigo': 'auto_pericia_hrf', 'param': 'placa'},
+        {'nome': 'AUTO PERÍCIA HRF (Recomendado)', 'codigo': 'auto_pericia_hrf', 'param': 'placa'},
         {'nome': 'AUTO COMPLETA', 'codigo': 'auto_completa', 'param': 'placa'},
         {'nome': 'AUTO LEILÃO', 'codigo': 'auto_leilao', 'param': 'placa'},
         {'nome': 'AUTO BASE ESTADUAL', 'codigo': 'auto_base_estadual', 'param': 'placa'},

@@ -32,11 +32,11 @@ class AppDrawer extends StatelessWidget {
                         color: Colors.amber.shade100,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.phonelink_lock_rounded,
+                      child: const Icon(Icons.admin_panel_settings_rounded,
                           color: Color(0xFFD97706), size: 20),
                     ),
                     title: const Text(
-                      'Liberar Aparelhos',
+                      'Painel Master',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         color: Color(0xFFB45309),
@@ -44,7 +44,7 @@ class AppDrawer extends StatelessWidget {
                       ),
                     ),
                     subtitle: const Text(
-                      'Autorizar e gerenciar aparelhos',
+                      'Gerenciar aparelhos e créditos',
                       style: TextStyle(
                         fontSize: 11,
                         color: Color(0xFF92400E),

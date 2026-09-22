@@ -80,6 +80,7 @@ dependencies:
   image: ^4.8.0
   speech_to_text: ^7.4.0
   flutter_html_to_pdf: ^0.7.0
+  ntp: ^2.0.0
 
 dev_dependencies:
   flutter_test:

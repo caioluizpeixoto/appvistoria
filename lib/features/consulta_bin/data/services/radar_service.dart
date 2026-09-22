@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:get_it/get_it.dart';
 import '../../domain/entities/radar_veiculo.dart';
 import '../../domain/entities/radar_historico.dart';
 import '../../domain/radar_produtos.dart';
 import '../repositories/radar_repository.dart';
+import '../../../wallet/data/repositories/wallet_repository.dart';
 
 class RadarService {
   final SupabaseClient supabase;
@@ -33,6 +35,14 @@ class RadarService {
   );
 
   RadarService({required this.supabase, required this.repository});
+
+  WalletRepository? _getWalletRepository() {
+    try {
+      return GetIt.I<WalletRepository>();
+    } catch (_) {
+      return null;
+    }
+  }
 
   bool _deveConsultarDireto(String produto) {
     return true; // Sempre consulta diretamente a API da Radar via Dio com credenciais configuradas
@@ -125,6 +135,66 @@ class RadarService {
     }
   }
 
+  Future<List<dynamic>> listarConsultasAutocredNuvem() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return [];
+
+    try {
+      final response = await supabase
+          .from('autocred_consultas')
+          .select()
+          .eq('user_id', userId)
+          .order('created_at', ascending: false)
+          .limit(100);
+
+      if (response == null || response is! List) return [];
+
+      return response.map((row) {
+        final Map<String, dynamic> c = row as Map<String, dynamic>;
+
+        // Emular formato da Radar API para o ModalAtrelarPesquisa
+        final status = c['status'] == 'concluida' ? '1' : '2';
+
+        // O token original da Radar fica dentro do retorno_bruto
+        String token = '';
+        try {
+          if (c['retorno_bruto'] != null && c['retorno_bruto'].toString().isNotEmpty) {
+            final raw = jsonDecode(c['retorno_bruto']);
+            if (raw is Map) {
+              if (raw['consulta'] is Map && raw['consulta']['token'] != null) {
+                token = raw['consulta']['token'].toString();
+              } else if (raw['token-consulta'] != null) {
+                token = raw['token-consulta'].toString();
+              }
+            }
+          }
+        } catch (_) {}
+
+        String parametro = 'placa';
+        String parametroValor = c['placa'] ?? '';
+        if (parametroValor.isEmpty && c['chassi'] != null && c['chassi'].toString().isNotEmpty) {
+          parametro = 'chassi';
+          parametroValor = c['chassi'];
+        } else if (parametroValor.isEmpty && c['motor'] != null && c['motor'].toString().isNotEmpty) {
+          parametro = 'motor';
+          parametroValor = c['motor'];
+        }
+
+        return {
+          'status': status,
+          'token': token,
+          'parametro': parametro,
+          'parametro_valor': parametroValor,
+          'titulo': 'Pesquisa Autocred',
+          'data_hora': c['created_at'],
+        };
+      }).toList();
+    } catch (e) {
+      print('Erro ao buscar historico nuvem: $e');
+      return [];
+    }
+  }
+
   Future<RadarVeiculo> consultarVeiculo({
     required String produto, // ex: "auto_bin", "bin_por_motor"
     required String param, // ex: "placa", "chassi", "motor"
@@ -153,6 +223,33 @@ class RadarService {
       Map<String, dynamic>? finalData;
       bool isForcarNova = forcarNova;
       bool consultarDireto = _deveConsultarDireto(produto);
+
+      if (isForcarNova) {
+        try {
+          final recent = await listarConsultasRadar(param: param, value: value);
+          if (recent.isNotEmpty) {
+            recent.sort((a, b) {
+              final da = DateTime.tryParse(a['data_hora']?.toString() ?? a['ctime']?.toString() ?? '') ?? DateTime(2000);
+              final db = DateTime.tryParse(b['data_hora']?.toString() ?? b['ctime']?.toString() ?? '') ?? DateTime(2000);
+              return db.compareTo(da);
+            });
+            final mostRecent = recent.first;
+            final da = DateTime.tryParse(mostRecent['data_hora']?.toString() ?? mostRecent['ctime']?.toString() ?? '');
+            if (da != null) {
+              final diff = DateTime.now().difference(da);
+              if (diff.inHours < 24) {
+                isForcarNova = false;
+                if (mostRecent['token'] != null && mostRecent['token'].toString().isNotEmpty) {
+                  currentToken = mostRecent['token'].toString();
+                }
+                print('>>> TRAVA 24H: Impedindo nova pesquisa para $param=$value. Usando consulta de ${diff.inHours}h atras.');
+              }
+            }
+          }
+        } catch (e) {
+          print('Erro na trava 24h: $e');
+        }
+      }
 
       if (!consultarDireto) {
         int retryCount = 0;
@@ -286,6 +383,47 @@ class RadarService {
         dadosTratados: parsed,
         arquivoPesquisaUrl: parsed['radar_pdf_url'],
       );
+
+      // DÉBITO DA CARTEIRA APENAS EM CASO DE SUCESSO (CONCLUÍDA)
+      print('>>> STATUS FINAL DA PESQUISA: $statusFinal');
+      if (statusFinal == 'concluida') {
+        try {
+          print('>>> TENTANDO DEBITAR CARTEIRA PARA: $produto (ID: $idPesquisa)');
+          final walletRepo = _getWalletRepository();
+          if (walletRepo != null) {
+            String friendlyName = produto;
+            switch (produto) {
+              case 'auto_bin': friendlyName = 'BIN'; break;
+              case 'auto_completa': friendlyName = 'Completa'; break;
+              case 'auto_base_estadual': friendlyName = 'Base Estadual'; break;
+              case 'auto_pericia': friendlyName = 'Perícia'; break;
+              case 'auto_leilao': friendlyName = 'Leilão'; break;
+              case 'auto_decodificador_chassi': friendlyName = 'Decodificador Chassi'; break;
+              case 'auto_gravame': friendlyName = 'Gravame'; break;
+              case 'auto_debitos_recall': friendlyName = 'Débitos e Recall'; break;
+              case 'auto_analise': friendlyName = 'Análise'; break;
+              case 'auto_analise_plus': friendlyName = 'Análise Plus'; break;
+              case 'auto_pericia_hrf': friendlyName = 'Perícia HRF'; break;
+              case 'bin_por_motor': friendlyName = 'BIN por Motor'; break;
+              case 'e_crlv_nova': friendlyName = 'E-CRLV'; break;
+            }
+            final paramName = param.toUpperCase();
+            final desc = 'Pesquisa $friendlyName ($paramName: $value)';
+
+            final auth = await walletRepo.authorizePaidOperation(
+              serviceCode: produto,
+              referenceType: 'radar_pesquisa',
+              referenceId: idPesquisa,
+              description: desc,
+            );
+            print('>>> RETORNO DO SUPABASE: allowed=${auth.allowed}, reason=${auth.reason}, balance=${auth.balance}, graceUsed=${auth.graceOperationsUsed}');
+          } else {
+            print('>>> ERRO: WalletRepository retornou null no GetIt!');
+          }
+        } catch (e) {
+          print('>>> Aviso: falha ao debitar na carteira: $e');
+        }
+      }
 
       if (isPendente) {
         throw TimeoutException(

@@ -90,25 +90,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               _PesquisaCard(
-                titulo: 'AUTO BIN (Simples)',
-                codigo: 'auto_bin',
-                preco: 7.66,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _abrirModalCautelar(context, 'auto_bin');
-                },
-              ),
-              _PesquisaCard(
-                titulo: 'PESQUISA DE MOTOR',
-                codigo: 'bin_por_motor',
-                preco: 7.90,
-                icone: Icons.tune_rounded,
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _abrirModalCautelar(context, 'bin_por_motor');
-                },
-              ),
-              _PesquisaCard(
                 titulo: 'AUTO PERÍCIA',
                 codigo: 'auto_pericia',
                 preco: 35.80,
@@ -118,7 +99,7 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
               _PesquisaCard(
-                titulo: 'AUTO PERÍCIA HRF',
+                titulo: 'AUTO PERÍCIA HRF (Recomendado)',
                 codigo: 'auto_pericia_hrf',
                 preco: 28.90,
                 onTap: () {
@@ -322,12 +303,10 @@ class HomeScreen extends StatelessWidget {
           ValueListenableBuilder<WalletModel?>(
             valueListenable: sl<WalletRepository>().getWalletNotifier(),
             builder: (context, wallet, child) {
-              String balanceText = '';
-              double currentBalance = 0;
-              if (wallet != null) {
-                currentBalance = wallet.balance;
-                balanceText = NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(currentBalance);
-              }
+              final isLoading = wallet == null;
+              final balanceText = isLoading 
+                  ? 'R\$ ...' 
+                  : NumberFormat.currency(locale: 'pt_BR', symbol: 'R\$').format(wallet.balance);
               
               return InkWell(
                 onTap: () => context.push('/carteira'),
@@ -336,17 +315,15 @@ class HomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     children: [
-                      if (balanceText.isNotEmpty) ...[
-                        Text(
-                          balanceText,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: currentBalance < 0 ? Colors.redAccent : Colors.white,
-                          ),
+                      Text(
+                        balanceText,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: (wallet != null && wallet.balance < 0) ? Colors.redAccent : Colors.white,
                         ),
-                        const SizedBox(width: 8),
-                      ],
+                      ),
+                      const SizedBox(width: 8),
                       const Icon(Icons.account_balance_wallet_outlined, color: Colors.white),
                     ],
                   ),

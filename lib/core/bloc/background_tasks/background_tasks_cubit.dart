@@ -4,6 +4,7 @@ import 'background_tasks_state.dart';
 
 import '../../../../injection_container.dart';
 import '../../../../features/consulta_bin/data/services/radar_service.dart';
+import '../../../../features/wallet/data/repositories/wallet_repository.dart';
 
 class BackgroundTasksCubit extends Cubit<BackgroundTasksState> {
   BackgroundTasksCubit() : super(const BackgroundTasksState());
@@ -36,6 +37,8 @@ class BackgroundTasksCubit extends Cubit<BackgroundTasksState> {
     emit(state.copyWith(
       tasks: [newTask, ...state.tasks],
     ));
+
+    // A cobrança agora é feita APENAS no sucesso da consulta (em radar_service.dart)
 
     try {
       final service = sl<RadarService>();

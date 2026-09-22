@@ -115,6 +115,102 @@ REGRAS OBRIGATÓRIAS DE ORÇAMENTO DOS APONTAMENTOS (${estadoLocal}):
       extraJsonSchema = `,\n"apontamentos_veiculo": [\n  {\n    "apontamentoId": "${apontamentosFormatados[0]?.apontamentoId || '123'}",\n    "nomePeca": "${apontamentosFormatados[0]?.nomePeca || 'Para-choque'}",\n    "descricaoProblema": "Descrição do dano",\n    "valorEstimadoPeca": 1200.00,\n    "valorEstimadoMaoDeObra": 400.00\n  }\n]`;
     }
 
+    // ── MODO RÁPIDO: Orçamento de Avarias com IA ─────────────────────────────
+    const apenasAvarias = body.apenasAvarias === true || body.modo === 'orcamento_avarias';
+    if (apenasAvarias) {
+      if (!hasApontamentos) {
+        return new Response(JSON.stringify({ source: 'empty', data: { apontamentos_veiculo: [] } }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const promptAvarias = `Você é um Perito Automotivo e Avaliador Técnico Sênior no Brasil.
+Seu objetivo é orçar exclusivamente os custos médios de mercado de peças de reposição e mão de obra de reparo/funilaria para as avarias listadas de um veículo vistoriado.
+Retorne EXCLUSIVAMENTE um JSON válido no formato:
+{
+  "apontamentos_veiculo": [
+    {
+      "apontamentoId": "string (o mesmo ID recebido)",
+      "nomePeca": "string",
+      "descricaoProblema": "string",
+      "valorEstimadoPeca": 0.00,
+      "valorEstimadoMaoDeObra": 0.00
+    }
+  ]
+}
+
+Veículo: ${brand} ${model} ${year} ${version || ''} (${engine || ''})
+${extraPrompt}`;
+
+      // @ts-ignore
+      const openAiKey = Deno.env.get('OPENAI_API_KEY');
+      let parsedAvariasJson: any = null;
+      let sourceAvarias = '';
+
+      if (openAiKey) {
+        try {
+          const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${openAiKey}`,
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              response_format: { type: 'json_object' },
+              messages: [
+                { role: 'system', content: 'Você é um perito avaliador automotivo brasileiro. Retorne exclusivamente JSON válido de acordo com o esquema solicitado.' },
+                { role: 'user', content: promptAvarias }
+              ],
+              temperature: 0.2,
+            }),
+          });
+          if (resp.ok) {
+            const resData = await resp.json();
+            const content = resData.choices?.[0]?.message?.content;
+            if (content) {
+              parsedAvariasJson = JSON.parse(content);
+              sourceAvarias = 'openai-gpt-4o-mini';
+            }
+          }
+        } catch (e: any) {
+          console.error('Erro OpenAI em apenasAvarias:', e.message);
+        }
+      }
+
+      if (!parsedAvariasJson) {
+        // @ts-ignore
+        const geminiKey = Deno.env.get('GEMINI_API_KEY');
+        if (geminiKey) {
+          try {
+            const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`;
+            const gResp = await fetch(geminiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ contents: [{ parts: [{ text: promptAvarias }] }] }),
+            });
+            if (gResp.ok) {
+              const gData = await gResp.json();
+              const text = gData.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) {
+                const clean = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+                parsedAvariasJson = JSON.parse(clean);
+                sourceAvarias = 'gemini-1.5-flash';
+              }
+            }
+          } catch (e: any) {
+            console.error('Erro Gemini em apenasAvarias:', e.message);
+          }
+        }
+      }
+
+      if (parsedAvariasJson) {
+        return new Response(JSON.stringify({ source: sourceAvarias, data: parsedAvariasJson }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     const prompt = `Você é um Perito Automotivo e Avaliador Técnico Sênior no Brasil.
 Seu objetivo é gerar uma FICHA TÉCNICA INTELIGENTE DO VEÍCULO profissional, elegante, estritamente neutra e puramente informativa (sem juízo de valor "caro/barato", "bom/ruim").
 Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON.${extraPrompt}

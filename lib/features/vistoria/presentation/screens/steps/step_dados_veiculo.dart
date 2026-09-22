@@ -10,6 +10,8 @@ import '../../../../../core/utils/veiculo_parser.dart';
 import '../placa_camera_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../../core/services/pdf_radar_generator.dart';
+import '../../../../consulta_bin/domain/entities/radar_veiculo.dart';
+import '../../widgets/modal_atrelar_pesquisa.dart';
 
 /// Step 2 — Dados do Veículo
 class StepDadosVeiculo extends StatefulWidget {
@@ -160,21 +162,19 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Botão OCR CRLV ───────────────────────────────────────────────
+          // ── Botão Atrelar Pesquisa ───────────────────────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                backgroundColor: AppTheme.primary,
+                backgroundColor: const Color(0xFF0D9488), // Verde azulado
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              onPressed: _isLoadingOcr ? null : () => _scanCrlv(ImageSource.camera),
-              icon: _isLoadingOcr
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Icon(Icons.document_scanner_rounded),
-              label: Text(_isLoadingOcr ? 'Analisando documento...' : 'Ler CRLV via Câmera (Mágico)'),
+              onPressed: () => _abrirModalAtrelarPesquisa(context),
+              icon: const Icon(Icons.link_rounded),
+              label: const Text('Atrelar Pesquisa (Histórico)'),
             ),
           ),
           const SizedBox(height: 16),
@@ -538,14 +538,14 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   }) {
     return TextFormField(
       controller: ctrl,
-      textCapitalization: caps,
       keyboardType: keyboard,
+      textCapitalization: caps,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: icon != null ? Icon(icon, size: 18) : null,
+        prefixIcon: icon != null ? Icon(icon, size: 20, color: AppTheme.primary) : null,
         suffixIcon: suffixIcon,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       ),
       style: const TextStyle(fontSize: 13),
       onChanged: onChanged,
@@ -670,62 +670,58 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
     );
   }
 
-  Future<void> _scanCrlv(ImageSource source) async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1600, maxHeight: 1600);
-    if (pickedFile == null) return;
+  Future<void> _abrirModalAtrelarPesquisa(BuildContext context) async {
+    final RadarVeiculo? veiculo = await showModalBottomSheet<RadarVeiculo>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.85,
+        child: const ModalAtrelarPesquisa(),
+      ),
+    );
 
-    setState(() => _isLoadingOcr = true);
-
-    try {
-      final file = File(pickedFile.path);
-      final result = await OcrCrlvService.scanImage(file);
-
-      if (result.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Não foi possível encontrar dados legíveis na imagem.'),
-              backgroundColor: AppTheme.naoConforme,
-            ),
-          );
-        }
-      } else {
-        setState(() {
-          if (result.placa.isNotEmpty) _placaCtrl.text = result.placa;
-          if (result.renavam.isNotEmpty) _renavamCtrl.text = result.renavam;
-          if (result.chassi.isNotEmpty) {
-            _chassiVeiculoCtrl.text = result.chassi;
-            if (!context.read<VistoriaWizardState>().isChecklist) _chassiBinCtrl.text = result.chassi; // auto fill bin if cautious
-          }
-          if (result.cor.isNotEmpty) _corCtrl.text = result.cor;
-          if (result.combustivel.isNotEmpty) _combustivelCtrl.text = result.combustivel;
-          if (result.anoFabricacao.isNotEmpty) _anoFabCtrl.text = result.anoFabricacao;
-          if (result.anoModelo.isNotEmpty) _anoModCtrl.text = result.anoModelo;
-          if (result.marcaModelo.isNotEmpty) {
-            final mm = VeiculoParser.extrairMarcaModelo(result.marcaModelo);
-            if (mm.marca.isNotEmpty) _marcaCtrl.text = mm.marca;
-            if (mm.modelo.isNotEmpty) _modeloCtrl.text = mm.modelo;
-          }
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Dados capturados com sucesso! Revise os campos preenchidos.'),
-              backgroundColor: AppTheme.conforme,
-            ),
-          );
-        }
+    if (veiculo != null) {
+      final state = context.read<VistoriaWizardState>();
+      state.statusConsulta = 'concluida';
+      if (veiculo.placa.isNotEmpty) state.placa = veiculo.placa;
+      if (veiculo.chassi.isNotEmpty) {
+        state.chassiVeiculo = veiculo.chassi;
+        if (!state.isChecklist) state.chassiBin = veiculo.chassi;
       }
-    } catch (e) {
+      if (veiculo.motor.isNotEmpty) {
+        state.motorVeiculo = veiculo.motor;
+        if (!state.isChecklist) state.motorBin = veiculo.motor;
+      }
+      if (veiculo.cor.isNotEmpty) state.cor = veiculo.cor;
+      if (veiculo.combustivel.isNotEmpty) state.combustivel = veiculo.combustivel;
+      if (veiculo.municipio.isNotEmpty) state.municipio = veiculo.municipio;
+      if (veiculo.estado.isNotEmpty) state.uf = veiculo.estado;
+      if (veiculo.renavam.isNotEmpty) state.renavam = veiculo.renavam;
+      if (veiculo.anoFabricacao.isNotEmpty) state.anoFabricacao = veiculo.anoFabricacao;
+      if (veiculo.anoModelo.isNotEmpty) state.anoModelo = veiculo.anoModelo;
+      if (veiculo.marcaModelo.isNotEmpty) {
+        final mm = VeiculoParser.extrairMarcaModelo(veiculo.marcaModelo);
+        if (mm.marca.isNotEmpty) state.marca = mm.marca;
+        if (mm.modelo.isNotEmpty) state.modelo = mm.modelo;
+      }
+      
+      // Atrelar o PDF da pesquisa à Vistoria
+      if (veiculo.arquivoPesquisaUrl != null && veiculo.arquivoPesquisaUrl!.isNotEmpty) {
+        state.arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl!;
+      }
+
+      state.versaoDadosVeiculo++;
+      state.notifyListeners();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao processar imagem: $e')),
+          const SnackBar(
+            content: Text('Pesquisa atrelada com sucesso! Revise os campos preenchidos.'),
+            backgroundColor: AppTheme.conforme,
+          ),
         );
       }
-    } finally {
-      setState(() => _isLoadingOcr = false);
     }
   }
 }

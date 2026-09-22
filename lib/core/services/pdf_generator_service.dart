@@ -251,12 +251,14 @@ class PdfGeneratorService {
                 .where((u) => u.isNotEmpty)
                 .toList();
 
+            final obsLimpa = ApontamentoAvaria.extrairMetadadosIa(item.observacao ?? '').obsLimpa;
+
             wizardState.apontamentos.add(ApontamentoAvaria(
               id: item.id,
               categoria: item.categoria,
               peca: item.nome,
               motivoAvaria: item.status,
-              observacao: item.observacao ?? '',
+              observacao: obsLimpa,
               fotosLocais: fotosDoItem,
               fotosUrls: fotosUrlsDoItem,
             ));
@@ -1190,6 +1192,9 @@ class PdfGeneratorService {
               'apontamentoId': apt.id,
               'nomePeca': apt.peca,
               'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
+              if (apt.valorPeca != null) 'valorEstimadoPeca': apt.valorPeca,
+              if (apt.valorMaoDeObra != null) 'valorEstimadoMaoDeObra': apt.valorMaoDeObra,
+              if (apt.justificativaIa != null && apt.justificativaIa!.isNotEmpty) 'justificativa': apt.justificativaIa,
             });
           }
         }
@@ -1299,7 +1304,14 @@ class PdfGeneratorService {
           // Fallback sem IA: renderiza a Ficha Técnica com a FIPE oficial e os apontamentos locais
           final fallbackData = <String, dynamic>{
             if (fipeValor != null && fipeValor.isNotEmpty) 'fipe_valor_oficial': fipeValor,
-            'apontamentos_veiculo': <Map<String, dynamic>>[],
+            'apontamentos_veiculo': wState?.apontamentos.map((apt) => {
+              'apontamentoId': apt.id,
+              'nomePeca': apt.peca,
+              'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
+              'valorEstimadoPeca': apt.valorPeca ?? 0.0,
+              'valorEstimadoMaoDeObra': apt.valorMaoDeObra ?? 0.0,
+              'justificativa': apt.justificativaIa ?? '',
+            }).toList() ?? <Map<String, dynamic>>[],
           };
           _buildFichaTecnicaPages(pdf, fallbackData, vistoria, styles,
               logoImage, assinaturaImage, wizardState);

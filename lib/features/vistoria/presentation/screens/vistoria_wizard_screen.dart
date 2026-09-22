@@ -20,8 +20,11 @@ import '../../domain/vistoria_wizard_state.dart';
 import '../../../consulta_bin/data/services/radar_service.dart';
 import '../../../consulta_bin/data/repositories/radar_repository.dart';
 import '../../../consulta_bin/domain/entities/radar_veiculo.dart';
+import '../../../wallet/data/repositories/wallet_repository.dart';
+import '../../../wallet/presentation/widgets/insufficient_balance_dialog.dart';
 import 'steps/step_dados_gerais.dart';
 import 'steps/step_dados_veiculo.dart';
+import '../widgets/modal_atrelar_pesquisa.dart';
 import 'steps/step_fotos_externas.dart';
 import 'steps/step_painel_hodometro.dart';
 import 'steps/step_chassi_motor.dart';
@@ -220,7 +223,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         .watchConsultaPorVistoria(widget.vistoriaId)
         .listen((consulta) {
       if (consulta != null && mounted) {
-        _wizardState.arquivoPesquisaUrl = consulta.arquivoPesquisaUrl ?? '';
+        if (consulta.arquivoPesquisaUrl != null && consulta.arquivoPesquisaUrl!.isNotEmpty) {
+          _wizardState.arquivoPesquisaUrl = consulta.arquivoPesquisaUrl!;
+        }
         var novoStatus = consulta.status;
         final retornoBruto = consulta.retornoBruto ?? "";
 
@@ -228,6 +233,21 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         if (novoStatus == 'erro' &&
             retornoBruto.contains('já está em andamento')) {
           novoStatus = 'andamento';
+        }
+
+        if (_wizardState.statusConsulta == 'concluida' && novoStatus != 'concluida') {
+          // Ignorar overwrite do stream, pois o usuário atrelou a pesquisa manualmente.
+        } else {
+          if (_wizardState.statusConsulta != novoStatus) {
+            setState(() {
+              _wizardState.setStatusConsulta(novoStatus);
+            });
+          }
+        }
+
+        if (novoStatus == 'concluida') {
+          _veiculoSub?.cancel();
+          _consultaSub?.cancel();
         }
 
         if (_wizardState.statusConsulta == 'pendente' && novoStatus == 'concluida') {
@@ -472,58 +492,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       return;
     }
 
-    // Se já estiver em andamento/pendente
-    if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento') {
-      final forcar = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Row(
-            children: [
-              Icon(Icons.hourglass_top_rounded, color: AppTheme.primary),
-              SizedBox(width: 8),
-              Text('Pesquisa em Andamento', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          content: const Text(
-            'Já existe uma pesquisa em andamento para este veículo no momento.\n\nO aplicativo continuará aguardando a conclusão. Se a consulta anterior travou, você pode forçar uma nova pesquisa.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, 'continuar'),
-              child: const Text('Continuar Aguardando', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.conforme,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(ctx, 'verificar'),
-              child: const Text('Verificar Status'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.naoConforme,
-                foregroundColor: Colors.white,
-              ),
-              onPressed: () => Navigator.pop(ctx, 'forcar'),
-              child: const Text('Forçar Nova Consulta'),
-            ),
-          ],
-        ),
-      );
 
-      if (forcar == 'forcar') {
-        final result = await _showSelectProdutoDialog(hideForcarNova: true);
-        if (result != null) {
-          final produto = result['produto'] as String;
-          await _executarNovaConsulta(produto: produto, placa: placa, blockUI: blockUI);
-        }
-      } else if (forcar == 'verificar') {
-        await _verificarStatusManual(placa);
-      }
-      return;
-    }
 
     // Modal de busca de pesquisas existentes
     showDialog(
@@ -644,31 +613,43 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                           : '$prefix Pesquisa';
                       final subtitle = 'Realizada em: $dateFormatted';
 
+                      final bool hasToken = item['tokenConsulta'] != null && item['tokenConsulta'].toString().isNotEmpty;
+                      final bool isReady = !isRadar || hasToken;
+
                       return Card(
                         elevation: 0,
-                        color: AppTheme.surfaceVariant.withValues(alpha: 0.5),
+                        color: isReady ? AppTheme.surfaceVariant.withValues(alpha: 0.5) : Colors.orange.withValues(alpha: 0.1),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: AppTheme.border),
+                          side: BorderSide(color: isReady ? AppTheme.border : Colors.orange.withValues(alpha: 0.3)),
                         ),
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: Icon(
                             isRadar ? Icons.cloud_sync_rounded : Icons.history_rounded,
-                            color: AppTheme.primary,
+                            color: isReady ? AppTheme.primary : Colors.orange,
                           ),
                           title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                           subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-                          trailing: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                            onPressed: () => Navigator.of(ctx).pop(item),
-                            icon: const Icon(Icons.check_rounded, size: 14),
-                            label: const Text('Utilizar'),
-                          ),
+                          trailing: isReady
+                              ? ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary,
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  onPressed: () => Navigator.of(ctx).pop(item),
+                                  icon: const Icon(Icons.check_rounded, size: 14),
+                                  label: const Text('Utilizar'),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text('Em Análise', style: TextStyle(fontSize: 11, color: Colors.deepOrange, fontWeight: FontWeight.bold)),
+                                ),
                         ),
                       );
                     },
@@ -678,6 +659,12 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
             ),
           ),
           actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.of(ctx).pop({'refresh': true}),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Atualizar'),
+              style: TextButton.styleFrom(foregroundColor: AppTheme.primary),
+            ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(null),
               child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
@@ -686,13 +673,18 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               style: ElevatedButton.styleFrom(backgroundColor: AppTheme.naoConforme),
               onPressed: () => Navigator.of(ctx).pop({'forcarNova': true}),
               icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
-              label: const Text('Realizar Nova Consulta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Nova Consulta', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
       );
 
       if (escolhida == null) return; // Cancelou
+      
+      if (escolhida['refresh'] == true) {
+        await Future.delayed(const Duration(milliseconds: 300));
+        return _retryRadarConsulta(blockUI: blockUI);
+      }
 
       if (escolhida['forcarNova'] == true) {
         final result = await _showSelectProdutoDialog(hideForcarNova: true);
@@ -886,30 +878,65 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       _wizardState.setStatusConsulta('pendente');
     });
 
+    bool dialogOpen = blockUI;
     if (blockUI) {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const AlertDialog(
-          content: Row(
+        builder: (ctx) => AlertDialog(
+          content: const Row(
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Text('Consultando base de dados...'),
+              Expanded(child: Text('Consultando base de dados...')),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                dialogOpen = false;
+                Navigator.pop(ctx);
+              },
+              child: const Text('Rodar em 2º Plano'),
+            ),
+          ],
         ),
-      );
+      ).then((_) => dialogOpen = false);
     }
+
+    final isMotor = produto == 'bin_por_motor';
+    final paramBusca = isMotor ? 'motor' : 'placa';
+    final valorBusca = isMotor && _wizardState.motorVeiculo.isNotEmpty
+        ? _wizardState.motorVeiculo
+        : placa;
+
+    try {
+      final walletRepo = sl<WalletRepository>();
+      final authResult = await walletRepo.authorizePaidOperation(
+        serviceCode: produto,
+        referenceType: 'consulta',
+        referenceId: '$produto:$valorBusca',
+        description: 'Consulta ${produto.toUpperCase()} ($valorBusca)',
+      );
+
+      if (!authResult.allowed) {
+        if (dialogOpen && mounted) {
+          dialogOpen = false;
+          Navigator.pop(context);
+        }
+        if (mounted) {
+          await InsufficientBalanceDialog.show(
+            context,
+            authResult: authResult,
+            customServiceName: 'Consulta ${produto.toUpperCase()}',
+          );
+        }
+        return;
+      }
+    } catch (_) {}
 
     try {
       final service = sl<RadarService>();
-      final isMotor = produto == 'bin_por_motor';
-      final paramBusca = isMotor ? 'motor' : 'placa';
-      final valorBusca = isMotor && _wizardState.motorVeiculo.isNotEmpty
-          ? _wizardState.motorVeiculo
-          : placa;
-
       final veiculoApi = await service.consultarVeiculo(
         produto: produto,
         param: paramBusca,
@@ -918,7 +945,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         forcarNova: true,
       );
 
-      if (blockUI && mounted) Navigator.pop(context);
+      if (dialogOpen && mounted) {
+        dialogOpen = false;
+        Navigator.pop(context);
+      }
 
       await _aplicarDadosConsulta(
         fonte: 'radar',
@@ -927,7 +957,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
         placa: placa,
       );
     } catch (e) {
-      if (blockUI && mounted) Navigator.pop(context);
+      if (dialogOpen && mounted) {
+        dialogOpen = false;
+        Navigator.pop(context);
+      }
       if (mounted) {
         String cleanError = e.toString().replaceAll('Exception: ', '').trim();
         if (cleanError.contains('já está em andamento')) {
@@ -1189,12 +1222,16 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           .where((u) => u.isNotEmpty)
           .toList();
 
+      final metaIa = ApontamentoAvaria.extrairMetadadosIa(item.observacao ?? '');
       _wizardState.apontamentos.add(ApontamentoAvaria(
         id: item.id,
         categoria: item.categoria,
         peca: item.nome,
         motivoAvaria: item.status,
-        observacao: item.observacao ?? '',
+        observacao: metaIa.obsLimpa,
+        valorPeca: metaIa.valorPeca,
+        valorMaoDeObra: metaIa.valorMaoDeObra,
+        justificativaIa: metaIa.justificativaIa,
         fotosLocais: fotosDoItem,
         fotosUrls: fotosUrlsDoItem,
       ));
@@ -1396,6 +1433,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
 
       // Salvar Apontamentos (Avarias para IA)
+      await _dao.deletarItensPorEtapa(widget.vistoriaId, 'apontamento');
       for (int i = 0; i < s.apontamentos.length; i++) {
         final a = s.apontamentos[i];
         await _dao.inserirOuAtualizarItem(ItensVistoriaCompanion(
@@ -1404,7 +1442,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
           categoria: drift.Value(a.categoria),
           nome: drift.Value(a.peca),
           status: drift.Value(a.motivoAvaria),
-          observacao: drift.Value(a.observacao),
+          observacao: drift.Value(a.serializarParaObservacaoBanco()),
           etapa: const drift.Value('apontamento'),
           ordem: drift.Value(i),
         ));
@@ -1465,6 +1503,62 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  void _abrirModalAtrelarPesquisa() async {
+    final RadarVeiculo? veiculo = await showModalBottomSheet<RadarVeiculo>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => const ModalAtrelarPesquisa(),
+    );
+
+    if (veiculo != null) {
+      if (mounted) {
+        setState(() {
+          _wizardState.statusConsulta = 'concluida';
+          if (veiculo.placa.isNotEmpty) _wizardState.placa = veiculo.placa;
+          if (veiculo.chassi.isNotEmpty) {
+            _wizardState.chassiVeiculo = veiculo.chassi;
+            if (!_wizardState.isChecklist) _wizardState.chassiBin = veiculo.chassi;
+          }
+          if (veiculo.motor.isNotEmpty) {
+            _wizardState.motorVeiculo = veiculo.motor;
+            if (!_wizardState.isChecklist) _wizardState.motorBin = veiculo.motor;
+          }
+          if (veiculo.cor.isNotEmpty) _wizardState.cor = veiculo.cor;
+          if (veiculo.combustivel.isNotEmpty) _wizardState.combustivel = veiculo.combustivel;
+          if (veiculo.municipio.isNotEmpty) _wizardState.municipio = veiculo.municipio;
+          if (veiculo.estado.isNotEmpty) _wizardState.uf = veiculo.estado;
+          if (veiculo.renavam.isNotEmpty) _wizardState.renavam = veiculo.renavam;
+          if (veiculo.anoModelo.isNotEmpty) _wizardState.anoModelo = veiculo.anoModelo;
+          if (veiculo.anoFabricacao.isNotEmpty) _wizardState.anoFabricacao = veiculo.anoFabricacao;
+          if (veiculo.marcaModelo.isNotEmpty) {
+            final mm = VeiculoParser.extrairMarcaModelo(veiculo.marcaModelo);
+            if (mm.marca.isNotEmpty) _wizardState.marca = mm.marca;
+            if (mm.modelo.isNotEmpty) _wizardState.modelo = mm.modelo;
+          }
+          if (veiculo.arquivoPesquisaUrl != null && veiculo.arquivoPesquisaUrl!.isNotEmpty) {
+            _wizardState.arquivoPesquisaUrl = veiculo.arquivoPesquisaUrl!;
+          }
+          _wizardState.versaoDadosVeiculo++;
+          _wizardState.notifyListeners();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Pesquisa atrelada com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _salvarRascunhoPeriodico() async {
+    await _salvar();
+    if (mounted) {
+      context.go('/home');
     }
   }
 
@@ -1675,47 +1769,50 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
     }
 
-    // Pergunta sobre a Ficha Técnica com IA antes de gerar o laudo
-    final desejaFichaIa = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 24),
-            SizedBox(width: 10),
-            Text('Ficha Técnica com IA',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          'Deseja realizar a Ficha Técnica Inteligente com IA (especificações e estimativa de valores) para este veículo?',
-          style: TextStyle(fontSize: 14, height: 1.4),
-        ),
-        actions: [
-          OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppTheme.textSecondary),
-            ),
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Não',
-                style: TextStyle(
-                    color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primary,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            icon: const Icon(Icons.check_rounded, size: 18),
-            label: const Text('Sim, Gerar com IA',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+    // --- TEMPORARIAMENTE DESATIVADO ---
+    // // Pergunta sobre a Ficha Técnica com IA antes de gerar o laudo
+    // final desejaFichaIa = await showDialog<bool>(
+    //   context: context,
+    //   barrierDismissible: false,
+    //   builder: (ctx) => AlertDialog(
+    //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    //     title: const Row(
+    //       children: [
+    //         Icon(Icons.auto_awesome_rounded, color: AppTheme.primary, size: 24),
+    //         SizedBox(width: 10),
+    //         Text('Ficha Técnica com IA',
+    //             style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+    //       ],
+    //     ),
+    //     content: const Text(
+    //       'Deseja realizar a Ficha Técnica Inteligente com IA (especificações e estimativa de valores) para este veículo?',
+    //       style: TextStyle(fontSize: 14, height: 1.4),
+    //     ),
+    //     actions: [
+    //       OutlinedButton(
+    //         style: OutlinedButton.styleFrom(
+    //           side: const BorderSide(color: AppTheme.textSecondary),
+    //         ),
+    //         onPressed: () => Navigator.pop(ctx, false),
+    //         child: const Text('Não',
+    //             style: TextStyle(
+    //                 color: AppTheme.textSecondary, fontWeight: FontWeight.bold)),
+    //       ),
+    //       ElevatedButton.icon(
+    //         style: ElevatedButton.styleFrom(
+    //           backgroundColor: AppTheme.primary,
+    //           foregroundColor: Colors.white,
+    //         ),
+    //         onPressed: () => Navigator.pop(ctx, true),
+    //         icon: const Icon(Icons.check_rounded, size: 18),
+    //         label: const Text('Sim, Gerar com IA',
+    //             style: TextStyle(fontWeight: FontWeight.bold)),
+    //       ),
+    //     ],
+    //   ),
+    // );
+    
+    final desejaFichaIa = false;
 
     if (desejaFichaIa != null) {
       _wizardState.gerarFichaTecnicaComIa = desejaFichaIa;
@@ -1796,9 +1893,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
                           message:
-                              'Pesquisa concluída. Clique para atualizar novamente.',
+                              'Atrelar Pesquisa. Clique para abrir o histórico.',
                           child: InkWell(
-                            onTap: _retryRadarConsulta,
+                            onTap: _abrirModalAtrelarPesquisa,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
@@ -1816,9 +1913,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
                           message:
-                              'Erro na pesquisa. Tocar para tentar novamente.',
+                              'Erro na pesquisa. Tocar para atrelar pesquisa.',
                           child: InkWell(
-                            onTap: _retryRadarConsulta,
+                            onTap: _abrirModalAtrelarPesquisa,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
@@ -1834,9 +1931,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       child: Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
-                          message: 'Realizar Consulta',
+                          message: 'Atrelar Consulta',
                           child: InkWell(
-                            onTap: _retryRadarConsulta,
+                            onTap: _abrirModalAtrelarPesquisa,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),
@@ -1853,9 +1950,9 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                         padding: const EdgeInsets.only(right: 16),
                         child: Tooltip(
                           message:
-                              'A pesquisa está demorando. Toque para puxar os dados atualizados.',
+                              'A pesquisa está demorando. Toque para atrelar do histórico.',
                           child: InkWell(
-                            onTap: _retryRadarConsulta,
+                            onTap: _abrirModalAtrelarPesquisa,
                             borderRadius: BorderRadius.circular(20),
                             child: const Padding(
                               padding: EdgeInsets.all(4.0),

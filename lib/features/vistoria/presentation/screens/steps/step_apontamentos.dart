@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:provider/provider.dart';
@@ -11,8 +10,8 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../domain/entities/apontamento_avaria.dart';
 import '../../../domain/vistoria_wizard_state.dart';
 
-/// Etapa dedicada de Apontamentos e Avarias.
-/// Os itens cadastrados aqui são a base exclusiva para o cálculo e orçamento de peças por IA.
+/// Etapa dedicada de Apontamentos e Avarias do Laudo Cautelar.
+/// Os itens cadastrados aqui são a base exclusiva para o cálculo e depreciação financeira por IA (no PDF).
 class StepApontamentos extends StatefulWidget {
   const StepApontamentos({super.key});
 
@@ -23,14 +22,12 @@ class StepApontamentos extends StatefulWidget {
 class _StepApontamentosState extends State<StepApontamentos> {
   final _imagePicker = ImagePicker();
 
-  // ── Dados Pré-definidos por Categoria ───────────────────────────────────────
+  // ── Catálogo Limpo Focado Exclusivamente no Laudo de Vistoria Cautelar ───────
 
   static const Map<String, List<String>> _pecasPorCategoria = {
-    'Estrutural': [
+    'Estrutura e Longarinas': [
       'Longarina Dianteira Esquerda',
       'Longarina Dianteira Direita',
-      'Longarina Centro Esquerda',
-      'Longarina Centro Direita',
       'Longarina Traseira Esquerda',
       'Longarina Traseira Direita',
       'Coluna Dianteira Esquerda (A)',
@@ -39,20 +36,20 @@ class _StepApontamentosState extends State<StepApontamentos> {
       'Coluna Central Direita (B)',
       'Coluna Traseira Esquerda (C)',
       'Coluna Traseira Direita (C)',
+      'Painel Frontal',
+      'Painel Traseiro',
+      'Painel Corta-Fogo',
+      'Caixa do Estepe',
       'Caixa de Roda Dianteira Esquerda',
       'Caixa de Roda Dianteira Direita',
       'Caixa de Roda Traseira Esquerda',
       'Caixa de Roda Traseira Direita',
       'Torre do Amortecedor Esquerda',
       'Torre do Amortecedor Direita',
-      'Painel Frontal',
-      'Painel Corta-Fogo',
-      'Painel Traseiro',
-      'Caixa do Estepe',
-      'Assoalho Esquerdo',
-      'Assoalho Direito',
       'Caixa de Ar Esquerda',
       'Caixa de Ar Direita',
+      'Assoalho Esquerdo',
+      'Assoalho Direito',
       'Outra peça estrutural...',
     ],
     'Pintura e Lataria': [
@@ -72,44 +69,24 @@ class _StepApontamentosState extends State<StepApontamentos> {
       'Retrovisor Esquerdo',
       'Retrovisor Direito',
       'Grade Dianteira',
-      'Friso / Moldura Lateral',
-      'Outra peça de lataria/pintura...',
+      'Outra peça de lataria...',
     ],
     'Vidros e Iluminação': [
-      'Para-brisa Dianteiro',
-      'Vigia Traseiro (Vidro Traseiro)',
+      'Vidro Frontal (Para-brisa)',
+      'Vidro Traseiro (Vigia)',
       'Vidro Porta Dianteira Esquerda',
       'Vidro Porta Dianteira Direita',
       'Vidro Porta Traseira Esquerda',
       'Vidro Porta Traseira Direita',
-      'Vidro Lateral Fixo Esquerdo',
-      'Vidro Lateral Fixo Direito',
       'Farol Dianteiro Esquerdo',
       'Farol Dianteiro Direito',
-      'Farol de Milha / Neblina Esquerdo',
-      'Farol de Milha / Neblina Direito',
       'Lanterna Traseira Esquerda',
       'Lanterna Traseira Direita',
-      'Lanterna Tampa Traseira',
+      'Farol de Milha / Neblina Esquerdo',
+      'Farol de Milha / Neblina Direito',
       'Outro vidro / iluminação...',
     ],
-    'Mecânica / Motor': [
-      'Bloco do Motor',
-      'Cabeçote / Tampa de Válvulas',
-      'Câmbio / Transmissão',
-      'Radiador / Arrefecimento',
-      'Alternador / Motor de Partida',
-      'Caixa de Direção',
-      'Suspensão Dianteira',
-      'Suspensão Traseira',
-      'Amortecedor / Mola',
-      'Escapamento / Catalisador',
-      'Cárter de Óleo',
-      'Bateria',
-      'Sistema de Freios',
-      'Outro componente mecânico...',
-    ],
-    'Interior / Segurança': [
+    'Pneus e Rodas': [
       'Pneu Dianteiro Esquerdo',
       'Pneu Dianteiro Direito',
       'Pneu Traseiro Esquerdo',
@@ -119,15 +96,17 @@ class _StepApontamentosState extends State<StepApontamentos> {
       'Roda Dianteira Direita',
       'Roda Traseira Esquerda',
       'Roda Traseira Direita',
-      'Painel de Instrumentos',
-      'Volante / Airbag Volante',
-      'Airbag Passageiro / Cortina',
-      'Bancos Dianteiros',
-      'Bancos Traseiros',
-      'Cinto de Segurança',
-      'Forro de Teto / Tapeçaria',
-      'Central Multimídia / Som',
-      'Outro item de interior/segurança...',
+      'Outro pneu / roda...',
+    ],
+    'Identificação e Segurança': [
+      'Gravação do Chassi',
+      'Numeração do Motor / Bloco',
+      'Plaqueta de Identificação / ETA',
+      'Cinto de Segurança Dianteiro Esquerdo',
+      'Cinto de Segurança Dianteiro Direito',
+      'Cinto de Segurança Traseiro',
+      'Airbag / Painel / Volante',
+      'Outro item de segurança...',
     ],
     'Outro': [
       'Outra avaria / peça personalizada...',
@@ -135,93 +114,88 @@ class _StepApontamentosState extends State<StepApontamentos> {
   };
 
   static const Map<String, List<String>> _motivosPorCategoria = {
-    'Estrutural': [
+    'Estrutura e Longarinas': [
+      'Deformado / Amassado',
       'Recuperado / Soldado',
-      'Amassado / Deformado',
       'Corte / Emenda Estrutural',
       'Trincado / Fissura',
       'Corrosão / Ferrugem',
       'Reparo com Massa Plástica',
       'Desalinhado / Indício de Colisão',
-      'Perfurado / Rasgado',
       'Substituído / Não Original',
-      'Sem Acesso / Obstruído',
+      'Obstruído / Sem Acesso',
       'Outro motivo estrutural...',
     ],
     'Pintura e Lataria': [
-      'Repintura / Retoque',
-      'Excesso de Massa / Alta Espessura',
       'Amassado / Pique',
-      'Riscado / Arranhado',
-      'Queimado de Sol / Verniz Descascado',
-      'Desalinhado / Fresta Irregular',
+      'Riscado / Arranhado Profundo',
+      'Repintura com Massa',
       'Trincado / Quebrado',
+      'Queimado de Sol / Verniz Danificado',
       'Ponto de Ferrugem / Corrosão',
-      'Diferença de Tonalidade',
-      'Micro-ondulação / Batida de Pedra',
+      'Desalinhado / Fresta Irregular',
+      'Substituído / Paralelo',
       'Outro motivo de lataria...',
     ],
     'Vidros e Iluminação': [
       'Trincado / Fissura',
       'Quebrado / Estilhaçado',
       'Pique de Pedra (Olho de Boi)',
-      'Riscado / Arranhado',
-      'Numeração / Gravação Divergente',
-      'Numeração / Gravação Ilegível',
-      'Não Original / Substituído',
-      'Opaco / Amarelado',
+      'Riscado / Desgastado',
+      'Numeração VIS Divergente / Ausente',
+      'Lente Quebrada / Trincada',
       'Infiltração de Água / Condensação',
-      'Lâmpada / Led Inoperante',
-      'Faltante / Ausente',
+      'Lâmpada / LED Inoperante',
+      'Não Original / Paralelo',
       'Outro motivo de vidros/iluminação...',
     ],
-    'Mecânica / Motor': [
-      'Vazamento de Óleo / Fluído',
-      'Ruído Anormal / Batendo',
-      'Folga Excessiva / Desgaste',
-      'Oxidação / Corrosão',
-      'Trincado / Quebrado',
-      'Gravação Ilegível / Sem Acesso',
-      'Plaqueta Ausente / Danificada',
-      'Modificado / Não Original',
-      'Nível Baixo de Fluído',
-      'Faltante / Ausente',
-      'Outro motivo mecânico...',
-    ],
-    'Interior / Segurança': [
+    'Pneus e Rodas': [
       'Pneu Desgastado (Abaixo TWI / Careca)',
-      'Pneu com Bolha / Deformação / Rasgo',
-      'Roda Amassada / Ralada / Trincada',
-      'Rasgado / Descosturado / Furo',
-      'Desgastado / Queimado de Sol',
-      'Manchado / Sujeira Excessiva',
-      'Cinto Travado / Desfiado',
-      'Luz de Airbag / Injeção Acesa',
-      'Trava / Mecanismo Quebrado',
-      'Faltante / Ausente',
-      'Outro motivo de interior...',
+      'Pneu com Bolha ou Rasgo Lateral',
+      'Pneu com Desgaste Irregular / Escariado',
+      'Roda Amassada / Torta',
+      'Roda Ralada / Esfolada',
+      'Roda Trincada / Soldada',
+      'Outro motivo de pneu/roda...',
+    ],
+    'Identificação e Segurança': [
+      'Vestígio de Adulteração / Avaria',
+      'Numeração Ilegível / Enferrujada',
+      'Plaqueta Ausente / Danificada',
+      'Cinto Travado / Não Recolhe / Desfiado',
+      'Airbag Danificado / Disparado',
+      'Luz de Advertência Acesa no Painel',
+      'Outro motivo de segurança...',
     ],
     'Outro': [
-      'Amassado',
+      'Amassado / Deformado',
       'Riscado / Arranhado',
       'Trincado / Quebrado',
-      'Desgastado / Danificado',
+      'Danificado / Desgastado',
       'Corrosão / Ferrugem',
       'Faltante / Ausente',
       'Outro motivo...',
     ],
   };
 
+  static String _normalizarCategoria(String cat) {
+    if (cat == 'Estrutural') return 'Estrutura e Longarinas';
+    if (cat == 'Mecânica / Motor') return 'Estrutura e Longarinas';
+    if (cat == 'Interior / Segurança') return 'Identificação e Segurança';
+    if (_pecasPorCategoria.containsKey(cat)) return cat;
+    return 'Pintura e Lataria';
+  }
+
   static List<String> _obterMotivosDisponiveis(String categoria, String peca) {
+    final catNorm = _normalizarCategoria(categoria);
     final pecaLower = peca.toLowerCase();
 
     if (pecaLower.contains('pneu')) {
       return [
         'Pneu Desgastado (Abaixo TWI / Careca)',
-        'Pneu com Bolha / Deformação',
-        'Pneu Rasgado / Corte na Banda',
+        'Pneu com Bolha ou Rasgo Lateral',
         'Pneu com Desgaste Irregular / Escariado',
-        'Medida / Modelo Divergente',
+        'Medida Divergente',
         'Pneu Vencido (DOT Antigo)',
         'Outro motivo para pneu...',
       ];
@@ -231,8 +205,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
       return [
         'Roda Amassada / Torta',
         'Roda Ralada / Esfolada',
-        'Roda Trincada / Quebrada',
-        'Roda Soldada / Recuperada',
+        'Roda Trincada / Soldada',
         'Pintura Descascada / Corrosão',
         'Parafuso / Prisioneiro Faltante',
         'Outro motivo para roda...',
@@ -250,7 +223,6 @@ class _StepApontamentosState extends State<StepApontamentos> {
         'Numeração VIS Divergente',
         'Numeração VIS Ilegível / Ausente',
         'Não Original / Sem Logomarca',
-        'Película / Insulfilm Danificado',
         'Outro motivo para vidro...',
       ];
     }
@@ -264,19 +236,17 @@ class _StepApontamentosState extends State<StepApontamentos> {
         'Infiltração de Água / Condensação',
         'Suporte / Fixação Quebrada',
         'Lâmpada / LED Queimado',
-        'Foco Desalinhado / Quebrado',
         'Não Original / Paralelo',
-        'Faltante / Ausente',
         'Outro motivo para iluminação...',
       ];
     }
 
     if (pecaLower.contains('airbag') || pecaLower.contains('volante')) {
       return [
-        'Luz do Airbag Acesa no Painel',
+        'Airbag Danificado / Disparado',
         'Tampa do Airbag Deformada / Aberta',
+        'Luz do Airbag Acesa no Painel',
         'Volante Desgastado / Rasgado',
-        'Indício de Disparo / Acionamento',
         'Outro motivo para airbag/volante...',
       ];
     }
@@ -291,25 +261,24 @@ class _StepApontamentosState extends State<StepApontamentos> {
       ];
     }
 
-    return _motivosPorCategoria[categoria] ??
-        _motivosPorCategoria['Outro']!;
+    return _motivosPorCategoria[catNorm] ?? _motivosPorCategoria['Outro']!;
   }
 
   static const Map<String, IconData> _categoriaIcones = {
-    'Estrutural': Icons.minor_crash_rounded,
+    'Estrutura e Longarinas': Icons.minor_crash_rounded,
     'Pintura e Lataria': Icons.format_paint_rounded,
     'Vidros e Iluminação': Icons.visibility_rounded,
-    'Mecânica / Motor': Icons.build_circle_rounded,
-    'Interior / Segurança': Icons.airline_seat_recline_extra_rounded,
+    'Pneus e Rodas': Icons.album_outlined,
+    'Identificação e Segurança': Icons.verified_user_rounded,
     'Outro': Icons.more_horiz_rounded,
   };
 
   static const Map<String, Color> _categoriaCores = {
-    'Estrutural': Colors.deepOrange,
+    'Estrutura e Longarinas': Colors.deepOrange,
     'Pintura e Lataria': Colors.indigo,
     'Vidros e Iluminação': Colors.teal,
-    'Mecânica / Motor': Colors.brown,
-    'Interior / Segurança': Colors.blueGrey,
+    'Pneus e Rodas': Colors.amber,
+    'Identificação e Segurança': Colors.blueGrey,
     'Outro': Colors.purple,
   };
 
@@ -358,10 +327,10 @@ class _StepApontamentosState extends State<StepApontamentos> {
     final state = context.read<VistoriaWizardState>();
     final isEditing = apontamentoExistente != null;
 
-    String categoriaSelecionada =
-        apontamentoExistente?.categoria ?? 'Pintura e Lataria';
+    String categoriaSelecionada = _normalizarCategoria(
+        apontamentoExistente?.categoria ?? 'Pintura e Lataria');
     String pecaSelecionada = apontamentoExistente?.peca ?? '';
-    
+
     final pecaCustomCtrl = TextEditingController();
     final motivoCustomCtrl = TextEditingController();
     final obsCtrl =
@@ -375,7 +344,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
 
     if (pecaSelecionada.isNotEmpty) {
       if (pecasDisponiveis.contains(pecaSelecionada)) {
-        // Encontrado na lista
+        // Encontrado na lista pré-definida
       } else {
         isPecaCustom = true;
         pecaCustomCtrl.text = pecaSelecionada;
@@ -415,7 +384,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                 _pecasPorCategoria[categoriaSelecionada] ?? ['Outro...'];
 
             return Container(
-              height: MediaQuery.of(ctx).size.height * 0.90,
+              height: MediaQuery.of(ctx).size.height * 0.92,
               decoration: const BoxDecoration(
                 color: AppTheme.surface,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -440,15 +409,27 @@ class _StepApontamentosState extends State<StepApontamentos> {
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            isEditing
-                                ? 'Editar Apontamento de Avaria'
-                                : 'Novo Apontamento de Avaria',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.textPrimary,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isEditing
+                                    ? 'Editar Apontamento de Avaria'
+                                    : 'Novo Apontamento de Avaria',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              const Text(
+                                'Avarias que constarão no laudo e serão orçadas por IA',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         IconButton(
@@ -464,9 +445,9 @@ class _StepApontamentosState extends State<StepApontamentos> {
                     child: ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        // 1. Categoria (Onde foi a avaria?)
+                        // 1. Categoria
                         const Text(
-                          '1. Onde ocorreu a avaria? (Seção)',
+                          '1. Seção da Vistoria',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -527,11 +508,11 @@ class _StepApontamentosState extends State<StepApontamentos> {
                         const Divider(),
                         const SizedBox(height: 10),
 
-                        // 2. Seleção de Peça / Componente
+                        // 2. Peça / Componente
                         Row(
                           children: [
                             const Text(
-                              '2. Qual é a peça / componente?',
+                              '2. Peça / Componente Apontado',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -570,7 +551,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                             autofocus: true,
                             decoration: InputDecoration(
                               labelText: 'Nome da Peça / Local',
-                              hintText: 'Ex: Friso da coluna traseira direita',
+                              hintText: 'Ex: Longarina dianteira direita',
                               border: const OutlineInputBorder(),
                               suffixIcon: IconButton(
                                 icon: const Icon(Icons.list_alt_rounded),
@@ -610,7 +591,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                                     : null),
                             isExpanded: true,
                             decoration: const InputDecoration(
-                              labelText: 'Selecione a Peça Pré-definida',
+                              labelText: 'Selecione a Peça do Laudo',
                               border: OutlineInputBorder(),
                               prefixIcon:
                                   Icon(Icons.directions_car_rounded),
@@ -662,7 +643,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                         const Divider(),
                         const SizedBox(height: 10),
 
-                        // 3. Motivo da Avaria / Tipo de Dano
+                        // 3. Motivo da Avaria
                         Row(
                           children: [
                             const Text(
@@ -832,7 +813,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'Nenhuma foto anexada. Use os botões acima para fotografar o dano.',
+                                    'Nenhuma foto anexada. Use os botões acima para registrar o dano visual.',
                                     style: TextStyle(
                                       color: AppTheme.textSecondary,
                                       fontSize: 12,
@@ -901,7 +882,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
 
                         // 5. Observações Complementares
                         const Text(
-                          '5. Observações / Detalhes (Opcional)',
+                          '5. Observações do Vistoriador (Opcional)',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
@@ -914,12 +895,14 @@ class _StepApontamentosState extends State<StepApontamentos> {
                           maxLines: 2,
                           decoration: const InputDecoration(
                             hintText:
-                                'Ex: Profundidade aproximada de 1cm, sem trinca na pintura...',
+                                'Ex: Profundidade aproximada de 1cm, sem afetação da coluna...',
                             border: OutlineInputBorder(),
                           ),
                           textCapitalization: TextCapitalization.sentences,
                         ),
 
+                        const SizedBox(height: 20),
+                        const Divider(),
                         const SizedBox(height: 30),
                       ],
                     ),
@@ -992,6 +975,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                               fotosLocais: fotosTemporarias,
                             );
                             state.updateApontamento(indexExistente, atualizado);
+                            Navigator.pop(ctx);
                           } else {
                             final novo = ApontamentoAvaria(
                               id: 'apontamento_${DateTime.now().millisecondsSinceEpoch}',
@@ -1002,9 +986,8 @@ class _StepApontamentosState extends State<StepApontamentos> {
                               fotosLocais: fotosTemporarias,
                             );
                             state.addApontamento(novo);
+                            Navigator.pop(ctx);
                           }
-
-                          Navigator.pop(ctx);
                         },
                       ),
                     ),
@@ -1028,14 +1011,14 @@ class _StepApontamentosState extends State<StepApontamentos> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // ── Card Informativo Superior ─────────────────────────────────────────
+        // ── Card de Resumo Financeiro & Avarias ───────────────────────────────
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppTheme.primary.withValues(alpha: 0.12),
-                AppTheme.primary.withValues(alpha: 0.04),
+                AppTheme.primary.withValues(alpha: 0.10),
+                AppTheme.primary.withValues(alpha: 0.03),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1055,7 +1038,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
-                      Icons.auto_awesome_rounded,
+                      Icons.report_problem_rounded,
                       color: Colors.white,
                       size: 20,
                     ),
@@ -1066,7 +1049,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Apontamentos para Cálculo por IA',
+                          'Apontamento de Avarias',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -1075,7 +1058,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                         ),
                         SizedBox(height: 2),
                         Text(
-                          'Apenas as avarias adicionadas aqui serão orçadas pela IA.',
+                          'Avarias que constarão no laudo cautelar.',
                           style: TextStyle(
                             fontSize: 12,
                             color: AppTheme.textSecondary,
@@ -1087,18 +1070,20 @@ class _StepApontamentosState extends State<StepApontamentos> {
                 ],
               ),
               const SizedBox(height: 14),
+
+              // Ações do Cabeçalho
               Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                        horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: AppTheme.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: AppTheme.border),
                     ),
                     child: Text(
-                      '${apontamentos.length} avaria(s) apontada(s)',
+                      '${apontamentos.length} avaria(s)',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1111,13 +1096,14 @@ class _StepApontamentosState extends State<StepApontamentos> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primary,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 10),
+                          horizontal: 14, vertical: 8),
+                      visualDensity: VisualDensity.compact,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Adicionar Avaria'),
+                    label: const Text('Adicionar'),
                     onPressed: () => _abrirDialogApontamento(),
                   ),
                 ],
@@ -1146,7 +1132,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                 ),
                 const SizedBox(height: 14),
                 const Text(
-                  'Nenhum apontamento de avaria adicionado',
+                  'Nenhuma avaria apontada',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1156,7 +1142,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                 ),
                 const SizedBox(height: 6),
                 const Text(
-                  'Caso o veículo possua avarias em peças que necessitam de cálculo/orçamento, clique no botão acima para registrar.',
+                  'Caso o veículo possua danos na estrutura, pintura, vidros ou identificação, clique no botão para registrar e orçar.',
                   style: TextStyle(
                     fontSize: 13,
                     color: AppTheme.textSecondary,
@@ -1172,7 +1158,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                   ),
                   icon: const Icon(Icons.add_rounded, color: AppTheme.primary),
                   label: const Text(
-                    '+ Adicionar Primeiro Apontamento',
+                    '+ Adicionar Avaria do Laudo',
                     style: TextStyle(color: AppTheme.primary),
                   ),
                   onPressed: () => _abrirDialogApontamento(),
@@ -1184,10 +1170,10 @@ class _StepApontamentosState extends State<StepApontamentos> {
           ...apontamentos.asMap().entries.map((entry) {
             final idx = entry.key;
             final item = entry.value;
-            final catCor =
-                _categoriaCores[item.categoria] ?? AppTheme.primary;
+            final catNorm = _normalizarCategoria(item.categoria);
+            final catCor = _categoriaCores[catNorm] ?? AppTheme.primary;
             final catIcone =
-                _categoriaIcones[item.categoria] ?? Icons.report_problem_rounded;
+                _categoriaIcones[catNorm] ?? Icons.report_problem_rounded;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 12),
@@ -1218,7 +1204,7 @@ class _StepApontamentosState extends State<StepApontamentos> {
                           Icon(catIcone, size: 16, color: catCor),
                           const SizedBox(width: 8),
                           Text(
-                            item.categoria.toUpperCase(),
+                            catNorm.toUpperCase(),
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,

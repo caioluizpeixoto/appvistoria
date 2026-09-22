@@ -12,6 +12,8 @@ import '../../../../database/daos/vistoria_dao.dart';
 import '../../../../database/app_database.dart';
 import '../../../../core/utils/veiculo_parser.dart';
 import '../../domain/vistoria_wizard_state.dart';
+import '../../../../features/wallet/data/repositories/wallet_repository.dart';
+import '../../../../features/wallet/presentation/widgets/insufficient_balance_dialog.dart';
 
 class RevisaoScreen extends StatefulWidget {
   final String vistoriaId;
@@ -141,6 +143,12 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
       _showBloqueio(faltando);
       return;
     }
+
+    final placaBruta = (_veiculo?.placa ?? state.placa).trim().toUpperCase();
+    final placaLimpa = placaBruta.replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+    // A geração do laudo PDF não tem mais cobrança no app.
+    // O bloco de autorização foi removido conforme a regra de negócio.
 
     setState(() => _gerandoPdf = true);
     await Future.delayed(const Duration(milliseconds: 60));
@@ -274,37 +282,38 @@ class _RevisaoScreenState extends State<RevisaoScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── Ficha Técnica Inteligente com IA ─────────────────────
-                  if (_state != null)
-                    _Card(
-                      title: 'Ficha Técnica com IA',
-                      icon: Icons.auto_awesome_rounded,
-                      trailing: Switch.adaptive(
-                        value: _state!.gerarFichaTecnicaComIa,
-                        activeThumbColor: AppTheme.primary,
-                        onChanged: (val) {
-                          setState(() {
-                            _state!.gerarFichaTecnicaComIa = val;
-                          });
-                        },
-                      ),
-                      children: [
-                        Text(
-                          _state!.gerarFichaTecnicaComIa
-                              ? 'A Ficha Técnica Inteligente com IA será gerada com estimativas e especificações técnicas.'
-                              : 'O Laudo será gerado sem as páginas de Ficha Técnica IA.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _state!.gerarFichaTecnicaComIa
-                                ? AppTheme.textPrimary
-                                : AppTheme.textSecondary,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                  const SizedBox(height: 32),
+                  // --- TEMPORARIAMENTE DESATIVADO ---
+                  // // ── Ficha Técnica Inteligente com IA ─────────────────────
+                  // if (_state != null)
+                  //   _Card(
+                  //     title: 'Ficha Técnica com IA',
+                  //     icon: Icons.auto_awesome_rounded,
+                  //     trailing: Switch.adaptive(
+                  //       value: _state!.gerarFichaTecnicaComIa,
+                  //       activeThumbColor: AppTheme.primary,
+                  //       onChanged: (val) {
+                  //         setState(() {
+                  //           _state!.gerarFichaTecnicaComIa = val;
+                  //         });
+                  //       },
+                  //     ),
+                  //     children: [
+                  //       Text(
+                  //         _state!.gerarFichaTecnicaComIa
+                  //             ? 'A Ficha Técnica Inteligente com IA será gerada com estimativas e especificações técnicas.'
+                  //             : 'O Laudo será gerado sem as páginas de Ficha Técnica IA.',
+                  //         style: TextStyle(
+                  //           fontSize: 13,
+                  //           color: _state!.gerarFichaTecnicaComIa
+                  //               ? AppTheme.textPrimary
+                  //               : AppTheme.textSecondary,
+                  //           height: 1.3,
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  //
+                  // const SizedBox(height: 32),
                 ],
               ),
             ),

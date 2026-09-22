@@ -44,6 +44,7 @@ class VistoriaWizardState extends ChangeNotifier {
   String numeroGrv = '';
   String arquivoPesquisaUrl = '';
   String statusConsulta = 'nenhuma';
+  int versaoDadosVeiculo = 0;
 
   // ── Histórico / Consulta (Alimentado diretamente na vistoria) ──────────────
   String statusLeilao = 'Nada Consta';
@@ -64,7 +65,7 @@ class VistoriaWizardState extends ChangeNotifier {
 
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
-  bool gerarFichaTecnicaComIa = true;
+  bool gerarFichaTecnicaComIa = false;
   Map<String, dynamic>? fichaTecnicaJsonCache;
   String? apontamentosHashCache;
 
@@ -351,11 +352,17 @@ class VistoriaWizardState extends ChangeNotifier {
 
   List<Map<String, dynamic>> getApontamentosParaIa() {
     return apontamentos.map((a) => {
+      'id': a.id,
+      'apontamentoId': a.id,
       'categoria': a.categoria,
       'peca': a.peca,
+      'nomePeca': a.peca,
       'motivo_avaria': a.motivoAvaria,
+      'descricaoProblema': '${a.motivoAvaria}${a.observacao.isNotEmpty ? " - ${a.observacao}" : ""}',
       'observacao': a.observacao,
       'qtd_fotos': a.fotosLocais.length + a.fotosUrls.length,
+      if (a.valorPeca != null) 'valor_peca_estimado': a.valorPeca,
+      if (a.valorMaoDeObra != null) 'valor_mao_de_obra_estimado': a.valorMaoDeObra,
     }).toList();
   }
 

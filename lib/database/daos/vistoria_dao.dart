@@ -1,6 +1,8 @@
 import 'package:drift/drift.dart';
 import '../app_database.dart';
 import '../tables/app_tables.dart';
+import '../../injection_container.dart';
+import '../../core/services/time_service.dart';
 
 part 'vistoria_dao.g.dart';
 
@@ -134,7 +136,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
       (update(vistorias)..where((t) => t.id.equals(id))).write(
         VistoriasCompanion(
           etapaAtual: Value(etapa),
-          updatedAt: Value(DateTime.now()),
+          updatedAt: Value(sl<TimeService>().nowBrasilia()),
         ),
       );
 
@@ -160,7 +162,7 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
           pdfUrl: Value(pdfUrl),
           status: const Value('concluido'),
           sincronizado: const Value(false),
-          updatedAt: Value(DateTime.now()),
+          updatedAt: Value(sl<TimeService>().nowBrasilia()),
         ),
       );
 
@@ -231,6 +233,9 @@ class VistoriaDao extends DatabaseAccessor<AppDatabase>
 
   Future<int> inserirOuAtualizarItem(ItensVistoriaCompanion item) =>
       into(itensVistoria).insertOnConflictUpdate(item);
+
+  Future<int> deletarItensPorEtapa(String vistoriaId, String etapa) =>
+      (delete(itensVistoria)..where((t) => t.vistoriaId.equals(vistoriaId) & t.etapa.equals(etapa))).go();
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
 

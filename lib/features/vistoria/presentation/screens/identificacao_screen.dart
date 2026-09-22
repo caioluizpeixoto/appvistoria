@@ -25,6 +25,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/bloc/background_tasks/background_tasks_cubit.dart';
 
 import '../../../../features/wallet/data/repositories/wallet_repository.dart';
+import '../../../../features/wallet/presentation/widgets/insufficient_balance_dialog.dart';
 
 class IdentificacaoScreen extends StatefulWidget {
   final TipoVistoria tipo;
@@ -62,6 +63,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   bool _veiculoEncontrado = false;
   bool _modoOffline = false;
   bool _buscandoVeiculo = false;
+  bool _isProcessing = false; // Bloqueio total da tela
   bool _buscandoRadarHistorico = false;
   bool _buscandoLaudo = false;
   String _mensagemCarregamento = '';
@@ -76,8 +78,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   bool _somenteMotor = false;
 
   // Tipos de consulta disponíveis (Radar Consultas)
-  final List<Map<String, dynamic>> _tiposConsulta =
-      RadarProdutos.listaParaSelecao;
+  late List<Map<String, dynamic>> _tiposConsulta;
   String _produtoSelecionado = 'auto_bin';
 
   @override
@@ -131,6 +132,20 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
       if (widget.dadosIniciais!.containsKey('vincularVistoriaId')) {
         _vincularVistoriaId = widget.dadosIniciais!['vincularVistoriaId'];
+      }
+    }
+
+    // Inicializa a lista de consultas
+    _tiposConsulta = List.from(RadarProdutos.listaParaSelecao);
+
+    // Se NÃO for pesquisa avulsa (ou seja, é um Laudo/Cautelar), remove as pesquisas simples
+    if (!_somentePesquisa) {
+      _tiposConsulta.removeWhere((p) => p['codigo'] == 'auto_bin' || p['codigo'] == 'bin_por_motor');
+      
+      // Se a pesquisa padrão selecionada foi removida, mudamos para a recomendada
+      if (_produtoSelecionado == 'auto_bin' || _produtoSelecionado == 'bin_por_motor') {
+        _produtoSelecionado = 'auto_pericia_hrf';
+        _modoEntrada = 'placa';
       }
     }
   }
@@ -639,7 +654,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   }
 
   Future<bool> _buscarVeiculo() async {
-    if (_buscandoVeiculo) return false;
+    if (_isProcessing || _buscandoVeiculo) return false;
     if (_produtoSelecionado == 'nenhuma') return false;
 
     final rawValor = _buscaCtrl.text.trim();
@@ -648,10 +663,13 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     final valor = rawValor.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
     if (valor.isEmpty) return false;
 
+    setState(() => _isProcessing = true);
+
     final escolhida = await _verificarNuvem(valor);
     if (escolhida == null) {
       setState(() {
         _buscandoVeiculo = false;
+        _isProcessing = false;
       });
       return false; // Cancelou
     }
@@ -666,6 +684,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                   'A pesquisa ainda está em andamento. Aguarde a conclusão ou acesse pelo histórico.')));
           setState(() {
             _buscandoVeiculo = false;
+            _isProcessing = false;
           });
           return false;
         }
@@ -673,10 +692,12 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         try {
           final veiculo = RadarVeiculo.fromJson(escolhida['dados_tratados']);
           _preencherDados(veiculo);
+          setState(() => _isProcessing = false);
           return true;
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Erro ao carregar dados antigos: $e')));
+          setState(() => _isProcessing = false);
           return false;
         }
       } else if (escolhida['fonte'] == 'radar') {
@@ -684,6 +705,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         tokenConsulta = escolhida['tokenConsulta'];
       }
     }
+
+
 
     if (_somentePesquisa && (escolhida['forcarNova'] == true || (escolhida['fonte'] == 'radar' && tokenConsulta != null))) {
       // Send to background task
@@ -703,6 +726,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         )
       );
       
+      setState(() => _isProcessing = false);
       if (mounted) context.pop();
       return true;
     }
@@ -714,23 +738,6 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           ? 'Puxando detalhes da base...'
           : 'Consultando veículo...';
     });
-
-    // Lógica pronta para descontar do saldo (Desativada por enquanto)
-    /*
-    if (escolhida['forcarNova'] == true) {
-      try {
-        final walletRepo = sl<WalletRepository>();
-        await walletRepo.authorizePaidOperation(
-          serviceCode: _produtoSelecionado,
-          referenceType: 'consulta',
-          referenceId: valor,
-          description: 'Consulta $_produtoSelecionado ($valor)',
-        );
-      } catch (e) {
-        // Ignora erro para não travar (conforme solicitado: sem trava de saldo)
-      }
-    }
-    */
 
     try {
       final service = sl<RadarService>();
@@ -787,6 +794,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         setState(() {
           _buscandoVeiculo = false;
           _mensagemCarregamento = '';
+          _isProcessing = false;
         });
       }
     }
@@ -982,6 +990,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
   // ── Iniciar vistoria em background ────────────────────────────────────────
 
   Future<void> _iniciarVistoriaEmBackground() async {
+    if (_isProcessing) return;
     final rawValor = _buscaCtrl.text.trim();
     if (rawValor.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -994,6 +1003,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
     }
     final valor = rawValor.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
 
+    setState(() => _isProcessing = true);
     try {
       final dao = sl<VistoriaDao>();
       String vistoriaId;
@@ -1097,6 +1107,34 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           motorVeiculo: drift.Value(motor),
           combustivel: drift.Value(combustivel),
         ));
+      }
+
+      if (!reuse && forcarNova && _produtoSelecionado != 'nenhuma') {
+        try {
+          final walletRepo = sl<WalletRepository>();
+          final currentWallet = walletRepo.walletNotifier.value;
+          final prices = await walletRepo.getServicePrices();
+          
+          final servicePrice = prices.firstWhere((p) => p.serviceCode == _produtoSelecionado);
+          final balance = currentWallet?.balance ?? 0.0;
+          
+          if (balance < servicePrice.price) {
+            if (mounted) {
+              await InsufficientBalanceDialog.show(
+                context,
+                authResult: OperationAuthorizationResult(
+                  allowed: false,
+                  enforcementEnabled: true,
+                  balance: balance,
+                  graceOperationsUsed: 0,
+                  reason: 'INSUFFICIENT_FUNDS',
+                ),
+                customServiceName: 'Consulta ${_produtoSelecionado.toUpperCase()}',
+              );
+            }
+            return;
+          }
+        } catch (_) {}
       }
 
       // Inicia consulta em segundo plano sem await, independentemente de ser reuso ou nova,
@@ -1385,7 +1423,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed: (_buscandoVeiculo && _somentePesquisa)
+                  onPressed: _isProcessing || (_buscandoVeiculo && _somentePesquisa)
                       ? null
                       : () async {
                           if (_somentePesquisa) {

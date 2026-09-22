@@ -5,6 +5,8 @@ import 'package:pdf/widgets.dart' as pw;
 import '../data/models/relatorio_dashboard_model.dart';
 import '../data/models/relatorio_filtros_model.dart';
 import '../../../../core/services/empresa_rodape_helper.dart';
+import '../../../../core/services/time_service.dart';
+import '../../../../injection_container.dart';
 
 enum TipoRelatorioExportacao {
   resumido,
@@ -90,7 +92,7 @@ class RelatorioPdfService {
     final timeFormat = DateFormat('dd/MM/yyyy HH:mm');
     final periodoFormatado =
         '${dateFormat.format(filtros.dataInicio)} a ${dateFormat.format(filtros.dataFim)}';
-    final dataEmissaoFormatada = timeFormat.format(DateTime.now());
+    final dataEmissaoFormatada = timeFormat.format(sl<TimeService>().nowBrasilia());
 
     // Orientação: Paisagem para tabelas extensas, Retrato para Resumido
     final pageFormat = tipo == TipoRelatorioExportacao.resumido

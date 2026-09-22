@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/services/time_service.dart';
 import 'core/services/device_security_service.dart';
 import 'features/auth/presentation/blocs/auth_bloc.dart';
 import 'core/bloc/background_tasks/background_tasks_cubit.dart';
@@ -21,6 +22,7 @@ Future<void> main() async {
   );
 
   await initDependencies();
+  await sl<TimeService>().init();
   await sl<DeviceSecurityService>().init();
 
   runApp(const CautelarApp());

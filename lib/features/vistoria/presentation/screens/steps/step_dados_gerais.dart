@@ -10,6 +10,7 @@ import '../../../../../database/app_database.dart';
 import '../../../../../database/daos/vistoria_dao.dart';
 import '../../../../../core/services/sync_service.dart';
 import '../../../../../injection_container.dart';
+import '../../../../../core/services/time_service.dart';
 import '../../../domain/vistoria_wizard_state.dart';
 import '../../../domain/vistoria_type.dart';
 import '../clientes_screen.dart';
@@ -142,7 +143,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
       cpfCnpj: drift.Value(_clienteCpfCtrl.text.trim()),
       email: drift.Value(_clienteEmailCtrl.text.trim().toLowerCase()),
       telefone: drift.Value(_clienteTelefoneCtrl.text.trim()),
-      createdAt: drift.Value(DateTime.now()),
+      createdAt: drift.Value(sl<TimeService>().nowBrasilia()),
     );
 
     await _dao.inserirOuAtualizarCliente(companion);
@@ -222,7 +223,7 @@ class _StepDadosGeraisState extends State<StepDadosGerais> {
               _InfoRow(
                 icon: Icons.access_time_rounded,
                 label: 'Data e Hora',
-                value: _formatDateTime(DateTime.now()),
+                value: _formatDateTime(sl<TimeService>().nowBrasilia()),
               ),
               const Divider(height: 1),
               _InfoRow(

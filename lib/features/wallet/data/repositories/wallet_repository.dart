@@ -10,21 +10,29 @@ import 'package:flutter/foundation.dart';
 class OperationAuthorizationResult {
   final bool allowed;
   final bool enforcementEnabled;
+  final bool alreadyProcessed;
+  final bool debited;
   final double balance;
   final int graceOperationsUsed;
   final bool usedGraceOperation;
   final int? graceOperationsRemaining;
   final double consumedAmount;
+  final double price;
+  final String? serviceName;
   final String? reason;
 
   const OperationAuthorizationResult({
     required this.allowed,
     required this.enforcementEnabled,
+    this.alreadyProcessed = false,
+    this.debited = false,
     required this.balance,
     required this.graceOperationsUsed,
     this.usedGraceOperation = false,
     this.graceOperationsRemaining,
     this.consumedAmount = 0.0,
+    this.price = 0.0,
+    this.serviceName,
     this.reason,
   });
 
@@ -32,6 +40,8 @@ class OperationAuthorizationResult {
     return OperationAuthorizationResult(
       allowed: json['allowed'] as bool? ?? false,
       enforcementEnabled: json['enforcement_enabled'] as bool? ?? false,
+      alreadyProcessed: json['already_processed'] as bool? ?? false,
+      debited: json['debited'] as bool? ?? false,
       balance: (json['balance'] as num?)?.toDouble() ?? 0.0,
       graceOperationsUsed:
           (json['grace_operations_used'] as num?)?.toInt() ?? 0,
@@ -39,6 +49,8 @@ class OperationAuthorizationResult {
       graceOperationsRemaining:
           (json['grace_operations_remaining'] as num?)?.toInt(),
       consumedAmount: (json['consumed_amount'] as num?)?.toDouble() ?? 0.0,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      serviceName: json['service_name'] as String?,
       reason: json['reason'] as String?,
     );
   }
@@ -194,7 +206,7 @@ class WalletRepository {
     final isAndroidEmulator =
         defaultTargetPlatform == TargetPlatform.android && !kIsWeb;
     final baseUrl = const String.fromEnvironment('PIX_BACKEND_URL',
-        defaultValue: 'http://localhost:3000');
+        defaultValue: 'https://ultraprime.vercel.app');
     final endpointUrl =
         (baseUrl == 'http://localhost:3000' && isAndroidEmulator)
             ? 'http://10.0.2.2:3000/api/pix/create-charge'
@@ -247,7 +259,7 @@ class WalletRepository {
 
     final dio = Dio();
     final isAndroidEmulator = defaultTargetPlatform == TargetPlatform.android && !kIsWeb;
-    final baseUrl = const String.fromEnvironment('PIX_BACKEND_URL', defaultValue: 'http://localhost:3000');
+    final baseUrl = const String.fromEnvironment('PIX_BACKEND_URL', defaultValue: 'https://ultraprime.vercel.app');
     final endpointUrl = (baseUrl == 'http://localhost:3000' && isAndroidEmulator)
         ? 'http://10.0.2.2:3000/api/pix/charge/$txid'
         : '$baseUrl/api/pix/charge/$txid';
@@ -299,7 +311,7 @@ class WalletRepository {
           );
         }
         // Dispara uma busca real no banco para garantir consistência em background
-        getOrCreateWallet().catchError((_) => currentWallet); // Ignora erros do background
+        getOrCreateWallet().then((_) {}, onError: (_) {}); // Ignora erros do background
       }
       
       return authResult;

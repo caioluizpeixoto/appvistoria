@@ -19,6 +19,7 @@ import 'features/wallet/data/payment/mock_pix_payment_service.dart';
 import 'features/wallet/data/payment/payment_provider.dart';
 import 'features/wallet/data/repositories/wallet_repository.dart';
 import 'features/relatorios/data/repositories/relatorios_repository.dart';
+import 'core/services/time_service.dart';
 
 final sl = GetIt.instance;
 
@@ -27,6 +28,10 @@ Future<void> initDependencies() async {
 
   sl.registerLazySingleton<BackgroundTasksCubit>(
     () => BackgroundTasksCubit(),
+  );
+
+  sl.registerLazySingleton<TimeService>(
+    () => TimeService(),
   );
   // ── Supabase ───────────────────────────────────────────────────────────────
   sl.registerLazySingleton<SupabaseClient>(
