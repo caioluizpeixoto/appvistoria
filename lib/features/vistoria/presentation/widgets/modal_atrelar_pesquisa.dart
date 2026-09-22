@@ -26,7 +26,7 @@ class _ModalAtrelarPesquisaState extends State<ModalAtrelarPesquisa> {
   Future<void> _carregarHistorico() async {
     setState(() => _isLoading = true);
     try {
-      final consultas = await _radarService.listarConsultasAutocredNuvem();
+      final consultas = await _radarService.listarConsultasRadar();
       if (mounted) {
         setState(() {
           _consultas = consultas;
@@ -154,11 +154,22 @@ class _ModalAtrelarPesquisaState extends State<ModalAtrelarPesquisa> {
                       color: AppTheme.textPrimary,
                     ),
                   ),
-                  IconButton(
-                    padding: const EdgeInsets.all(12),
-                    iconSize: 28,
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                  Row(
+                    children: [
+                      IconButton(
+                        padding: const EdgeInsets.all(12),
+                        iconSize: 26,
+                        color: AppTheme.primary,
+                        icon: const Icon(Icons.refresh_rounded),
+                        onPressed: _carregarHistorico,
+                      ),
+                      IconButton(
+                        padding: const EdgeInsets.all(12),
+                        iconSize: 28,
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
                 ],
               ),

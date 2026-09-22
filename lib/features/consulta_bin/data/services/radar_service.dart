@@ -195,6 +195,8 @@ class RadarService {
     }
   }
 
+  static final Map<String, Future<RadarVeiculo>> _ongoingConsultas = {};
+
   Future<RadarVeiculo> consultarVeiculo({
     required String produto, // ex: "auto_bin", "bin_por_motor"
     required String param, // ex: "placa", "chassi", "motor"
@@ -204,7 +206,42 @@ class RadarService {
     bool forcarNova = false,
     String? tokenConsulta,
   }) async {
+    final cacheKey = '${produto}_${param}_${value.toUpperCase()}';
+
+    if (_ongoingConsultas.containsKey(cacheKey)) {
+      print('>>> [TRAVA INTELIGENTE] Consulta já em andamento para $cacheKey. Prevenindo duplicidade!');
+      return await _ongoingConsultas[cacheKey]!;
+    }
+
+    final future = _internalConsultarVeiculo(
+      produto: produto,
+      param: param,
+      value: value,
+      vistoriaId: vistoriaId,
+      codigoConsulta: codigoConsulta,
+      forcarNova: forcarNova,
+      tokenConsulta: tokenConsulta,
+    );
+    _ongoingConsultas[cacheKey] = future;
+
+    try {
+      return await future;
+    } finally {
+      _ongoingConsultas.remove(cacheKey);
+    }
+  }
+
+  Future<RadarVeiculo> _internalConsultarVeiculo({
+    required String produto,
+    required String param,
+    required String value,
+    String vistoriaId = '',
+    int codigoConsulta = 0,
+    bool forcarNova = false,
+    String? tokenConsulta,
+  }) async {
     final idPesquisa = const Uuid().v4();
+    bool isReusingSearch = tokenConsulta != null;
 
     try {
       await repository.salvarConsulta(
@@ -226,27 +263,78 @@ class RadarService {
 
       if (isForcarNova) {
         try {
-          final recent = await listarConsultasRadar(param: param, value: value);
+          // Passamos produto para que a edge function possa filtrar, mas também filtramos localmente.
+          final recentList = await listarConsultasRadar(produto: produto, param: param, value: value);
+          // Filtrar apenas o mesmo produto e que sejam recentes
+          final recent = recentList.where((c) {
+             final cProd = c['produto']?.toString() ?? c['codigo_produto']?.toString() ?? '';
+             final tProd = RadarProdutos.catalogo[produto]?.token ?? produto;
+             // Se houver produto na resposta, tem que bater. Se não houver, assume que bate.
+             if (cProd.isNotEmpty && cProd != produto && cProd != tProd) return false;
+             return true;
+          }).toList();
+
           if (recent.isNotEmpty) {
             recent.sort((a, b) {
-              final da = DateTime.tryParse(a['data_hora']?.toString() ?? a['ctime']?.toString() ?? '') ?? DateTime(2000);
-              final db = DateTime.tryParse(b['data_hora']?.toString() ?? b['ctime']?.toString() ?? '') ?? DateTime(2000);
+              DateTime parseDate(dynamic d) {
+                if (d == null) return DateTime(2000);
+                String s = d.toString();
+                if (s.contains('/')) {
+                   // tenta parsear dd/MM/yyyy HH:mm
+                   try {
+                     final parts = s.split(' ');
+                     final dateParts = parts[0].split('/');
+                     if (dateParts.length == 3) {
+                       final timeStr = parts.length > 1 ? parts[1] : '00:00:00';
+                       return DateTime.parse('${dateParts[2]}-${dateParts[1]}-${dateParts[0]} $timeStr');
+                     }
+                   } catch (_) {}
+                }
+                return DateTime.tryParse(s) ?? DateTime(2000);
+              }
+              final da = parseDate(a['data_hora'] ?? a['ctime'] ?? a['created_at']);
+              final db = parseDate(b['data_hora'] ?? b['ctime'] ?? b['created_at']);
               return db.compareTo(da);
             });
+
             final mostRecent = recent.first;
-            final da = DateTime.tryParse(mostRecent['data_hora']?.toString() ?? mostRecent['ctime']?.toString() ?? '');
-            if (da != null) {
+            DateTime parseDate(dynamic d) {
+                if (d == null) return DateTime(2000);
+                String s = d.toString();
+                if (s.contains('/')) {
+                   try {
+                     final parts = s.split(' ');
+                     final dateParts = parts[0].split('/');
+                     if (dateParts.length == 3) {
+                       final timeStr = parts.length > 1 ? parts[1] : '00:00:00';
+                       return DateTime.parse('${dateParts[2]}-${dateParts[1]}-${dateParts[0]} $timeStr');
+                     }
+                   } catch (_) {}
+                }
+                return DateTime.tryParse(s) ?? DateTime(2000);
+            }
+            final da = parseDate(mostRecent['data_hora'] ?? mostRecent['ctime'] ?? mostRecent['created_at']);
+            
+            if (da.year > 2000) {
               final diff = DateTime.now().difference(da);
               if (diff.inHours < 24) {
                 isForcarNova = false;
-                if (mostRecent['token'] != null && mostRecent['token'].toString().isNotEmpty) {
-                  currentToken = mostRecent['token'].toString();
+                final tk = mostRecent['token']?.toString() ?? '';
+                if (tk.isNotEmpty) {
+                  currentToken = tk;
+                  isReusingSearch = true;
+                  print('>>> TRAVA 24H: Impedindo nova pesquisa para $param=$value. Usando consulta de ${diff.inHours}h atras.');
+                } else {
+                  // Achamos a pesquisa, ela tem menos de 24h, mas NÃO tem token.
+                  // Provavelmente está processando. Se chamarmos a API sem token, vamos Pagar de novo!
+                  print('>>> TRAVA 24H: Pesquisa recente encontrada sem token. Abortando para evitar duplicidade de cobrança!');
+                  throw TimeoutException('Uma pesquisa para este veículo foi feita nas últimas 24 horas e ainda está em processamento ou não gerou token.\nPor favor, aguarde e verifique o Histórico de Pesquisas (Nuvem) para puxar os dados, evitando pagar em duplicidade.');
                 }
-                print('>>> TRAVA 24H: Impedindo nova pesquisa para $param=$value. Usando consulta de ${diff.inHours}h atras.');
               }
             }
           }
         } catch (e) {
+          if (e is TimeoutException) rethrow; // Deixa o Timeout subir para abortar a consulta
           print('Erro na trava 24h: $e');
         }
       }
@@ -384,9 +472,9 @@ class RadarService {
         arquivoPesquisaUrl: parsed['radar_pdf_url'],
       );
 
-      // DÉBITO DA CARTEIRA APENAS EM CASO DE SUCESSO (CONCLUÍDA)
+      // DÉBITO DA CARTEIRA APENAS EM CASO DE SUCESSO (CONCLUÍDA) E SE NÃO FOR REUSO
       print('>>> STATUS FINAL DA PESQUISA: $statusFinal');
-      if (statusFinal == 'concluida') {
+      if (statusFinal == 'concluida' && !isReusingSearch) {
         try {
           print('>>> TENTANDO DEBITAR CARTEIRA PARA: $produto (ID: $idPesquisa)');
           final walletRepo = _getWalletRepository();
@@ -423,6 +511,16 @@ class RadarService {
         } catch (e) {
           print('>>> Aviso: falha ao debitar na carteira: $e');
         }
+      } else if (isReusingSearch) {
+        print('>>> PESQUISA REAPROVEITADA. Removendo linha duplicada e evitando cobrança.');
+        try {
+          await repository.supabase
+              .from('autocred_consultas')
+              .delete()
+              .eq('id_pesquisa_radar', idPesquisa);
+        } catch (e) {
+          print('>>> Aviso: falha ao remover linha duplicada: $e');
+        }
       }
 
       if (isPendente) {
@@ -448,11 +546,20 @@ class RadarService {
           mensagemErro.contains('já está em andamento') ||
           mensagemErro.contains('análise técnica');
 
-      await repository.atualizarConsulta(
-        idPesquisaRadar: idPesquisa,
-        status: isTimeout ? 'pendente' : 'erro',
-        retornoBruto: e.toString(),
-      );
+      if (isReusingSearch) {
+        try {
+          await repository.supabase
+              .from('autocred_consultas')
+              .delete()
+              .eq('id_pesquisa_radar', idPesquisa);
+        } catch (_) {}
+      } else {
+        await repository.atualizarConsulta(
+          idPesquisaRadar: idPesquisa,
+          status: isTimeout ? 'pendente' : 'erro',
+          retornoBruto: e.toString(),
+        );
+      }
 
       if (isTimeout) {
         if (mensagemErro.contains('análise técnica')) {
@@ -638,9 +745,9 @@ class RadarService {
         }
 
         retryCount++;
-        if (currentToken == null && retryCount > 5) {
+        if (retryCount > 5) {
           throw Exception(
-              'Falha de conexão ao iniciar a pesquisa. Verifique sua internet e tente novamente.');
+              'Falha de conexão ao carregar a pesquisa. Tente novamente mais tarde.');
         }
         await Future.delayed(const Duration(seconds: 10));
       }

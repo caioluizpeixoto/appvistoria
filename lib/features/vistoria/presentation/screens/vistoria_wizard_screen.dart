@@ -514,27 +514,41 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       final repo = sl<RadarRepository>();
       final service = sl<RadarService>();
 
-      final consultasNuvem = await repo.buscarConsultasRecentesNuvem('placa', placa);
-      for (final c in consultasNuvem) {
-        combinadas.add({...c, 'fonte': 'local'});
-      }
+      final consultasGerais = await service.listarConsultasRadar();
+      final normPlaca = placa.replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
 
-      final radarConsultas = await service.listarConsultasRadar(param: 'placa', value: placa);
-      for (final c in radarConsultas) {
-        combinadas.add({
-          'fonte': 'radar',
-          'tokenConsulta': c['token'],
-          'titulo': c['titulo'],
-          'created_at': c['data_hora'] ?? c['ctime'],
-          'codigo_produto': c['codigo_produto'],
-        });
+      for (final c in consultasGerais) {
+        final cVal = (c['parametro_valor'] ?? '').toString().replaceAll(RegExp(r'[^A-Za-z0-9]'), '').toUpperCase();
+        if (cVal == normPlaca) {
+          // Tratar data de UTC para Local se necessário
+          final dataString = c['data_hora']?.toString() ?? c['ctime']?.toString() ?? '';
+          DateTime? dataParsed;
+          if (dataString.isNotEmpty) {
+            dataParsed = DateTime.tryParse(dataString);
+            if (dataParsed != null) {
+              final str = dataString.toUpperCase();
+              if (!str.endsWith('Z') && !str.contains('+') && !str.contains('-')) {
+                 dataParsed = DateTime.utc(dataParsed.year, dataParsed.month, dataParsed.day, dataParsed.hour, dataParsed.minute, dataParsed.second);
+              }
+              dataParsed = dataParsed.toLocal();
+            }
+          }
+
+          combinadas.add({
+            'fonte': 'radar',
+            'tokenConsulta': c['token'],
+            'titulo': c['titulo'],
+            'created_at': dataParsed?.toIso8601String() ?? dataString,
+            'codigo_produto': c['codigo_produto'] ?? 'auto_bin',
+          });
+        }
       }
 
       // Ordenar por data mais recente
       combinadas.sort((a, b) {
         try {
-          final da = DateTime.parse(a['created_at'].toString());
-          final db = DateTime.parse(b['created_at'].toString());
+          final da = DateTime.tryParse(a['created_at'].toString()) ?? DateTime(2000);
+          final db = DateTime.tryParse(b['created_at'].toString()) ?? DateTime(2000);
           return db.compareTo(da);
         } catch (_) {
           return 0;
@@ -600,7 +614,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
                       final dataString = item['created_at'].toString();
                       DateTime? createdAt;
                       try {
-                        createdAt = DateTime.parse(dataString);
+                        createdAt = DateTime.parse(dataString).toLocal();
                       } catch (_) {}
 
                       final dateFormatted = createdAt != null
@@ -771,7 +785,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       );
 
       if (acao == 'aguardar') {
-        _iniciarAguardarPesquisa(placa);
+        // Nada, apenas espera o vistoriador checar manualmente depois.
       } else if (acao == 'nova') {
         final result = await _showSelectProdutoDialog(hideForcarNova: true);
         if (result != null) {
@@ -963,11 +977,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       }
       if (mounted) {
         String cleanError = e.toString().replaceAll('Exception: ', '').trim();
-        if (cleanError.contains('já está em andamento')) {
+        if (cleanError.contains('já está em andamento') || cleanError.contains('análise técnica')) {
           setState(() {
             _wizardState.setStatusConsulta('andamento');
           });
-          _iniciarAguardarPesquisa(placa);
         } else {
           setState(() {
             _wizardState.setStatusConsulta('erro');
@@ -1865,104 +1878,23 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
               ),
               actions: [
                 if (!_wizardState.isChecklist) ...[
-                  if (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message: 'Pesquisando na base... (Toque para opções)',
-                          child: InkWell(
-                            onTap: _retryRadarConsulta,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_wizardState.statusConsulta == 'concluida')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message:
-                              'Atrelar Pesquisa. Clique para abrir o histórico.',
-                          child: InkWell(
-                            onTap: _abrirModalAtrelarPesquisa,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.cloud_done_rounded,
-                                  color: Colors.greenAccent, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-
-                  else if (_wizardState.statusConsulta == 'erro')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message:
-                              'Erro na pesquisa. Tocar para atrelar pesquisa.',
-                          child: InkWell(
-                            onTap: _abrirModalAtrelarPesquisa,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.cloud_off_rounded,
-                                  color: Colors.redAccent, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_wizardState.statusConsulta == 'nenhuma')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message: 'Atrelar Consulta',
-                          child: InkWell(
-                            onTap: _abrirModalAtrelarPesquisa,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.cloud_queue_rounded,
-                                  color: Colors.white70, size: 22),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  else if (_wizardState.statusConsulta == 'timeout')
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: Tooltip(
-                          message:
-                              'A pesquisa está demorando. Toque para atrelar do histórico.',
-                          child: InkWell(
-                            onTap: _abrirModalAtrelarPesquisa,
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.schedule_rounded,
-                                  color: Colors.amber, size: 22),
-                            ),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 16),
+                      child: Tooltip(
+                        message: 'Pesquisas / Atrelar Base',
+                        child: InkWell(
+                          onTap: _abrirModalAtrelarPesquisa,
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4.0),
+                            child: Icon(Icons.search_rounded,
+                                color: Colors.white, size: 24),
                           ),
                         ),
                       ),
                     ),
+                  ),
                 ],
 
                 IconButton(

@@ -166,6 +166,13 @@ class _HistoricoRadarScreenState extends State<HistoricoRadarScreen> {
                     DateTime? data;
                     if (dataString != null) {
                       data = DateTime.tryParse(dataString.toString());
+                      if (data != null) {
+                        final str = dataString.toString().toUpperCase();
+                        if (!str.endsWith('Z') && !str.contains('+') && !str.contains('-')) {
+                           data = DateTime.utc(data.year, data.month, data.day, data.hour, data.minute, data.second);
+                        }
+                        data = data.toLocal();
+                      }
                     }
 
                     return Card(

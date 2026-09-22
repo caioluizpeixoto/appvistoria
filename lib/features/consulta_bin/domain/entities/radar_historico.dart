@@ -41,7 +41,11 @@ class RadarHistorico {
       dadosTratados: json['dados_tratados'] ?? {},
       arquivoPesquisaUrl: json['arquivo_pesquisa_url'],
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'])
+          ? DateTime.parse(
+              json['created_at'].toString().endsWith('Z') || json['created_at'].toString().contains('+') || json['created_at'].toString().contains('-')
+                  ? json['created_at'].toString()
+                  : '${json['created_at']}Z'
+            ).toLocal()
           : DateTime.now(),
     );
   }

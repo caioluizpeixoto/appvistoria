@@ -581,7 +581,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
                     final dataString = item['created_at'].toString();
                     DateTime? createdAt;
                     try {
-                      createdAt = DateTime.parse(dataString);
+                      createdAt = DateTime.parse(dataString).toLocal();
                     } catch (_) {}
 
                     final dateFormatted = createdAt != null
