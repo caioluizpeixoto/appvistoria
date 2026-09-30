@@ -6,6 +6,7 @@ import 'package:app_vistoria/database/app_database.dart' as import_app_database;
 import 'package:app_vistoria/core/services/sync_service.dart' as import_sync_service;
 import 'package:app_vistoria/core/services/device_security_service.dart' as import_device_sec;
 import 'package:app_vistoria/core/services/empresa_rodape_helper.dart' as import_rodape;
+import 'package:app_vistoria/features/wallet/data/repositories/wallet_repository.dart' as import_wallet_repo;
 
 // ── Events ────────────────────────────────────────────────────────────────────
 abstract class AuthEvent extends Equatable {
@@ -185,6 +186,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthBlocState> {
       // Limpa banco local no logout
       final db = sl<import_app_database.AppDatabase>();
       await db.clearAll();
+      
+      // Limpa dados em memória
+      sl<import_wallet_repo.WalletRepository>().clear();
 
       emit(AuthUnauthenticated());
     } catch (e) {

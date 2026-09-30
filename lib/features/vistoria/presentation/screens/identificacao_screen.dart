@@ -513,7 +513,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         ),
       );
       if (querNova == null) return null; // Cancelou
-      return {'forcarNova': querNova};
+      return {'forcarNova': querNova, 'continuarSemPesquisa': !querNova};
     }
     // Ordenar por data mais recente
     combinadas.sort((a, b) {
@@ -672,6 +672,14 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         _isProcessing = false;
       });
       return false; // Cancelou
+    }
+
+    if (escolhida['continuarSemPesquisa'] == true) {
+      setState(() {
+        _buscandoVeiculo = false;
+        _isProcessing = false;
+      });
+      return false;
     }
 
     String? tokenConsulta;
@@ -1025,7 +1033,10 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           return; // Cancela se o usuário fechar o Dialog
         }
 
-        if (escolhida['forcarNova'] == true) {
+        if (escolhida['continuarSemPesquisa'] == true) {
+          _produtoSelecionado = 'nenhuma';
+          forcarNova = true; // Trata como vistoria limpa
+        } else if (escolhida['forcarNova'] == true) {
           forcarNova = true;
         } else {
           if (escolhida['fonte'] == 'local') {

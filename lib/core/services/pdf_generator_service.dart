@@ -101,7 +101,7 @@ const _kWhite = PdfColors.white;
 const _kGreyLight = PdfColor.fromInt(0xFFF5F5F5);
 const _kGreyDark = PdfColor.fromInt(0xFF666666);
 const _kGreen = PdfColor.fromInt(0xFF183523);
-const _kOrange = PdfColor.fromInt(0xFFFFCA28);
+const _kOrange = PdfColor.fromInt(0xFFFDB22B);
 const _kRed = PdfColor.fromInt(0xFFEF5350);
 
 bool _isStatusConformeOuOk(String status) {
@@ -142,7 +142,10 @@ class PdfGeneratorService {
           if (data != null) {
             final cor = data['cor_pdf'];
             if (cor != null && cor.toString().isNotEmpty) {
-              final hex = cor.toString().replaceAll('#', '');
+              var hex = cor.toString().replaceAll('#', '').toUpperCase();
+              if (hex == 'FFCA28') {
+                hex = 'FDB22B';
+              }
               _dynamicThemeColor = PdfColor.fromHex('#$hex');
             }
             final logoTopo = data['logo_topo_url'];
@@ -864,7 +867,7 @@ class PdfGeneratorService {
                       margin: const pw.EdgeInsets.only(top: 8, bottom: 4),
                       padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                       decoration: pw.BoxDecoration(
-                        color: PdfColor.fromHex('FDB22B'),
+                        color: _dynamicThemeColor,
                         borderRadius: pw.BorderRadius.circular(4),
                       ),
                       child: pw.Text(
@@ -958,7 +961,7 @@ class PdfGeneratorService {
               }
 
               if (addResumoEParecer) {
-                final quadroApontamentos = _buildQuadroResumoApontamentos(wizardState, styles);
+                final quadroApontamentos = _buildQuadroResumoApontamentos(wizardState, styles, _dynamicThemeColor);
                 if (quadroApontamentos != null) {
                   widgets.add(pw.SizedBox(height: 10));
                   widgets.add(quadroApontamentos);
@@ -1906,7 +1909,7 @@ class PdfGeneratorService {
   pw.Widget _buildBlackBar(String text, _PdfStyles styles) {
     return pw.Container(
       width: double.infinity,
-      color: PdfColor.fromHex('FDB22B'),
+      color: _dynamicThemeColor,
       padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
       margin: const pw.EdgeInsets.only(bottom: 6),
       child: pw.Text(text,
@@ -3889,7 +3892,7 @@ class PdfGeneratorService {
                     warningYellow,
                     dangerRed),
                 pw.SizedBox(height: 6),
-                _buildBanner('ITENS ANALISADOS', styles),
+                _buildBanner('ITENS ANALISADOS', styles, _dynamicThemeColor),
                 pw.SizedBox(height: 12),
                 pw.Expanded(
                     child: pw.Row(
@@ -6220,7 +6223,7 @@ class PdfGeneratorService {
                 },
                 children: [
                   pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColor.fromHex('#B71C1C')), // Dark Red for Warning
+                    decoration: pw.BoxDecoration(color: _dynamicThemeColor), // Dynamic Theme Color
                     children: [
                       pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text('PEÇA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.white))),
                       pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text('PROBLEMA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.white))),
@@ -6500,6 +6503,7 @@ class PdfGeneratorService {
   static pw.Widget? _buildQuadroResumoApontamentos(
     VistoriaWizardState? wizardState,
     _PdfStyles styles,
+    PdfColor _dynamicThemeColor,
   ) {
     if (wizardState == null) return null;
 
@@ -6640,7 +6644,7 @@ class PdfGeneratorService {
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
         borderRadius: pw.BorderRadius.circular(6),
-        border: pw.Border.all(color: PdfColor.fromHex('1F5E3D'), width: 1.5),
+        border: pw.Border.all(color: _dynamicThemeColor, width: 1.5),
       ),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -6650,7 +6654,7 @@ class PdfGeneratorService {
             width: double.infinity,
             padding: const pw.EdgeInsets.symmetric(vertical: 6, horizontal: 10),
             decoration: pw.BoxDecoration(
-              color: PdfColor.fromHex('1F5E3D'),
+              color: _dynamicThemeColor,
               borderRadius: const pw.BorderRadius.vertical(top: pw.Radius.circular(4)),
             ),
             child: pw.Row(
@@ -6676,21 +6680,21 @@ class PdfGeneratorService {
                   flex: 4,
                   child: pw.Text(
                     'ITEM / COMPONENTE',
-                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColor.fromHex('1F5E3D')),
+                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: _dynamicThemeColor),
                   ),
                 ),
                 pw.Expanded(
                   flex: 3,
                   child: pw.Text(
                     'STATUS / CLASSIFICAÇÃO',
-                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColor.fromHex('1F5E3D')),
+                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: _dynamicThemeColor),
                   ),
                 ),
                 pw.Expanded(
                   flex: 5,
                   child: pw.Text(
                     'OBSERVAÇÃO / MOTIVO',
-                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: PdfColor.fromHex('1F5E3D')),
+                    style: pw.TextStyle(font: styles.bold, fontSize: 7.5, color: _dynamicThemeColor),
                   ),
                 ),
               ],
@@ -6807,10 +6811,10 @@ class PdfGeneratorService {
     );
   }
 
-  static pw.Widget _buildBanner(String text, _PdfStyles styles) {
+  static pw.Widget _buildBanner(String text, _PdfStyles styles, PdfColor _dynamicThemeColor) {
     return pw.Container(
       width: double.infinity,
-      color: PdfColor.fromHex('1F5E3D'), // The green banner color
+      color: _dynamicThemeColor, // Dynamic Theme Color
       padding: const pw.EdgeInsets.symmetric(vertical: 4),
       margin: const pw.EdgeInsets.symmetric(vertical: 4),
       alignment: pw.Alignment.center,

@@ -730,7 +730,49 @@ class _MainActionCard extends StatelessWidget {
 
 // ── Banner de boas-vindas ─────────────────────────────────────────────────────
 
-class _WelcomeBanner extends StatelessWidget {
+class _WelcomeBanner extends StatefulWidget {
+  @override
+  State<_WelcomeBanner> createState() => _WelcomeBannerState();
+}
+
+class _WelcomeBannerState extends State<_WelcomeBanner> {
+  String? _razaoSocial;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchEmpresa();
+  }
+
+  Future<void> _fetchEmpresa() async {
+    try {
+      final supa = Supabase.instance.client;
+      final session = supa.auth.currentSession;
+      if (session == null) return;
+      
+      final meta = session.user.userMetadata ?? {};
+      final cnpjMeta = meta['cnpj'];
+      String cnpj = '';
+      if (cnpjMeta != null) {
+        cnpj = cnpjMeta.toString().replaceAll(RegExp(r'\D'), '');
+      } else {
+        final email = session.user.email ?? '';
+        cnpj = email.split('@').first.replaceAll(RegExp(r'\D'), '');
+      }
+      
+      if (cnpj.isEmpty) return;
+      
+      final data = await supa.from('empresas').select('razao_social').eq('cnpj', cnpj).maybeSingle();
+      if (data != null && data['razao_social'] != null) {
+        if (mounted) {
+          setState(() {
+            _razaoSocial = data['razao_social'];
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -747,14 +789,18 @@ class _WelcomeBanner extends StatelessWidget {
         builder: (context, state) {
           String displayValue = 'Vistoriador';
           if (state is AuthAuthenticated) {
-            final name = state.user.userMetadata?['name'] as String?;
-            if (name != null && name.trim().isNotEmpty) {
-              displayValue = name;
+            if (_razaoSocial != null && _razaoSocial!.trim().isNotEmpty) {
+              displayValue = _razaoSocial!;
             } else {
-              final email = state.user.email ?? '';
-              if (email.isNotEmpty) {
-                // Remove o @appvistoria.com.br
-                displayValue = email.split('@').first;
+              final meta = state.user.userMetadata ?? {};
+              final nome = meta['empresa_nome'] ?? meta['nome'] ?? meta['name'] as String?;
+              if (nome != null && nome.toString().trim().isNotEmpty && !RegExp(r'^\d+$').hasMatch(nome.toString().trim())) {
+                displayValue = nome.toString();
+              } else {
+                final email = state.user.email ?? '';
+                if (email.isNotEmpty) {
+                  displayValue = email.split('@').first;
+                }
               }
             }
           }

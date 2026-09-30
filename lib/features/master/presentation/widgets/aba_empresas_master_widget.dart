@@ -74,7 +74,7 @@ class _AbaEmpresasMasterWidgetState extends State<AbaEmpresasMasterWidget> {
               itemCount: _empresas.length,
               itemBuilder: (context, index) {
                 final emp = _empresas[index];
-                final corHex = emp['cor_pdf'] ?? '#FFCA28';
+                final corHex = emp['cor_pdf'] ?? '#FDB22B';
                 final Color empColor = _parseColor(corHex);
 
                 return Card(
@@ -82,6 +82,16 @@ class _AbaEmpresasMasterWidgetState extends State<AbaEmpresasMasterWidget> {
                   margin: const EdgeInsets.only(bottom: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   child: ListTile(
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (ctx) => _FormularioEmpresaBottomSheet(empresa: emp),
+                      ).then((_) {
+                        _fetchEmpresas();
+                      });
+                    },
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     leading: CircleAvatar(
                       backgroundColor: empColor,
@@ -99,7 +109,7 @@ class _AbaEmpresasMasterWidgetState extends State<AbaEmpresasMasterWidget> {
                         Text('Login: ${emp['email']}', style: const TextStyle(fontSize: 13, color: Colors.black54)),
                       ],
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                    trailing: const Icon(Icons.edit_rounded, color: Colors.grey),
                   ),
                 );
               },
@@ -122,7 +132,8 @@ class _AbaEmpresasMasterWidgetState extends State<AbaEmpresasMasterWidget> {
 }
 
 class _FormularioEmpresaBottomSheet extends StatefulWidget {
-  const _FormularioEmpresaBottomSheet();
+  final Map<String, dynamic>? empresa;
+  const _FormularioEmpresaBottomSheet({this.empresa});
 
   @override
   State<_FormularioEmpresaBottomSheet> createState() => _FormularioEmpresaBottomSheetState();
@@ -132,16 +143,37 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
   final _formKey = GlobalKey<FormState>();
   final _razaoCtrl = TextEditingController();
   final _cnpjCtrl = TextEditingController();
-  final _enderecoCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
+  final _enderecoCompletoCtrl = TextEditingController();
+  final _telefoneCtrl = TextEditingController();
+  final _outrosContatosCtrl = TextEditingController();
   final _senhaCtrl = TextEditingController();
-  final _corCtrl = TextEditingController(text: '#FFCA28');
+  final _corCtrl = TextEditingController(text: '#FDB22B');
   
+  bool _mostrarSenha = false;
   File? _logoFile;
   bool _isLoading = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.empresa != null) {
+      final e = widget.empresa!;
+      _razaoCtrl.text = e['razao_social'] ?? '';
+      _cnpjCtrl.text = e['cnpj'] ?? '';
+      _corCtrl.text = e['cor_pdf'] ?? '#FDB22B';
+      
+      final endCompleto = (e['endereco'] ?? '') as String;
+      final partes = endCompleto.split(' | ');
+      if (partes.isNotEmpty) _enderecoCompletoCtrl.text = partes[0];
+      if (partes.length > 1) {
+        _telefoneCtrl.text = partes[1].replaceAll('Tel: ', '');
+      }
+      if (partes.length > 2) _outrosContatosCtrl.text = partes[2];
+    }
+  }
+
   final List<String> _presetColors = [
-    '#FFCA28', // Amarelo Ouro
+    '#FDB22B', // Amarelo Ouro
     '#2196F3', // Azul
     '#4CAF50', // Verde
     '#F44336', // Vermelho
@@ -156,8 +188,9 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
   void dispose() {
     _razaoCtrl.dispose();
     _cnpjCtrl.dispose();
-    _enderecoCtrl.dispose();
-    _emailCtrl.dispose();
+    _enderecoCompletoCtrl.dispose();
+    _telefoneCtrl.dispose();
+    _outrosContatosCtrl.dispose();
     _senhaCtrl.dispose();
     _corCtrl.dispose();
     super.dispose();
@@ -173,6 +206,46 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
     }
   }
 
+  Future<void> _deletarEmpresa() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Excluir Empresa'),
+        content: const Text('Tem certeza que deseja excluir esta empresa? Esta ação não pode ser desfeita e impedirá o acesso dos usuários vinculados a ela.'),
+        actions: [
+          TextButton(
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            onPressed: () => Navigator.of(ctx).pop(false),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Excluir', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    setState(() => _isLoading = true);
+    try {
+      final supa = Supabase.instance.client;
+      await supa.from('empresas').delete().eq('cnpj', widget.empresa!['cnpj']);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Empresa excluída com sucesso!', style: TextStyle(color: Colors.white)), backgroundColor: Colors.green));
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erro ao excluir: $e'), backgroundColor: Colors.red));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _salvar() async {
     if (!_formKey.currentState!.validate()) return;
     
@@ -184,9 +257,13 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
 
       final cnpjLimpo = _cnpjCtrl.text.trim().replaceAll(RegExp(r'\D'), '');
       
+      final isEdit = widget.empresa != null;
+      
       final existingEmpresa = await supa.from('empresas').select('id').eq('cnpj', cnpjLimpo).maybeSingle();
       if (existingEmpresa != null) {
-        throw Exception('Já existe uma empresa com este CNPJ cadastrado!');
+        if (!isEdit || existingEmpresa['id'] != widget.empresa!['id']) {
+          throw Exception('Já existe uma empresa com este CNPJ cadastrado!');
+        }
       }
 
       String? logoUrl;
@@ -203,42 +280,70 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
         logoUrl = supa.storage.from('laudos-pdf').getPublicUrl(filePath);
       }
 
-      await supa.from('empresas').insert({
+      final partesEndereco = [
+        _enderecoCompletoCtrl.text.trim(),
+        if (_telefoneCtrl.text.trim().isNotEmpty) 'Tel: ${_telefoneCtrl.text.trim()}',
+        _outrosContatosCtrl.text.trim(),
+      ].where((e) => e.isNotEmpty).join(' | ');
+
+      final loginEmail = '$cnpjLimpo@appvistoria.com.br';
+
+      final updateData = {
         'razao_social': _razaoCtrl.text.trim(),
         'cnpj': cnpjLimpo,
-        'endereco': _enderecoCtrl.text.trim(),
-        'email': _emailCtrl.text.trim(),
+        'endereco': partesEndereco,
         'cor_pdf': _corCtrl.text.trim(),
-        'logo_topo_url': logoUrl,
-        'logo_marca_dagua_url': logoUrl,
-      });
-
-      final res = await supa.functions.invoke(
-        'admin-create-user',
-        body: {
-          'email': _emailCtrl.text.trim(),
-          'password': _senhaCtrl.text,
-          'nome': _razaoCtrl.text.trim(),
-          'empresa_nome': _razaoCtrl.text.trim(),
-          'cnpj': cnpjLimpo,
-        },
-      );
+      };
       
-      if (res.status != 200) {
-        await supa.from('empresas').delete().eq('cnpj', cnpjLimpo);
-        throw Exception(res.data?['error'] ?? 'Erro ao criar usuário.');
+      if (logoUrl != null) {
+        updateData['logo_topo_url'] = logoUrl;
+        updateData['logo_marca_dagua_url'] = logoUrl;
+      }
+
+      if (isEdit) {
+        await supa.from('empresas').update(updateData).eq('id', widget.empresa!['id']);
+      } else {
+        updateData['email'] = loginEmail;
+        await supa.from('empresas').insert(updateData);
+
+        final res = await supa.functions.invoke(
+          'admin-create-user',
+          body: {
+            'email': loginEmail,
+            'password': _senhaCtrl.text,
+            'nome': _razaoCtrl.text.trim(),
+            'empresa_nome': _razaoCtrl.text.trim(),
+            'cnpj': cnpjLimpo,
+          },
+        );
+        
+        if (res.status != 200) {
+          await supa.from('empresas').delete().eq('cnpj', cnpjLimpo);
+          throw Exception(res.data?['error'] ?? 'Erro ao criar usuário.');
+        }
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ Empresa e Usuário cadastrados com sucesso!'), backgroundColor: AppTheme.conforme)
+          SnackBar(content: Text(isEdit ? '✅ Empresa atualizada com sucesso!' : '✅ Empresa e Usuário cadastrados com sucesso!'), backgroundColor: AppTheme.conforme)
         );
         Navigator.pop(context); // Fecha o bottom sheet
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Erro: $e'), backgroundColor: AppTheme.naoConforme)
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Ops! Algo deu errado', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+            content: Text(e.toString().replaceAll('Exception: ', '')),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK', style: TextStyle(color: Colors.black87)),
+              )
+            ],
+          ),
         );
       }
     } finally {
@@ -316,9 +421,9 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Nova Empresa',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF183523)),
+                    Text(
+                      widget.empresa != null ? 'Editar Empresa' : 'Nova Empresa',
+                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Color(0xFF183523)),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close_rounded, color: Colors.grey),
@@ -349,38 +454,60 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
                     ),
                     const SizedBox(height: 16),
                     _buildTextField(
-                      controller: _enderecoCtrl,
-                      label: 'Endereço e Contatos (Será exibido no laudo)',
+                      controller: _enderecoCompletoCtrl,
+                      label: 'Endereço (Rua, Nº, Bairro, Cidade/UF)',
                       icon: Icons.location_on_rounded,
-                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _telefoneCtrl,
+                      label: 'Telefone / WhatsApp',
+                      icon: Icons.phone_rounded,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _outrosContatosCtrl,
+                      label: 'E-mail, Site ou Redes Sociais',
+                      icon: Icons.alternate_email_rounded,
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
-                // LOGIN
-                _buildSectionCard(
-                  title: 'Acesso (Login do Cliente)',
-                  icon: Icons.lock_person_rounded,
-                  children: [
-                    _buildTextField(
-                      controller: _emailCtrl,
-                      label: 'E-mail de Login',
-                      icon: Icons.email_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) => v!.isEmpty ? 'Campo obrigatório' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _senhaCtrl,
-                      label: 'Senha Inicial',
-                      icon: Icons.password_rounded,
-                      obscureText: true,
-                      validator: (v) => (v != null && v.length < 6) ? 'Mínimo 6 caracteres' : null,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
+                // LOGIN (Apenas para novas empresas)
+                if (widget.empresa == null) ...[
+                  _buildSectionCard(
+                    title: 'Acesso (Login do Cliente)',
+                    icon: Icons.lock_person_rounded,
+                    children: [
+                      const Text(
+                        'O login do cliente será o próprio CNPJ informado acima.',
+                        style: TextStyle(color: Colors.black54, fontSize: 13),
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _senhaCtrl,
+                        label: 'Senha Inicial',
+                        icon: Icons.password_rounded,
+                        obscureText: !_mostrarSenha,
+                        validator: (v) => (v != null && v.length < 6) ? 'Mínimo 6 caracteres' : null,
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _mostrarSenha ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                            color: Colors.black38,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _mostrarSenha = !_mostrarSenha;
+                            });
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
 
                 // CUSTOMIZAÇÃO
                 _buildSectionCard(
@@ -506,9 +633,26 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
                     onPressed: _isLoading ? null : _salvar,
                     child: _isLoading
                         ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                        : const Text('Cadastrar Empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        : const Text('Cadastrar/Salvar Empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
+                
+                if (widget.empresa != null) ...[
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _isLoading ? null : _deletarEmpresa,
+                      child: const Text('Excluir Empresa', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -564,6 +708,7 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
     bool obscureText = false,
     int maxLines = 1,
     String? Function(String?)? validator,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -579,6 +724,7 @@ class _FormularioEmpresaBottomSheetState extends State<_FormularioEmpresaBottomS
         filled: true,
         fillColor: Colors.grey.shade50,
         prefixIcon: Icon(icon, color: Colors.black38, size: 20),
+        suffixIcon: suffixIcon,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade200)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),

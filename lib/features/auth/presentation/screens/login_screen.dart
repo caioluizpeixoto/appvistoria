@@ -173,16 +173,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       : const Text('Entrar'),
                                 ),
                               ),
-                              const SizedBox(height: 16),
-                              TextButton(
-                                onPressed: isLoading
-                                    ? null
-                                    : () {
-                                        context.push('/register');
-                                      },
-                                child:
-                                    const Text('Não possui conta? Cadastre-se'),
-                              ),
                             ],
                           ),
                         ),

@@ -116,6 +116,14 @@ class WalletRepository {
   final ValueNotifier<WalletModel?> walletNotifier = ValueNotifier(null);
   RealtimeChannel? _walletChannel;
 
+  void clear() {
+    walletNotifier.value = null;
+    if (_walletChannel != null) {
+      supabase.removeChannel(_walletChannel!);
+      _walletChannel = null;
+    }
+  }
+
   /// Retorna o ValueNotifier da carteira para a UI reagir instantaneamente
   ValueNotifier<WalletModel?> getWalletNotifier() {
     final userId = currentUserId;
