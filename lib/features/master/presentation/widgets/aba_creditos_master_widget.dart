@@ -42,7 +42,7 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
     }
   }
 
-  Future<void> _abrirDialogCredito(Map<String, dynamic> empresa) async {
+  Future<void> _abrirDialogCredito(Map<String, dynamic> empresa, bool isCredito) async {
     final amountCtrl = TextEditingController();
     final motivoCtrl = TextEditingController();
     bool isSaving = false;
@@ -54,7 +54,7 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return AlertDialog(
-              title: const Text('Adicionar Crédito Manual'),
+              title: Text(isCredito ? 'Adicionar Crédito Manual' : 'Remover Saldo Manual'),
               content: SizedBox(
                 width: 300,
                 child: Column(
@@ -75,10 +75,10 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: motivoCtrl..text = 'Recarga', // Pré-preenchido
+                      controller: motivoCtrl..text = isCredito ? 'Recarga' : 'Ajuste de Saldo', // Pré-preenchido
                       decoration: const InputDecoration(
                         labelText: 'Motivo / Descrição',
-                        hintText: 'Recarga',
+                        hintText: 'Descrição do ajuste',
                         border: OutlineInputBorder(),
                       ),
                       maxLines: 2,
@@ -92,7 +92,7 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
                   child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
                 ),
                 ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.conforme),
+                  style: ElevatedButton.styleFrom(backgroundColor: isCredito ? AppTheme.conforme : AppTheme.naoConforme),
                   onPressed: isSaving
                       ? null
                       : () async {
@@ -105,20 +105,21 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
                             return;
                           }
                           if (motivo.isEmpty) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Informe o motivo da devolução.')));
+                            ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Informe o motivo do ajuste.')));
                             return;
                           }
 
                           setStateDialog(() => isSaving = true);
                           try {
-                            await _supabase.rpc('master_add_credits', params: {
+                            final rpcName = isCredito ? 'master_add_credits' : 'master_remove_credits';
+                            await _supabase.rpc(rpcName, params: {
                               'target_company_id': empresa['company_id'],
                               'amount': amount,
                               'description': motivo,
                             });
                             if (mounted) {
                               Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Crédito adicionado com sucesso!'), backgroundColor: AppTheme.conforme));
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(isCredito ? 'Crédito adicionado com sucesso!' : 'Saldo removido com sucesso!'), backgroundColor: isCredito ? AppTheme.conforme : AppTheme.naoConforme));
                               _carregarEmpresas();
                             }
                           } catch (e) {
@@ -162,36 +163,57 @@ class _AbaCreditosMasterWidgetState extends State<AbaCreditosMasterWidget> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
-                    child: const Icon(Icons.business, color: AppTheme.primary),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(e['empresa_nome'] ?? 'Sem Nome', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                        const SizedBox(height: 4),
-                        Text(e['email'] ?? 'Sem Email', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                        const SizedBox(height: 8),
-                        Row(
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: AppTheme.primary.withValues(alpha: 0.1),
+                        child: const Icon(Icons.business, color: AppTheme.primary),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Saldo Atual: ', style: TextStyle(fontSize: 13)),
-                            Text(_currencyFormat.format(saldo), style: TextStyle(fontWeight: FontWeight.bold, color: saldo < 0 ? AppTheme.naoConforme : AppTheme.conforme)),
+                            Text(e['empresa_nome'] ?? 'Sem Nome', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            const SizedBox(height: 4),
+                            Text(e['email'] ?? 'Sem Email', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Text('Saldo Atual: ', style: TextStyle(fontSize: 13)),
+                                Text(_currencyFormat.format(saldo), style: TextStyle(fontWeight: FontWeight.bold, color: saldo < 0 ? AppTheme.naoConforme : AppTheme.conforme)),
+                              ],
+                            ),
                           ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppTheme.conforme),
-                    onPressed: () => _abrirDialogCredito(e),
-                    icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                    label: const Text('Crédito', style: TextStyle(color: Colors.white)),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.naoConforme.withValues(alpha: 0.1),
+                          foregroundColor: AppTheme.naoConforme,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                        ),
+                        onPressed: () => _abrirDialogCredito(e, false),
+                        child: const Icon(Icons.remove, size: 18),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.conforme),
+                        onPressed: () => _abrirDialogCredito(e, true),
+                        icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                        label: const Text('Crédito', style: TextStyle(color: Colors.white)),
+                      ),
+                    ],
                   ),
                 ],
               ),

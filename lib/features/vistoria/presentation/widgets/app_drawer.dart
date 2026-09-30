@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -333,7 +334,31 @@ class _DrawerHeader extends StatelessWidget {
 
 // ── Rodapé ────────────────────────────────────────────────────────────────────
 
-class _DrawerFooter extends StatelessWidget {
+class _DrawerFooter extends StatefulWidget {
+  @override
+  State<_DrawerFooter> createState() => _DrawerFooterState();
+}
+
+class _DrawerFooterState extends State<_DrawerFooter> {
+  String _version = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() {
+          _version = 'v${info.version}+${info.buildNumber}';
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -387,6 +412,17 @@ class _DrawerFooter extends StatelessWidget {
               );
             },
           ),
+          if (_version.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: Text(
+                'Versão $_version',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textHint,
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -259,196 +259,112 @@ class RadarService {
       String? currentToken = tokenConsulta;
       Map<String, dynamic>? finalData;
       bool isForcarNova = forcarNova;
-      bool consultarDireto = _deveConsultarDireto(produto);
 
-      if (isForcarNova) {
+      // Chama a Edge Function que agora é blindada por idempotência no backend
+      int pollingAttempts = 0;
+      bool isReusedBackend = false;
+
+      while (true) {
         try {
-          // Passamos produto para que a edge function possa filtrar, mas também filtramos localmente.
-          final recentList = await listarConsultasRadar(produto: produto, param: param, value: value);
-          // Filtrar apenas o mesmo produto e que sejam recentes
-          final recent = recentList.where((c) {
-             final cProd = c['produto']?.toString() ?? c['codigo_produto']?.toString() ?? '';
-             final tProd = RadarProdutos.catalogo[produto]?.token ?? produto;
-             // Se houver produto na resposta, tem que bater. Se não houver, assume que bate.
-             if (cProd.isNotEmpty && cProd != produto && cProd != tProd) return false;
-             return true;
-          }).toList();
+          // Passamos a empresaId para a Edge Function poder compor a idempotency_key de forma segura
+          final userResp = await supabase.auth.getUser();
+          final userId = userResp.user?.id;
+          String? empresaId;
+          
+          if (userId != null) {
+            try {
+               final profile = await supabase.from('profiles').select('empresa_id').eq('id', userId).maybeSingle();
+               if (profile != null) {
+                 empresaId = profile['empresa_id'];
+               }
+            } catch (_) {}
+          }
 
-          if (recent.isNotEmpty) {
-            recent.sort((a, b) {
-              DateTime parseDate(dynamic d) {
-                if (d == null) return DateTime(2000);
-                String s = d.toString();
-                if (s.contains('/')) {
-                   // tenta parsear dd/MM/yyyy HH:mm
-                   try {
-                     final parts = s.split(' ');
-                     final dateParts = parts[0].split('/');
-                     if (dateParts.length == 3) {
-                       final timeStr = parts.length > 1 ? parts[1] : '00:00:00';
-                       return DateTime.parse('${dateParts[2]}-${dateParts[1]}-${dateParts[0]} $timeStr');
-                     }
-                   } catch (_) {}
-                }
-                return DateTime.tryParse(s) ?? DateTime(2000);
-              }
-              final da = parseDate(a['data_hora'] ?? a['ctime'] ?? a['created_at']);
-              final db = parseDate(b['data_hora'] ?? b['ctime'] ?? b['created_at']);
-              return db.compareTo(da);
-            });
+          final bool isValidUuid = RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', caseSensitive: false).hasMatch(vistoriaId);
+          
+          final response = await supabase.functions.invoke(
+            'radar-consultar',
+            body: {
+              'vistoriaId': isValidUuid ? vistoriaId : null,
+              'empresaId': empresaId?.isEmpty == true ? null : empresaId,
+              'produto': produto,
+              'param': param,
+              'value': value,
+              'forcarNova': isForcarNova,
+              'tokenConsulta': currentToken,
+              'aguardarRetorno': false,
+              'idPesquisaClient': idPesquisa,
+            },
+          );
 
-            final mostRecent = recent.first;
-            DateTime parseDate(dynamic d) {
-                if (d == null) return DateTime(2000);
-                String s = d.toString();
-                if (s.contains('/')) {
-                   try {
-                     final parts = s.split(' ');
-                     final dateParts = parts[0].split('/');
-                     if (dateParts.length == 3) {
-                       final timeStr = parts.length > 1 ? parts[1] : '00:00:00';
-                       return DateTime.parse('${dateParts[2]}-${dateParts[1]}-${dateParts[0]} $timeStr');
-                     }
-                   } catch (_) {}
-                }
-                return DateTime.tryParse(s) ?? DateTime(2000);
+          isForcarNova = false;
+          final data = response.data;
+          
+          if (data is Map<String, dynamic>) {
+            if (data['sucesso'] == false) {
+              final erroMsg = data['error']?.toString() ?? 'Erro desconhecido na Radar Consultas';
+              throw Exception(erroMsg);
             }
-            final da = parseDate(mostRecent['data_hora'] ?? mostRecent['ctime'] ?? mostRecent['created_at']);
-            
-            if (da.year > 2000) {
-              final diff = DateTime.now().difference(da);
-              if (diff.inHours < 24) {
-                isForcarNova = false;
-                final tk = mostRecent['token']?.toString() ?? '';
-                if (tk.isNotEmpty) {
-                  currentToken = tk;
-                  isReusingSearch = true;
-                  print('>>> TRAVA 24H: Impedindo nova pesquisa para $param=$value. Usando consulta de ${diff.inHours}h atras.');
-                } else {
-                  // Achamos a pesquisa, ela tem menos de 24h, mas NÃO tem token.
-                  // Provavelmente está processando. Se chamarmos a API sem token, vamos Pagar de novo!
-                  print('>>> TRAVA 24H: Pesquisa recente encontrada sem token. Abortando para evitar duplicidade de cobrança!');
-                  throw TimeoutException('Uma pesquisa para este veículo foi feita nas últimas 24 horas e ainda está em processamento ou não gerou token.\nPor favor, aguarde e verifique o Histórico de Pesquisas (Nuvem) para puxar os dados, evitando pagar em duplicidade.');
-                }
+
+            if (data['reused'] == true) {
+               isReusedBackend = true;
+               isReusingSearch = true;
+            }
+
+            if (data['emProcessamento'] == true) {
+              currentToken = data['tokenConsulta'];
+              
+              // SALVAR O TOKEN IMEDIATAMENTE (Fail-safe contra crashes)
+              if (currentToken != null) {
+                await repository.atualizarConsulta(
+                  idPesquisaRadar: idPesquisa,
+                  status: 'pendente',
+                  retornoBruto: jsonEncode({'consulta': {'token': currentToken}}),
+                  dadosTratados: {},
+                );
               }
+
+              pollingAttempts++;
+              if (pollingAttempts >= 12) {
+                throw TimeoutException('A pesquisa está em andamento (token: ${currentToken ?? ""}). Ela continuará no Histórico.');
+              }
+              print('>>> STATUS RADAR: Processando... Aguardando 5s (tentativa $pollingAttempts)');
+              await Future.delayed(const Duration(seconds: 5));
+              continue; // Faz o polling usando o token
+            }
+
+            finalData = data;
+            break;
+          } else {
+            throw Exception('Resposta inválida da API Radar (Backend).');
+          }
+        } catch (innerError) {
+          String errStr = innerError.toString();
+          if (innerError is FunctionException) {
+            final details = innerError.details;
+            if (details is Map && details.containsKey('error')) {
+              errStr = details['error'].toString();
             }
           }
-        } catch (e) {
-          if (e is TimeoutException) rethrow; // Deixa o Timeout subir para abortar a consulta
-          print('Erro na trava 24h: $e');
-        }
-      }
 
-      if (!consultarDireto) {
-        int retryCount = 0;
-        int processingCount = 0;
-        while (true) {
-          try {
-            final response = await supabase.functions.invoke(
-              'radar-consultar',
-              body: {
-                'produto': produto,
-                'param': param,
-                'value': value,
-                'forcarNova': isForcarNova,
-                'tokenConsulta': currentToken,
-                'aguardarRetorno': false,
-              },
-            );
+          bool isNetworkError = errStr.contains('SocketException') ||
+              errStr.contains('Failed host lookup') ||
+              innerError is TimeoutException ||
+              errStr.toLowerCase().contains('timeout') ||
+              errStr.contains('502') || errStr.contains('503') || errStr.contains('504');
 
-            isForcarNova = false;
-            retryCount = 0;
+          if (!isNetworkError) {
+            rethrow;
+          }
 
-            final data = response.data;
-            if (data is Map<String, dynamic>) {
-              if (data['sucesso'] == false) {
-                final erroMsg = data['error']?.toString() ??
-                    'Erro desconhecido na Radar Consultas';
-                if (erroMsg.contains('já está em andamento')) {
-                  processingCount++;
-                  if (processingCount >= 3) {
-                    throw Exception('Pesquisa em andamento:${currentToken ?? ""}');
-                  }
-                  await Future.delayed(const Duration(seconds: 10));
-                  continue;
-                }
-                if (erroMsg.contains('Produto não encontrado')) {
-                  consultarDireto = true;
-                  break;
-                }
-                throw Exception(erroMsg);
-              }
-
-              if (data['emProcessamento'] == true) {
-                currentToken = data['tokenConsulta'];
-                processingCount++;
-                if (processingCount >= 3) {
-                  throw Exception('Pesquisa em andamento:${currentToken ?? ""}');
-                }
-                await Future.delayed(const Duration(seconds: 10));
-                continue;
-              }
-
-              finalData = data;
-              break;
-            } else {
-              throw Exception('Resposta inválida da API Radar.');
-            }
-          } catch (innerError) {
-            String errStr = innerError.toString();
-            if (innerError is FunctionException) {
-              final details = innerError.details;
-              if (details is Map && details.containsKey('error')) {
-                errStr = details['error'].toString();
-              }
-            }
-
-            if (errStr.contains('Produto não encontrado')) {
-              consultarDireto = true;
-              break;
-            }
-
-            bool isNetworkError =
-                errStr.contains('ClientSoftware caused connection abort') ||
-                    errStr.contains('SocketException') ||
-                    errStr.contains('Failed host lookup') ||
-                    innerError is TimeoutException ||
-                    errStr.toLowerCase().contains('timeout') ||
-                    errStr.contains('502') ||
-                    errStr.contains('503') ||
-                    errStr.contains('504') ||
-                    errStr.contains('Relay Error') ||
-                    errStr.contains('upstream request');
-
-            if (!isNetworkError) {
-              rethrow;
-            }
-
-            retryCount++;
-            if (currentToken == null && retryCount > 5) {
-              throw Exception(
-                  'Falha de conexão ao iniciar a pesquisa. Verifique sua internet e tente novamente.');
-            }
-            await Future.delayed(const Duration(seconds: 10));
+          if (currentToken == null) {
+            throw Exception('Falha de conexão ao iniciar a pesquisa. Verifique sua internet.');
+          } else {
+             // Se já temos token, a internet caiu DURANTE o polling. Vamos abortar e deixar no histórico.
+             throw TimeoutException('Conexão instável. A pesquisa continuará no Histórico.');
           }
         }
       }
-
-      if (consultarDireto) {
-        final directResult = await _consultarDiretoRadar(
-          produto: produto,
-          param: param,
-          value: value,
-          forcarNova: isForcarNova,
-          tokenConsulta: currentToken,
-        );
-        finalData = {
-          'sucesso': true,
-          'raw': directResult['raw'],
-          'parsed': directResult['parsed'],
-        };
-      }
-
       final parsed = finalData!['parsed'] as Map<String, dynamic>;
       final raw = finalData['raw'];
 
@@ -472,64 +388,29 @@ class RadarService {
         arquivoPesquisaUrl: parsed['radar_pdf_url'],
       );
 
-      // DÉBITO DA CARTEIRA APENAS EM CASO DE SUCESSO (CONCLUÍDA) E SE NÃO FOR REUSO
+      // DÉBITO DA CARTEIRA REMOVIDO DO FRONTEND.
+      // O débito agora é feito exclusivamente pela Edge Function de forma idempotente,
+      // prevenindo race conditions ou falhas caso o app feche inesperadamente.
       print('>>> STATUS FINAL DA PESQUISA: $statusFinal');
-      if (statusFinal == 'concluida' && !isReusingSearch) {
-        try {
-          print('>>> TENTANDO DEBITAR CARTEIRA PARA: $produto (ID: $idPesquisa)');
-          final walletRepo = _getWalletRepository();
-          if (walletRepo != null) {
-            String friendlyName = produto;
-            switch (produto) {
-              case 'auto_bin': friendlyName = 'BIN'; break;
-              case 'auto_completa': friendlyName = 'Completa'; break;
-              case 'auto_base_estadual': friendlyName = 'Base Estadual'; break;
-              case 'auto_pericia': friendlyName = 'Perícia'; break;
-              case 'auto_leilao': friendlyName = 'Leilão'; break;
-              case 'auto_decodificador_chassi': friendlyName = 'Decodificador Chassi'; break;
-              case 'auto_gravame': friendlyName = 'Gravame'; break;
-              case 'auto_debitos_recall': friendlyName = 'Débitos e Recall'; break;
-              case 'auto_analise': friendlyName = 'Análise'; break;
-              case 'auto_analise_plus': friendlyName = 'Análise Plus'; break;
-              case 'auto_pericia_hrf': friendlyName = 'Perícia HRF'; break;
-              case 'bin_por_motor': friendlyName = 'BIN por Motor'; break;
-              case 'e_crlv_nova': friendlyName = 'E-CRLV'; break;
-            }
-            final paramName = param.toUpperCase();
-            final desc = 'Pesquisa $friendlyName ($paramName: $value)';
-
-            final auth = await walletRepo.authorizePaidOperation(
-              serviceCode: produto,
-              referenceType: 'radar_pesquisa',
-              referenceId: idPesquisa,
-              description: desc,
-            );
-            print('>>> RETORNO DO SUPABASE: allowed=${auth.allowed}, reason=${auth.reason}, balance=${auth.balance}, graceUsed=${auth.graceOperationsUsed}');
-          } else {
-            print('>>> ERRO: WalletRepository retornou null no GetIt!');
-          }
-        } catch (e) {
-          print('>>> Aviso: falha ao debitar na carteira: $e');
-        }
-      } else if (isReusingSearch) {
-        print('>>> PESQUISA REAPROVEITADA. Removendo linha duplicada e evitando cobrança.');
+      
+      if (isReusedBackend) {
+        print('>>> PESQUISA REAPROVEITADA. Removendo linha duplicada localmente para não sujar o histórico.');
         try {
           await repository.supabase
               .from('autocred_consultas')
               .delete()
               .eq('id_pesquisa_radar', idPesquisa);
-        } catch (e) {
-          print('>>> Aviso: falha ao remover linha duplicada: $e');
-        }
+        } catch (e) {}
       }
 
       if (isPendente) {
         throw TimeoutException(
-          'A pesquisa foi aberta na Radar e está em análise técnica pelo Detran.\n\n⚠️ Atenção: NÃO realize uma nova pesquisa para evitar cobrança duplicada!\n\nVocê pode acompanhar e carregar os dados pelo Histórico de Pesquisas (ícone do relógio) assim que for liberada.',
+          'A pesquisa foi aberta na Radar e está em análise técnica pelo Detran.\n\n⚠️ Atenção: NÃO realize uma nova pesquisa para evitar cobrança duplicada!\n\nVocê pode acompanhar pelo Histórico de Pesquisas assim que for liberada.',
         );
       }
 
       return veiculo;
+
     } catch (e) {
       String mensagemErro = e.toString();
       if (e is FunctionException) {

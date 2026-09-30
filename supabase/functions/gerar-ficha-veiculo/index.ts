@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildPrompt } from './prompt.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -69,10 +70,15 @@ Deno.serve(async (req) => {
       }
 
       if (cachedData && cachedData.data) {
-        console.log('Retornando dados técnicos do cache para:', brand, model, year)
-        return new Response(JSON.stringify({ source: 'cache', data: cachedData.data }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        // Verificar se o cache possui o formato NOVO (com analise_modelo)
+        if (cachedData.data.secao5_ficha_tecnica) {
+          console.log('Retornando dados técnicos do cache para:', brand, model, year)
+          return new Response(JSON.stringify({ source: 'cache', data: cachedData.data }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        } else {
+          console.log('Cache antigo encontrado (sem analise_modelo), ignorando cache e regerando ficha técnica para:', brand, model, year)
+        }
       }
     }
 
@@ -83,9 +89,9 @@ Deno.serve(async (req) => {
     if (hasApontamentos) {
       const apontamentosFormatados = apontamentos.map((a: any, idx: number) => {
         if (typeof a === 'object' && a !== null) {
-          const id = a.apontamentoId || a.id || `apt_${idx}`;
+          const id = a.apontamentoId || a.id || a.item || `apt_${idx}`;
           const peca = a.nomePeca || a.peca || a.item || 'Item apontado';
-          const desc = a.descricaoProblema || a.motivoAvaria || a.observacao || '';
+          const desc = a.descricaoProblema || a.motivoAvaria || a.problema || a.observacao || '';
           return { apontamentoId: String(id), nomePeca: String(peca), descricaoProblema: String(desc) };
         }
         return { apontamentoId: `apt_${idx}`, nomePeca: String(a), descricaoProblema: String(a) };
@@ -95,24 +101,19 @@ Deno.serve(async (req) => {
 ${apontamentosFormatados.map((it: any) => `- [ID: "${it.apontamentoId}"] Peça: "${it.nomePeca}" | Problema: "${it.descricaoProblema}"`).join('\n')}
 
 REGRAS OBRIGATÓRIAS DE ORÇAMENTO DOS APONTAMENTOS (${estadoLocal}):
-1. Para CADA apontamento listado acima, você deve retornar um objeto na lista "apontamentos_veiculo" com:
-   - "apontamentoId": O mesmo ID recebido correspondente.
-   - "nomePeca": Nome da peça danificada.
-   - "descricaoProblema": Descrição do dano/defeito.
-   - "valorEstimadoPeca": Número numérico (double) estimado para a peça de reposição (ex: 1200.00). Caso não requeira peça nova (ex: apenas repintura/martelinho), coloque 0.0.
-   - "valorEstimadoMaoDeObra": Número numérico (double) estimado para a mão de obra/instalação/serviço (ex: 400.00).
-2. ITENS SEM ACESSO / NÃO LOCALIZADO / NÃO VERIFICADO / PLAQUETA AUSENTE / DENTRO DO PADRÃO:
-   - "valorEstimadoPeca": 0.0
-   - "valorEstimadoMaoDeObra": 0.0
-3. ITENS DE RETOQUE OU REPINTURA JÁ REALIZADOS ANTERIORMENTE NO VEÍCULO:
-   - "valorEstimadoPeca": 0.0
-   - "valorEstimadoMaoDeObra": 0.0
-4. PROIBIÇÃO ABSOLUTA:
-   - A IA NÃO deve calcular valor do veículo, valor FIPE nem sugerir valor de mercado.
-   - A IA NÃO deve calcular depreciação nem percentual de depreciação nem valor final.
-   - NÃO inclua campos como "valorVeiculo", "valorMercado", "valorFipe", "depreciacao", "percentualDepreciacao", "valorVeiculoDepreciado" ou "valorFinal".`;
+1. Para CADA apontamento listado acima, você deve retornar um objeto na lista "apontamentos" com:
+   - "item": O mesmo ID recebido correspondente.
+   - "problema": Descrição do problema / peça danificada.
+   - "reparo_recomendado": Serviço recomendado (reparo ou substituição).
+   - "valor_peca": Número numérico (double) estimado para a peça de reposição (ex: 1200.00). Caso não requeira peça nova, coloque 0.0.
+   - "valor_mao_obra": Número numérico (double) estimado para a mão de obra/serviço (ex: 400.00).
+   - "outros_custos": Número numérico (ex: 0.0).
+   - "valor_total": A soma dos 3 anteriores (ex: 1600.00).
+   - "observacao": Uma breve justificativa da estimativa ou "estimativa de preço varia de R$ X a R$ Y".
+2. ITENS SEM ACESSO / DENTRO DO PADRÃO: "valor_peca": 0.0, "valor_mao_obra": 0.0
+3. PROIBIÇÃO ABSOLUTA: A IA NÃO deve calcular valor do veículo nem FIPE.`;
 
-      extraJsonSchema = `,\n"apontamentos_veiculo": [\n  {\n    "apontamentoId": "${apontamentosFormatados[0]?.apontamentoId || '123'}",\n    "nomePeca": "${apontamentosFormatados[0]?.nomePeca || 'Para-choque'}",\n    "descricaoProblema": "Descrição do dano",\n    "valorEstimadoPeca": 1200.00,\n    "valorEstimadoMaoDeObra": 400.00\n  }\n]`;
+      extraJsonSchema = `,\n  "apontamentos": [\n    {\n      "item": "${apontamentosFormatados[0]?.apontamentoId || '123'}",\n      "problema": "${apontamentosFormatados[0]?.nomePeca || 'Para-choque'}",\n      "reparo_recomendado": "Descrição",\n      "valor_peca": 1200.00,\n      "valor_mao_obra": 400.00,\n      "outros_custos": 0.00,\n      "valor_total": 1600.00,\n      "observacao": "Estimativa entre 1000 e 1400"\n    }\n  ]`;
     }
 
     // ── MODO RÁPIDO: Orçamento de Avarias com IA ─────────────────────────────
@@ -128,13 +129,16 @@ REGRAS OBRIGATÓRIAS DE ORÇAMENTO DOS APONTAMENTOS (${estadoLocal}):
 Seu objetivo é orçar exclusivamente os custos médios de mercado de peças de reposição e mão de obra de reparo/funilaria para as avarias listadas de um veículo vistoriado.
 Retorne EXCLUSIVAMENTE um JSON válido no formato:
 {
-  "apontamentos_veiculo": [
+  "apontamentos": [
     {
-      "apontamentoId": "string (o mesmo ID recebido)",
-      "nomePeca": "string",
-      "descricaoProblema": "string",
-      "valorEstimadoPeca": 0.00,
-      "valorEstimadoMaoDeObra": 0.00
+      "item": "string (o mesmo ID recebido)",
+      "problema": "string",
+      "reparo_recomendado": "string",
+      "valor_peca": 0.00,
+      "valor_mao_obra": 0.00,
+      "outros_custos": 0.00,
+      "valor_total": 0.00,
+      "observacao": "string"
     }
   ]
 }
@@ -147,6 +151,7 @@ ${extraPrompt}`;
       let parsedAvariasJson: any = null;
       let sourceAvarias = '';
 
+      let openAiErrorDetailAvarias = '';
       if (openAiKey) {
         try {
           const resp = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -169,13 +174,23 @@ ${extraPrompt}`;
             const resData = await resp.json();
             const content = resData.choices?.[0]?.message?.content;
             if (content) {
-              parsedAvariasJson = JSON.parse(content);
-              sourceAvarias = 'openai-gpt-4o-mini';
+              try {
+                parsedAvariasJson = JSON.parse(content);
+                sourceAvarias = 'openai-gpt-4o-mini';
+              } catch (e: any) {
+                openAiErrorDetailAvarias = `Erro no parse JSON de avarias: ${e.message}`;
+              }
             }
+          } else {
+             const txt = await resp.text();
+             openAiErrorDetailAvarias = `Erro HTTP OpenAI avarias: ${resp.status} - ${txt}`;
           }
         } catch (e: any) {
+          openAiErrorDetailAvarias = `Exceção de rede OpenAI avarias: ${e.message}`;
           console.error('Erro OpenAI em apenasAvarias:', e.message);
         }
+      } else {
+         openAiErrorDetailAvarias = 'Chave OPENAI_API_KEY não configurada.';
       }
 
       if (!parsedAvariasJson) {
@@ -208,73 +223,15 @@ ${extraPrompt}`;
         return new Response(JSON.stringify({ source: sourceAvarias, data: parsedAvariasJson }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      } else {
+         return new Response(JSON.stringify({ error: 'Falha ao orçar avarias com as IAs.', details: openAiErrorDetailAvarias }), {
+           status: 502,
+           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+         });
       }
     }
 
-    const prompt = `Você é um Perito Automotivo e Avaliador Técnico Sênior no Brasil.
-Seu objetivo é gerar uma FICHA TÉCNICA INTELIGENTE DO VEÍCULO profissional, elegante, estritamente neutra e puramente informativa (sem juízo de valor "caro/barato", "bom/ruim").
-Retorne APENAS JSON válido, sem markdown, sem texto fora do JSON.${extraPrompt}
-
-Veículo:
-Marca: ${brand}
-Modelo: ${model}
-Ano: ${year}
-Versão: ${version || 'Padrão'}
-Combustível: ${fuel || 'Flex'}
-Motor: ${engine || 'Padrão'}
-
-O JSON retornado deve seguir RIGOROSAMENTE esta estrutura:
-{
-"identificacao": {
-  "marca": "${brand}",
-  "modelo": "${model}",
-  "ano": "${year}",
-  "versao": "${version || ''}",
-  "combustivel": "${fuel || ''}",
-  "motor": "${engine || ''}"
-},
-"resumo_inteligente": "Texto conciso, neutro e institucional (1 parágrafo de 3 a 5 linhas). Exemplo: O [Marca Modelo Versão] reúne características voltadas ao uso cotidiano, com conjunto mecânico amplamente conhecido no mercado nacional. Nesta ficha estão reunidas suas principais especificações técnicas, insumos recomendados e componentes de manutenção, proporcionando uma visão rápida e organizada das principais informações do modelo.",
-"informacoes_uteis": {
-  "combustivel": "Flex",
-  "categoria": "Hatch compacto (ou Sedan, SUV, etc)",
-  "ocupantes": "5 lugares",
-  "tracao": "Dianteira",
-  "cambio": "Manual de 5 marchas (ou Automático)",
-  "capacidade_porta_malas": "285 litros",
-  "capacidade_tanque": "50 litros"
-},
-"especificacoes_tecnicas": [
-  {"item": "Potência", "informacao": "75 cv"},
-  {"item": "Torque", "informacao": "9,7 kgfm"},
-  {"item": "Câmbio", "informacao": "Manual de 5 marchas"},
-  {"item": "Tração", "informacao": "Dianteira"},
-  {"item": "Direção", "informacao": "Hidráulica"},
-  {"item": "Suspensão dianteira", "informacao": "Independente tipo McPherson"},
-  {"item": "Suspensão traseira", "informacao": "Eixo de torção"},
-  {"item": "Freios", "informacao": "Disco ventilado dianteiro / tambor traseiro"},
-  {"item": "Pneus originais", "informacao": "175/70 R14"},
-  {"item": "Tanque", "informacao": "50 litros"},
-  {"item": "Porta-malas", "informacao": "285 litros"}
-],
-"manutencao_recomendada": [
-  {"item": "Óleo recomendado", "especificacao": "5W30 (conforme manual)"},
-  {"item": "Capacidade de óleo", "especificacao": "3,5 litros com filtro"},
-  {"item": "Fluido de arrefecimento", "especificacao": "Aditivo orgânico + água desmineralizada"},
-  {"item": "Fluido de freio", "especificacao": "DOT 4"},
-  {"item": "Velas", "especificacao": "NGK BKR6E ou equivalente"},
-  {"item": "Sistema de distribuição", "especificacao": "Correia dentada (ou Corrente)"},
-  {"item": "Bateria", "especificacao": "12V — especificação compatível com o modelo"}
-],
-"principais_pecas_manutencao": [
-  {"componente": "Pastilhas de freio", "valor_peca": "R$ 150,00", "valor_mao_de_obra": "R$ 100,00", "estimativa_total": "R$ 250,00"},
-  {"componente": "Filtro de ar", "valor_peca": "R$ 50,00", "valor_mao_de_obra": "R$ 50,00", "estimativa_total": "R$ 100,00"},
-  {"componente": "Jogo de velas", "valor_peca": "R$ 140,00", "valor_mao_de_obra": "R$ 100,00", "estimativa_total": "R$ 240,00"},
-  {"componente": "Kit correia dentada", "valor_peca": "R$ 180,00", "valor_mao_de_obra": "R$ 250,00", "estimativa_total": "R$ 430,00"},
-  {"componente": "Disco de freio", "valor_peca": "R$ 280,00", "valor_mao_de_obra": "R$ 150,00", "estimativa_total": "R$ 430,00"},
-  {"componente": "Kit embreagem", "valor_peca": "R$ 650,00", "valor_mao_de_obra": "R$ 450,00", "estimativa_total": "R$ 1.100,00"}
-]${extraJsonSchema},
-"observacao_importante": "Ficha Inteligente: As informações técnicas, especificações e insumos apresentados possuem caráter informativo e complementar ao laudo cautelar. Valores podem variar conforme região, fornecedor e condições de mercado. As informações não indicam, por si só, necessidade de manutenção ou substituição dos componentes do veículo vistoriado."
-}`
+    const prompt = buildPrompt(brand, model, year, version, fuel, engine, extraPrompt, extraJsonSchema);
 
     let parsedJson: any = null
     let sourceUsed = ''
@@ -282,6 +239,8 @@ O JSON retornado deve seguir RIGOROSAMENTE esta estrutura:
     // ── 1. Tentar gerar com OpenAI (gpt-4o-mini ou gpt-4o) ────────────────────
     // @ts-ignore
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY')
+    let openAiErrorDetail = ''
+
     if (openAiApiKey) {
       console.log('Gerando ficha técnica com OpenAI gpt-4o-mini para:', brand, model, year)
       try {
@@ -312,17 +271,28 @@ O JSON retornado deve seguir RIGOROSAMENTE esta estrutura:
           const openAiData = await openAiResponse.json()
           const rawContent = openAiData.choices?.[0]?.message?.content
           if (rawContent) {
-            parsedJson = JSON.parse(rawContent)
-            sourceUsed = 'openai-gpt-4o-mini'
-            console.log('Ficha técnica gerada com sucesso via OpenAI!')
+            try {
+              parsedJson = JSON.parse(rawContent)
+              sourceUsed = 'openai-gpt-4o-mini'
+              console.log('Ficha técnica gerada com sucesso via OpenAI!')
+            } catch (parseError: any) {
+              openAiErrorDetail = `Erro ao parsear JSON da OpenAI: ${parseError.message}. Conteúdo: ${rawContent.substring(0, 100)}...`
+              console.error(openAiErrorDetail)
+            }
+          } else {
+             openAiErrorDetail = 'OpenAI retornou OK, mas não enviou nenhum conteúdo na resposta.'
           }
         } else {
           const errText = await openAiResponse.text()
-          console.error('Erro na chamada OpenAI:', errText)
+          openAiErrorDetail = `Erro HTTP da OpenAI: Status ${openAiResponse.status} - ${errText}`
+          console.error(openAiErrorDetail)
         }
       } catch (openAiErr: any) {
-        console.error('Exceção ao chamar OpenAI:', openAiErr.message)
+        openAiErrorDetail = `Exceção de rede ao chamar OpenAI: ${openAiErr.message}`
+        console.error(openAiErrorDetail)
       }
+    } else {
+      openAiErrorDetail = 'OPENAI_API_KEY não está configurada nos Secrets do Supabase.'
     }
 
     // ── 2. Fallback para Gemini se OpenAI não gerou ────────────────────────────
@@ -367,7 +337,7 @@ O JSON retornado deve seguir RIGOROSAMENTE esta estrutura:
     }
 
     if (!parsedJson) {
-      return new Response(JSON.stringify({ error: 'Falha ao gerar relatório inteligente nas APIs de IA.' }), {
+      return new Response(JSON.stringify({ error: 'Falha ao gerar relatório inteligente.', details: sourceUsed || 'Nenhuma IA conseguiu gerar um JSON válido.' }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

@@ -5,7 +5,8 @@ import '../../../../features/consulta_bin/data/services/radar_service.dart';
 import '../../../../injection_container.dart';
 
 class ModalAtrelarPesquisa extends StatefulWidget {
-  const ModalAtrelarPesquisa({super.key});
+  final String vistoriaId;
+  const ModalAtrelarPesquisa({super.key, required this.vistoriaId});
 
   @override
   State<ModalAtrelarPesquisa> createState() => _ModalAtrelarPesquisaState();
@@ -108,7 +109,7 @@ class _ModalAtrelarPesquisaState extends State<ModalAtrelarPesquisa> {
         produto: produto,
         param: param,
         value: paramValor,
-        vistoriaId: '',
+        vistoriaId: widget.vistoriaId,
         forcarNova: false,
         tokenConsulta: token,
       );
@@ -228,7 +229,7 @@ class _ModalAtrelarPesquisaState extends State<ModalAtrelarPesquisa> {
                                 subtitle: Text(
                                   '${c['titulo']} - ' +
                                       (data != null
-                                          ? DateFormat('dd/MM/yyyy HH:mm').format(data)
+                                          ? DateFormat('dd/MM/yyyy HH:mm').format(data.toLocal())
                                           : ''),
                                   style: const TextStyle(fontSize: 13),
                                 ),

@@ -445,6 +445,7 @@ class _AbaDispositivosMasterWidgetState
     final deviceId = item['device_id'] as String? ?? 'Sem ID';
     final model = item['device_model'] as String? ?? 'Desconhecido';
     final os = item['sistema_operacional'] as String? ?? '';
+    final appVersion = item['app_version'] as String? ?? '';
     final nome = item['solicitante_nome'] as String?;
     final fone = item['solicitante_telefone'] as String?;
     final motivo = item['motivo_bloqueio'] as String?;
@@ -499,16 +500,42 @@ class _AbaDispositivosMasterWidgetState
                 Icon(Icons.smartphone_rounded, color: statusColor, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    os.isNotEmpty && !model.toUpperCase().contains(os.toUpperCase())
-                        ? '$model • $os'
-                        : model,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          os.isNotEmpty && !model.toUpperCase().contains(os.toUpperCase())
+                              ? '$model • $os'
+                              : model,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (appVersion.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
+                          ),
+                          child: Text(
+                            appVersion,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF34D399),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Container(

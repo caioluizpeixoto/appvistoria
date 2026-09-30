@@ -1,0 +1,135 @@
+{
+  "source": "cache",
+  "data": {
+    "secao9_mercado": {
+      "desvalorizacao": "A desvalorização média é de 10% ao ano.",
+      "posicionamento": "O Fiat Punto 2014 se posiciona como uma opção acessível no segmento de hatches compactos.",
+      "procura_revenda": "Moderada, com boa aceitação no mercado de usados."
+    },
+    "secao4_destaques": [
+      {
+        "categoria": "Conforto",
+        "descricao": "O Punto é conhecido pelo conforto de seus bancos e pela qualidade do acabamento interno."
+      },
+      {
+        "categoria": "Tecnologia",
+        "descricao": "Equipado com sistema de som de boa qualidade e conectividade com dispositivos móveis."
+      }
+    ],
+    "secao8_seguranca": {
+      "recursos": [
+        "ABS",
+        "Airbags frontais",
+        "Cintos de segurança com pré-tensionadores"
+      ],
+      "testes_seguranca": "Não há resultados disponíveis do Euro NCAP/Latin NCAP para este modelo específico."
+    },
+    "secao1_visao_geral": {
+      "perfil_utilizacao": "Ideal para motoristas que buscam um carro compacto e econômico, com bom espaço interno e conforto para o dia a dia.",
+      "resumo_apresentacao": "O Fiat Punto 1.4 Attractive 8V Flex 4P Manual de 2014 é um hatchback que combina estilo, conforto e eficiência, ideal para o uso urbano e viagens curtas.",
+      "principais_diferenciais": "Destaque para o design italiano, bom nível de equipamentos de série e a versatilidade do motor flex."
+    },
+    "apontamentos_veiculo": [],
+    "secao5_ficha_tecnica": {
+      "dimensoes": {
+        "peso": "1.150 kg",
+        "altura": "1.490 mm",
+        "tanque": "45 L",
+        "largura": "1.687 mm",
+        "comprimento": "4.065 mm",
+        "entre_eixos": "2.510 mm",
+        "porta_malas": "280 L"
+      },
+      "motorizacao": {
+        "motor": "1.4",
+        "torque": "12,5 kgfm (gasolina) / 12,8 kgfm (etanol)",
+        "potencia": "85 cv (gasolina) / 88 cv (etanol)",
+        "aspiracao": "Natural",
+        "cilindrada": "1368 cm³",
+        "alimentacao": "Multiponto",
+        "combustivel": "Flex"
+      },
+      "transmissao": {
+        "cambio": "Manual",
+        "tracao": "Dianteira",
+        "marchas": "5"
+      }
+    },
+    "secao3_pontos_atencao": [
+      {
+        "motivo": "A suspensão pode apresentar desgaste prematuro, especialmente em vias irregulares.",
+        "sinais": "Ruídos ao passar por buracos e desgaste irregular dos pneus.",
+        "componente": "Suspensão Dianteira",
+        "verificacao": "Realizar teste de direção e inspeção visual da suspensão.",
+        "nivel_impacto": "Médio",
+        "consequencia_financeira": "Custo estimado de R$ 1.000 a R$ 1.500 para reparo."
+      },
+      {
+        "motivo": "Problemas no sistema de arrefecimento podem levar ao superaquecimento do motor.",
+        "sinais": "Vazamentos de líquido de arrefecimento e aumento da temperatura do motor.",
+        "componente": "Sistema de Arrefecimento",
+        "verificacao": "Verificar o nível do líquido de arrefecimento e a condição das mangueiras.",
+        "nivel_impacto": "Alto",
+        "consequencia_financeira": "Custo estimado de R$ 500 a R$ 1.000 se não for tratado."
+      }
+    ],
+    "secao2_pontos_positivos": [
+      {
+        "titulo": "Bom espaço interno",
+        "descricao": "O Punto oferece um interior espaçoso, com bom espaço para os passageiros e um porta-malas de tamanho razoável, tornando-o prático para o uso diário."
+      },
+      {
+        "titulo": "Eficiência de combustível",
+        "descricao": "Com motor 1.4 flex, o Punto apresenta um bom equilíbrio entre desempenho e consumo, especialmente em trajetos urbanos."
+      }
+    ],
+    "secao11_resumo_executivo": {
+      "atencao": "Manutenção da suspensão e sistema de arrefecimento.",
+      "vantagens": "Bom espaço interno e eficiência de combustível.",
+      "perfil_ideal": "Motoristas urbanos que buscam um hatch prático e econômico.",
+      "destaque_principal": "Design italiano e conforto."
+    },
+    "secao7_manutencao_custos": {
+      "fluidos": [
+        {
+          "item": "Óleo do Motor",
+          "capacidade": "3,5 L",
+          "especificacao": "5W30",
+          "intervalo_troca": "10.000 km ou 1 ano"
+        }
+      ],
+      "custos_estimados": [
+        {
+          "item": "Kit Amortecedores Dianteiros",
+          "faixa_custo": "R$ 800 a R$ 1.200"
+        }
+      ],
+      "intervalos_previstos": [
+        "10.000 km",
+        "20.000 km"
+      ]
+    },
+    "secao10_analise_comprador": {
+      "fatores_decisao": [
+        "Custo de manutenção",
+        "Conforto e espaço interno",
+        "Desempenho do motor"
+      ],
+      "conclusao_especialista": "O Fiat Punto 1.4 Attractive é uma escolha sólida para quem busca um carro econômico e confortável, mas é importante atentar-se aos pontos de manutenção."
+    },
+    "secao6_desempenho_consumo": {
+      "consumo": {
+        "cidade_etanol": "7,5 km/l",
+        "estrada_etanol": "9 km/l",
+        "cidade_gasolina": "10 km/l",
+        "estrada_gasolina": "13 km/l"
+      },
+      "desempenho": {
+        "torque": "12,5 kgfm (gasolina) / 12,8 kgfm (etanol)",
+        "potencia": "85 cv (gasolina) / 88 cv (etanol)",
+        "zero_cem": "11,5 segundos",
+        "velocidade_maxima": "175 km/h"
+      }
+    }
+  }
+}

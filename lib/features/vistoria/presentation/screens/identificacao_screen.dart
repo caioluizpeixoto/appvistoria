@@ -910,6 +910,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           renavam: drift.Value(_renavamEditCtrl.text),
         ));
       } else {
+        // Cobrança de laudo desativada
         vistoriaId = const Uuid().v4();
         final shortCode = vistoriaId.substring(0, 8).toUpperCase();
         final currentUserId = Supabase.instance.client.auth.currentUser?.id ??
@@ -1034,6 +1035,7 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             // Se for via buscar histórico radar, reaproveitamos o token sem forçar nova consulta
             forcarNova = false; // Corrigido: antes era true e gerava duplicidade
             tokenConsulta = escolhida['tokenConsulta'];
+            reuse = true; // trata como reuso para aguardar a consulta e preencher a base ANTES do wizard
           }
         }
       } else {
@@ -1049,6 +1051,8 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
         vistoriaId = _vincularVistoriaId!;
       } else {
         // Nova vistoria local, mas com ou sem dados da nuvem
+        // ====== COBRANÇA ANTECIPADA DA VISTORIA (DESATIVADA) ======
+
         vistoriaId = DateTime.now().millisecondsSinceEpoch.toString();
         final shortCode = const Uuid().v4().substring(0, 8).toUpperCase();
 
@@ -1072,6 +1076,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
       String combustivel = (veiculoExistente?.combustivel ?? '');
 
+      String marca = (veiculoExistente?.marca ?? '');
+      String modelo = (veiculoExistente?.modelo ?? '');
+      int? anoFabricacao = veiculoExistente?.anoFabricacao;
+      int? anoModelo = veiculoExistente?.anoModelo;
+      String renavam = (veiculoExistente?.renavam ?? '');
+      String cor = (veiculoExistente?.cor ?? '');
+      String municipio = (veiculoExistente?.municipio ?? '');
+      String uf = (veiculoExistente?.uf ?? '');
+      String cambioVeiculo = (veiculoExistente?.cambioVeiculo ?? '');
+
       if (dadosReaproveitados != null &&
           dadosReaproveitados['dados_tratados'] != null) {
         try {
@@ -1083,6 +1097,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           if (veiculoNuvem.combustivel.isNotEmpty) {
             combustivel = veiculoNuvem.combustivel;
           }
+          
+          final mm = VeiculoParser.extrairMarcaModelo(veiculoNuvem.marcaModelo);
+          if (mm.marca.isNotEmpty) marca = mm.marca;
+          if (mm.modelo.isNotEmpty) modelo = mm.modelo;
+          if (veiculoNuvem.anoFabricacao.isNotEmpty) anoFabricacao = int.tryParse(veiculoNuvem.anoFabricacao);
+          if (veiculoNuvem.anoModelo.isNotEmpty) anoModelo = int.tryParse(veiculoNuvem.anoModelo);
+          if (veiculoNuvem.renavam.isNotEmpty) renavam = veiculoNuvem.renavam;
+          if (veiculoNuvem.cor.isNotEmpty) cor = veiculoNuvem.cor;
+          if (veiculoNuvem.municipio.isNotEmpty) municipio = veiculoNuvem.municipio;
+          if (veiculoNuvem.estado.isNotEmpty) uf = veiculoNuvem.estado;
         } catch (_) {}
       }
 
@@ -1096,6 +1120,16 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
             placa: drift.Value(placa.isNotEmpty ? placa : vExistente.placa),
             chassiVeiculo: drift.Value(chassi.isNotEmpty ? chassi : vExistente.chassiVeiculo),
             motorVeiculo: drift.Value(motor.isNotEmpty ? motor : vExistente.motorVeiculo),
+            combustivel: drift.Value(combustivel.isNotEmpty ? combustivel : vExistente.combustivel),
+            marca: drift.Value(marca.isNotEmpty ? marca : vExistente.marca),
+            modelo: drift.Value(modelo.isNotEmpty ? modelo : vExistente.modelo),
+            anoFabricacao: drift.Value(anoFabricacao ?? vExistente.anoFabricacao),
+            anoModelo: drift.Value(anoModelo ?? vExistente.anoModelo),
+            renavam: drift.Value(renavam.isNotEmpty ? renavam : vExistente.renavam),
+            cor: drift.Value(cor.isNotEmpty ? cor : vExistente.cor),
+            municipio: drift.Value(municipio.isNotEmpty ? municipio : vExistente.municipio),
+            uf: drift.Value(uf.isNotEmpty ? uf : vExistente.uf),
+            cambioVeiculo: drift.Value(cambioVeiculo.isNotEmpty ? cambioVeiculo : vExistente.cambioVeiculo),
           ));
         }
       } else {
@@ -1106,6 +1140,15 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
           chassiVeiculo: drift.Value(chassi),
           motorVeiculo: drift.Value(motor),
           combustivel: drift.Value(combustivel),
+          marca: drift.Value(marca),
+          modelo: drift.Value(modelo),
+          anoFabricacao: drift.Value(anoFabricacao),
+          anoModelo: drift.Value(anoModelo),
+          renavam: drift.Value(renavam),
+          cor: drift.Value(cor),
+          municipio: drift.Value(municipio),
+          uf: drift.Value(uf),
+          cambioVeiculo: drift.Value(cambioVeiculo),
         ));
       }
 
@@ -1139,70 +1182,108 @@ class _IdentificacaoScreenState extends State<IdentificacaoScreen> {
 
       // Inicia consulta em segundo plano sem await, independentemente de ser reuso ou nova,
       // desde que tenhamos a placa para consultar. No reuso, envia forcarNova=false e tokenConsulta.
+      // Dispara a consulta na API da Radar ou pega a cacheada pelo token
+      // Se for reuso, aguardamos para que a base já esteja preenchida antes de avançar.
+      // Se for nova, jogamos para o background para não travar a tela por 30s.
       if (!reuse || (reuse && tokenConsulta != null)) {
         if (_produtoSelecionado != 'nenhuma') {
           final service = sl<RadarService>();
-          service
-              .consultarVeiculo(
-            produto: _produtoSelecionado,
-            param: _modoEntrada,
-            value: valor,
-            vistoriaId: vistoriaId,
-            forcarNova: forcarNova,
-            tokenConsulta: tokenConsulta,
-          )
-              .then((veiculoApi) async {
-          final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
-          if (veiculoDb != null) {
-            final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
-            final marca = mm.marca;
-            final modelo = mm.modelo;
+          
+          if (reuse) {
+            // Await explicitly so the UI has full data immediately
+            try {
+              final veiculoApi = await service.consultarVeiculo(
+                produto: _produtoSelecionado,
+                param: _modoEntrada,
+                value: valor,
+                vistoriaId: vistoriaId,
+                forcarNova: forcarNova,
+                tokenConsulta: tokenConsulta,
+              );
+              
+              final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
+              if (veiculoDb != null) {
+                final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
+                final marca = mm.marca;
+                final modelo = mm.modelo;
 
-            await dao.atualizarVeiculo(VeiculosCompanion(
-              id: drift.Value(veiculoDb.id),
-              vistoriaId: drift.Value(veiculoDb.vistoriaId),
-              placa: drift.Value(veiculoApi.placa.isNotEmpty
-                  ? veiculoApi.placa
-                  : veiculoDb.placa),
-              chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty
-                  ? veiculoApi.chassi
-                  : veiculoDb.chassiVeiculo),
-              motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty
-                  ? veiculoApi.motor
-                  : veiculoDb.motorVeiculo),
-              marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
-              modelo:
-                  drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
-              anoFabricacao: drift.Value(
-                  int.tryParse(veiculoApi.anoFabricacao) ??
-                      veiculoDb.anoFabricacao),
-              anoModelo: drift.Value(
-                  int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
-              cor: drift.Value(
-                  veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
-              renavam: drift.Value(veiculoApi.renavam.isNotEmpty
-                  ? veiculoApi.renavam
-                  : veiculoDb.renavam),
-              chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty
-                  ? veiculoApi.chassi
-                  : veiculoDb.chassiBin),
-              motorBin: drift.Value(veiculoApi.motor.isNotEmpty
-                  ? veiculoApi.motor
-                  : veiculoDb.motorBin),
-              municipio: drift.Value(veiculoApi.municipio.isNotEmpty
-                  ? veiculoApi.municipio
-                  : veiculoDb.municipio),
-              uf: drift.Value(veiculoApi.estado.isNotEmpty
-                  ? veiculoApi.estado
-                  : veiculoDb.uf),
-              combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty
-                  ? veiculoApi.combustivel
-                  : veiculoDb.combustivel),
-            ));
+                await dao.atualizarVeiculo(VeiculosCompanion(
+                  id: drift.Value(veiculoDb.id),
+                  vistoriaId: drift.Value(veiculoDb.vistoriaId),
+                  placa: drift.Value(veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
+                  chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
+                  motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+                  marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
+                  modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
+                  anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
+                  anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+                  cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+                  renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
+                  chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
+                  motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
+                  municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
+                  uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+                  combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty ? veiculoApi.combustivel : veiculoDb.combustivel),
+                ));
+              }
+            } catch (e) {
+              if (mounted) {
+                String errStr = e.toString().replaceAll('Exception: ', '').trim();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Falha ao recuperar dados: $errStr'),
+                  backgroundColor: AppTheme.naoConforme,
+                  duration: const Duration(seconds: 4),
+                ));
+              }
+            }
+          } else {
+            // Nova pesquisa: background
+            service
+                .consultarVeiculo(
+              produto: _produtoSelecionado,
+              param: _modoEntrada,
+              value: valor,
+              vistoriaId: vistoriaId,
+              forcarNova: forcarNova,
+              tokenConsulta: tokenConsulta,
+            )
+                .then((veiculoApi) async {
+              final veiculoDb = await dao.buscarVeiculoPorVistoria(vistoriaId);
+              if (veiculoDb != null) {
+                final mm = VeiculoParser.extrairMarcaModelo(veiculoApi.marcaModelo);
+                final marca = mm.marca;
+                final modelo = mm.modelo;
+
+                await dao.atualizarVeiculo(VeiculosCompanion(
+                  id: drift.Value(veiculoDb.id),
+                  vistoriaId: drift.Value(veiculoDb.vistoriaId),
+                  placa: drift.Value(veiculoApi.placa.isNotEmpty ? veiculoApi.placa : veiculoDb.placa),
+                  chassiVeiculo: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiVeiculo),
+                  motorVeiculo: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorVeiculo),
+                  marca: drift.Value(marca.isNotEmpty ? marca : veiculoDb.marca),
+                  modelo: drift.Value(modelo.isNotEmpty ? modelo : veiculoDb.modelo),
+                  anoFabricacao: drift.Value(int.tryParse(veiculoApi.anoFabricacao) ?? veiculoDb.anoFabricacao),
+                  anoModelo: drift.Value(int.tryParse(veiculoApi.anoModelo) ?? veiculoDb.anoModelo),
+                  cor: drift.Value(veiculoApi.cor.isNotEmpty ? veiculoApi.cor : veiculoDb.cor),
+                  renavam: drift.Value(veiculoApi.renavam.isNotEmpty ? veiculoApi.renavam : veiculoDb.renavam),
+                  chassiBin: drift.Value(veiculoApi.chassi.isNotEmpty ? veiculoApi.chassi : veiculoDb.chassiBin),
+                  motorBin: drift.Value(veiculoApi.motor.isNotEmpty ? veiculoApi.motor : veiculoDb.motorBin),
+                  municipio: drift.Value(veiculoApi.municipio.isNotEmpty ? veiculoApi.municipio : veiculoDb.municipio),
+                  uf: drift.Value(veiculoApi.estado.isNotEmpty ? veiculoApi.estado : veiculoDb.uf),
+                  combustivel: drift.Value(veiculoApi.combustivel.isNotEmpty ? veiculoApi.combustivel : veiculoDb.combustivel),
+                ));
+              }
+            }).catchError((e) {
+              if (mounted) {
+                String errStr = e.toString().replaceAll('Exception: ', '').trim();
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('Falha na pesquisa: $errStr'),
+                  backgroundColor: AppTheme.naoConforme,
+                  duration: const Duration(seconds: 6),
+                ));
+              }
+            });
           }
-        }).catchError((_) {
-          // Erros de background não interrompem a vistoria
-        });
         }
       }
 

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Serviço responsável pelo controle de segurança e trava de aprovação de aparelho
 class DeviceSecurityService {
@@ -152,6 +153,12 @@ class DeviceSecurityService {
     final deviceId = await getDeviceId();
     final deviceModel = await getDeviceModel();
     final os = kIsWeb ? 'Web' : Platform.operatingSystem;
+    
+    String appVersion = '';
+    try {
+      final info = await PackageInfo.fromPlatform();
+      appVersion = 'v${info.version}+${info.buildNumber}';
+    } catch (_) {}
 
     final localData = await _readLocalData();
     final nome = solicitanteNome ?? (localData['solicitante_nome'] as String?);
@@ -183,6 +190,7 @@ class DeviceSecurityService {
         _supabase.from('dispositivos_autorizados').update({
           'ultima_atividade': DateTime.now().toIso8601String(),
           if (userId != null) 'user_id': userId,
+          if (appVersion.isNotEmpty) 'app_version': appVersion,
         }).eq('device_id', deviceId).catchError((_) => {});
 
         return {
@@ -201,6 +209,7 @@ class DeviceSecurityService {
             'solicitante_nome': nome,
             'solicitante_telefone': fone,
             if (userId != null) 'user_id': userId,
+            if (appVersion.isNotEmpty) 'app_version': appVersion,
             'status': 'pendente',
             'created_at': DateTime.now().toIso8601String(),
             'ultima_atividade': DateTime.now().toIso8601String(),
@@ -231,6 +240,7 @@ class DeviceSecurityService {
         'p_solicitante_nome': nome,
         'p_solicitante_telefone': fone,
         'p_user_id': userId,
+        'p_app_version': appVersion.isNotEmpty ? appVersion : null,
       });
 
       if (res != null && res is List && res.isNotEmpty) {

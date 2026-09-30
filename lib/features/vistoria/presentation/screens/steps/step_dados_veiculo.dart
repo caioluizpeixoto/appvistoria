@@ -671,13 +671,16 @@ class _StepDadosVeiculoState extends State<StepDadosVeiculo> {
   }
 
   Future<void> _abrirModalAtrelarPesquisa(BuildContext context) async {
+    final state = context.read<VistoriaWizardState>();
+    final vistoriaId = state.vistoriaId;
+
     final RadarVeiculo? veiculo = await showModalBottomSheet<RadarVeiculo>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.85,
-        child: const ModalAtrelarPesquisa(),
+        child: ModalAtrelarPesquisa(vistoriaId: vistoriaId),
       ),
     );
 

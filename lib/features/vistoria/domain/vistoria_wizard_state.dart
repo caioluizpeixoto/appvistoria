@@ -65,7 +65,7 @@ class VistoriaWizardState extends ChangeNotifier {
 
   String? aiImage3dBase64;
   bool isGeneratingAiImage = false;
-  bool gerarFichaTecnicaComIa = false;
+  bool gerarFichaTecnicaComIa = true;
   Map<String, dynamic>? fichaTecnicaJsonCache;
   String? apontamentosHashCache;
 

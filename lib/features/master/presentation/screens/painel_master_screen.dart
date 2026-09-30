@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../widgets/aba_dispositivos_master_widget.dart';
 import '../widgets/aba_creditos_master_widget.dart';
+import '../widgets/aba_empresas_master_widget.dart';
 
 /// Tela Master exclusiva para autorização e gerenciamento de dispositivos móveis,
 /// bem como gestão e devolução de créditos (carteiras).
@@ -11,7 +12,7 @@ class PainelMasterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         backgroundColor: AppTheme.background,
         appBar: AppBar(
@@ -23,12 +24,13 @@ class PainelMasterScreen extends StatelessWidget {
             ],
           ),
           bottom: const TabBar(
-            indicatorColor: AppTheme.primary,
-            labelColor: AppTheme.primary,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
             unselectedLabelColor: Colors.grey,
             tabs: [
               Tab(icon: Icon(Icons.phonelink_lock_rounded), text: 'Aparelhos'),
               Tab(icon: Icon(Icons.account_balance_wallet_rounded), text: 'Créditos'),
+              Tab(icon: Icon(Icons.domain_add_rounded), text: 'Empresas'),
             ],
           ),
         ),
@@ -36,9 +38,11 @@ class PainelMasterScreen extends StatelessWidget {
           children: [
             AbaDispositivosMasterWidget(),
             AbaCreditosMasterWidget(),
+            AbaEmpresasMasterWidget(),
           ],
         ),
       ),
     );
   }
 }
+

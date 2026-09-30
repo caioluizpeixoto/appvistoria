@@ -213,18 +213,18 @@ class VehicleDepreciationService {
       final item = rawApontamentos[i];
       if (item is! Map) continue;
 
-      final id = (item['apontamentoId'] ?? item['id'] ?? 'apontamento_$i').toString();
-      final nome = (item['nomePeca'] ?? item['peca_ou_problema'] ?? item['peca'] ?? '').toString();
-      final desc = (item['descricaoProblema'] ?? item['observacao_indicada'] ?? item['observacao'] ?? '').toString();
+      final id = (item['item'] ?? item['apontamentoId'] ?? item['id'] ?? 'apontamento_$i').toString();
+      final nome = (item['problema'] ?? item['nomePeca'] ?? item['peca_ou_problema'] ?? item['peca'] ?? '').toString();
+      final desc = (item['reparo_recomendado'] ?? item['descricaoProblema'] ?? item['observacao_indicada'] ?? item['observacao'] ?? '').toString();
 
       final valorPeca = normalizarValor(
-        item['valorEstimadoPeca'] ?? item['valor_peca_estimado'] ?? item['valorPeca'],
+        item['valor_peca'] ?? item['valorEstimadoPeca'] ?? item['valor_peca_estimado'] ?? item['valorPeca'],
       );
       final valorMaoDeObra = normalizarValor(
-        item['valorEstimadoMaoDeObra'] ?? item['valor_mao_de_obra_estimado'] ?? item['valorMaoDeObra'],
+        item['valor_mao_obra'] ?? item['valorEstimadoMaoDeObra'] ?? item['valor_mao_de_obra_estimado'] ?? item['valorMaoDeObra'],
       );
 
-      final justificativa = (item['justificativa'] ?? item['motivo'] ?? item['justificativaIa'] ?? '').toString();
+      final justificativa = (item['observacao'] ?? item['justificativa'] ?? item['motivo'] ?? item['justificativaIa'] ?? '').toString();
 
       // Substituição se já existir para manter unicidade e idempotência
       if (idsProcessados.contains(id)) {
@@ -302,8 +302,11 @@ class VehicleDepreciationService {
       if (res.status == 200 && res.data != null) {
         final data = res.data is String ? jsonDecode(res.data) : res.data;
         final innerData = data is Map ? (data['data'] ?? data) : null;
-        if (innerData != null && innerData['apontamentos_veiculo'] != null) {
-          return parseRespostaIa(innerData['apontamentos_veiculo']);
+        if (innerData != null) {
+          final apts = innerData['apontamentos'] ?? innerData['apontamentos_veiculo'];
+          if (apts != null) {
+            return parseRespostaIa(apts);
+          }
         }
       } else {
         print('[VehicleDepreciationService] Erro Edge Function (Status ${res.status}): ${res.data}');

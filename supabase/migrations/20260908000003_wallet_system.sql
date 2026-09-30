@@ -108,24 +108,30 @@ ALTER TABLE public.recharges ENABLE ROW LEVEL SECURITY;
 
 -- POLICIES:
 -- Leitura pública / autenticada das configurações e preços
+DROP POLICY IF EXISTS "financial_settings_select_policy" ON public.financial_settings;
 CREATE POLICY "financial_settings_select_policy" ON public.financial_settings
     FOR SELECT USING (auth.role() = 'authenticated');
 
+DROP POLICY IF EXISTS "service_prices_select_policy" ON public.service_prices;
 CREATE POLICY "service_prices_select_policy" ON public.service_prices
     FOR SELECT USING (auth.role() = 'authenticated');
 
 -- Carteira: usuário autenticado só pode ver a carteira da sua própria empresa
+DROP POLICY IF EXISTS "wallets_select_own" ON public.wallets;
 CREATE POLICY "wallets_select_own" ON public.wallets
     FOR SELECT USING (auth.uid() = company_id);
 
 -- Transações: usuário autenticado só pode ver transações da sua própria empresa
+DROP POLICY IF EXISTS "wallet_transactions_select_own" ON public.wallet_transactions;
 CREATE POLICY "wallet_transactions_select_own" ON public.wallet_transactions
     FOR SELECT USING (auth.uid() = company_id);
 
 -- Recargas: usuário só vê recargas da sua empresa e pode solicitar (INSERT) recarga pendente
+DROP POLICY IF EXISTS "recharges_select_own" ON public.recharges;
 CREATE POLICY "recharges_select_own" ON public.recharges
     FOR SELECT USING (auth.uid() = company_id);
 
+DROP POLICY IF EXISTS "recharges_insert_own" ON public.recharges;
 CREATE POLICY "recharges_insert_own" ON public.recharges
     FOR INSERT WITH CHECK (auth.uid() = company_id AND status = 'pending');
 
@@ -178,6 +184,8 @@ $$;
 
 -- FUNÇÃO CENTRAL: authorize_paid_operation
 -- Executa a validação e o registro atômico com proteção contra race conditions e cobrança duplicada.
+DROP FUNCTION IF EXISTS public.authorize_paid_operation(TEXT, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.authorize_paid_operation(TEXT, TEXT, TEXT);
 CREATE OR REPLACE FUNCTION public.authorize_paid_operation(
     p_service_code TEXT,
     p_reference_type TEXT,

@@ -304,7 +304,7 @@ class _VistoriaCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           DateFormat('dd/MM/yyyy HH:mm')
-                              .format(vistoria.dataHora),
+                              .format(vistoria.dataHora.toLocal()),
                           style: const TextStyle(
                             fontSize: 12,
                             color: AppTheme.textHint,

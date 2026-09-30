@@ -23,6 +23,7 @@ ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
 
 -- 3. Políticas de Segurança (Policies)
 -- Master pode ler todas as empresas
+DROP POLICY IF EXISTS "Master pode ver todas as empresas" ON public.empresas;
 CREATE POLICY "Master pode ver todas as empresas" 
     ON public.empresas FOR SELECT 
     USING (
@@ -32,6 +33,7 @@ CREATE POLICY "Master pode ver todas as empresas"
     );
 
 -- Usuários comuns (vistoriadores) podem ver a própria empresa baseados no CNPJ do auth
+DROP POLICY IF EXISTS "Usuários veem a própria empresa" ON public.empresas;
 CREATE POLICY "Usuários veem a própria empresa" 
     ON public.empresas FOR SELECT 
     USING (

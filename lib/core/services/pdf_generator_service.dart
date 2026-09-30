@@ -21,6 +21,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'pdf_radar_generator.dart';
@@ -117,6 +118,56 @@ bool _isStatusConformeOuOk(String status) {
 }
 
 class PdfGeneratorService {
+
+  PdfColor _dynamicThemeColor = _kOrange;
+  pw.ImageProvider? _dynamicLogoImage;
+  pw.ImageProvider? _dynamicWatermarkImage;
+
+  Future<void> _loadEmpresaConfig() async {
+    _dynamicThemeColor = _kOrange;
+    _dynamicLogoImage = null;
+    _dynamicWatermarkImage = null;
+    try {
+      final supa = Supabase.instance.client;
+      final user = supa.auth.currentUser;
+      if (user != null) {
+        final cnpj = user.userMetadata?['cnpj'];
+        if (cnpj != null && cnpj.toString().isNotEmpty) {
+          final data = await supa
+              .from('empresas')
+              .select('cor_pdf, logo_topo_url, logo_marca_dagua_url')
+              .eq('cnpj', cnpj)
+              .maybeSingle();
+              
+          if (data != null) {
+            final cor = data['cor_pdf'];
+            if (cor != null && cor.toString().isNotEmpty) {
+              final hex = cor.toString().replaceAll('#', '');
+              _dynamicThemeColor = PdfColor.fromHex('#$hex');
+            }
+            final logoTopo = data['logo_topo_url'];
+            if (logoTopo != null && logoTopo.toString().isNotEmpty) {
+              final res = await http.get(Uri.parse(logoTopo));
+              if (res.statusCode == 200) {
+                _dynamicLogoImage = pw.MemoryImage(res.bodyBytes);
+              }
+            }
+            final logoMarca = data['logo_marca_dagua_url'];
+            if (logoMarca != null && logoMarca.toString().isNotEmpty) {
+              final res = await http.get(Uri.parse(logoMarca));
+              if (res.statusCode == 200) {
+                _dynamicWatermarkImage = pw.MemoryImage(res.bodyBytes);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Erro ao carregar config da empresa: $e');
+    }
+  }
+
+
   Future<File> generateLaudoPdf({
     required Vistoria vistoria,
     required Veiculo veiculo,
@@ -184,6 +235,7 @@ class PdfGeneratorService {
     required Veiculo veiculo,
     VistoriaWizardState? wizardState,
   }) async {
+    await _loadEmpresaConfig();
     final type = TipoVistoria.fromString(vistoria.tipoVistoria ?? '');
     if (type == TipoVistoria.checklistPesado ||
         type == TipoVistoria.checklistPasseio ||
@@ -336,14 +388,14 @@ class PdfGeneratorService {
     );
 
     // Carregar logo se existir (senão usa placeholder)
-    pw.ImageProvider? logoImage = await _loadAssetImage([
+    pw.ImageProvider? logoImage = _dynamicLogoImage ?? await _loadAssetImage([
       'assets/images/topo.pdf.png',
       'assets/images/topo.pdf.PNG',
       'assets/images/topo.png',
       'assets/images/logo.pdf.png',
       'assets/images/logo.png',
     ]);
-    pw.ImageProvider? marcaAguaBw = logoImage;
+    pw.ImageProvider? marcaAguaBw = _dynamicWatermarkImage ?? logoImage;
 
     pw.ImageProvider? carroEstruturaImage;
     pw.ImageProvider? caminhaoEstruturaImage;
@@ -1180,6 +1232,7 @@ class PdfGeneratorService {
     // ── Ficha Técnica Inteligente (Gemini) ──────────────────────────────────
     final deveGerarFichaIa = wizardState?.gerarFichaTecnicaComIa ?? true;
     if (deveGerarFichaIa) {
+      String? fipeValor;
       try {
         final List<Map<String, dynamic>> apontamentosParaIa = [];
         final wState = wizardState;
@@ -1212,7 +1265,6 @@ class PdfGeneratorService {
           }
         } catch (_) {}
 
-        String? fipeValor;
 
         // 1. Tentar primeiro obter dos dados já consultados da placa (Radar / AutoCred / BIN)
         final fontesConsulta = [
@@ -1273,6 +1325,18 @@ class PdfGeneratorService {
         }
 
         // A IA NUNCA recebe o valor FIPE nem dados financeiros do carro.
+        final fallbackData = <String, dynamic>{
+          if (fipeValor != null && fipeValor.isNotEmpty) 'fipe_valor_oficial': fipeValor,
+          'apontamentos_veiculo': wState?.apontamentos.map((apt) => {
+            'apontamentoId': apt.id,
+            'nomePeca': apt.peca,
+            'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
+            'valorEstimadoPeca': apt.valorPeca ?? 0.0,
+            'valorEstimadoMaoDeObra': apt.valorMaoDeObra ?? 0.0,
+            'justificativa': apt.justificativaIa ?? '',
+          }).toList() ?? <Map<String, dynamic>>[],
+        };
+
         final resFicha = await Supabase.instance.client.functions.invoke(
           'gerar-ficha-veiculo',
           body: {
@@ -1292,33 +1356,42 @@ class PdfGeneratorService {
           final data =
               resFicha.data is String ? jsonDecode(resFicha.data) : resFicha.data;
           if (data != null && data['data'] != null) {
-            final fichaData = data['data'] as Map<String, dynamic>;
+            Map<String, dynamic> fichaData = {};
+            if (data['data'] is String) {
+              fichaData = Map<String, dynamic>.from(jsonDecode(data['data']));
+            } else if (data['data'] is Map) {
+              fichaData = Map<String, dynamic>.from(data['data'] as Map);
+            }
+            
             if (fipeValor != null && fipeValor.isNotEmpty) {
               fichaData['fipe_valor_oficial'] = fipeValor;
             }
             _buildFichaTecnicaPages(pdf, fichaData, vistoria, styles,
                 logoImage, assinaturaImage, wizardState);
+          } else {
+            _buildFichaTecnicaPages(pdf, fallbackData, vistoria, styles,
+                logoImage, assinaturaImage, wizardState);
           }
         } else {
           print('Erro IA (Status ${resFicha.status}): ${resFicha.data}');
-          // Fallback sem IA: renderiza a Ficha Técnica com a FIPE oficial e os apontamentos locais
-          final fallbackData = <String, dynamic>{
-            if (fipeValor != null && fipeValor.isNotEmpty) 'fipe_valor_oficial': fipeValor,
-            'apontamentos_veiculo': wState?.apontamentos.map((apt) => {
-              'apontamentoId': apt.id,
-              'nomePeca': apt.peca,
-              'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
-              'valorEstimadoPeca': apt.valorPeca ?? 0.0,
-              'valorEstimadoMaoDeObra': apt.valorMaoDeObra ?? 0.0,
-              'justificativa': apt.justificativaIa ?? '',
-            }).toList() ?? <Map<String, dynamic>>[],
-          };
           _buildFichaTecnicaPages(pdf, fallbackData, vistoria, styles,
               logoImage, assinaturaImage, wizardState);
         }
-    } catch (e) {
-      print('Erro ao gerar ficha técnica inteligente: $e');
-      // Continua gerando o PDF normalmente
+    } catch (e, st) {
+      print('Erro ao gerar ficha técnica inteligente: $e\n$st');
+      final fallbackData = <String, dynamic>{
+        if (fipeValor != null && fipeValor.isNotEmpty) 'fipe_valor_oficial': fipeValor,
+        'apontamentos_veiculo': wizardState?.apontamentos.map((apt) => {
+          'apontamentoId': apt.id,
+          'nomePeca': apt.peca,
+          'descricaoProblema': '${apt.motivoAvaria}${apt.observacao.isNotEmpty ? " - ${apt.observacao}" : ""}',
+          'valorEstimadoPeca': apt.valorPeca ?? 0.0,
+          'valorEstimadoMaoDeObra': apt.valorMaoDeObra ?? 0.0,
+          'justificativa': apt.justificativaIa ?? '',
+        }).toList() ?? <Map<String, dynamic>>[],
+      };
+      _buildFichaTecnicaPages(pdf, fallbackData, vistoria, styles,
+          logoImage, assinaturaImage, wizardState);
     }
     }
 
@@ -5659,7 +5732,7 @@ class PdfGeneratorService {
         status.contains('ENVELOPADO') ||
         status.contains('RISCADO') ||
         status.contains('REPARO')) {
-      return _kOrange;
+      return _dynamicThemeColor;
     }
     return _kGreyDark;
   }
@@ -5823,676 +5896,438 @@ class PdfGeneratorService {
     pw.ImageProvider? assinatura,
     VistoriaWizardState? state,
   ) {
-    final themeRed = PdfColor.fromHex('#1F5E3D'); // Verde principal
-    final lightRed = PdfColor.fromHex('#F1F8E9'); // Fundo verde clarinho
-    final borderRed = PdfColor.fromHex('#C5E1A5'); // Borda verde suave
+    final themeGreen = _dynamicThemeColor;
     final textDark = PdfColor.fromHex('#222222');
     final textMuted = PdfColor.fromHex('#666666');
-    final mainGreen = PdfColor.fromHex('#183523');
-    final blueColor = const PdfColor.fromInt(0xFF1976D2);
+    final warningColor = PdfColor.fromHex('#F57F17');
 
-    pw.Widget buildRedBar(String text, {PdfColor? bgColor}) {
-      return pw.Container(
-        width: double.infinity,
-        padding: const pw.EdgeInsets.symmetric(vertical: 3.5, horizontal: 6),
-        margin: const pw.EdgeInsets.only(bottom: 3, top: 4),
-        decoration: pw.BoxDecoration(
-          color: bgColor ?? themeRed,
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-        ),
-        child: pw.Text(
-          text,
-          style: pw.TextStyle(
-            font: styles.bold,
-            fontSize: 7.5,
-            color: PdfColors.white,
-          ),
-        ),
-      );
+    double? parseFipe(dynamic val) {
+      if (val == null) return null;
+      final str = val.toString().replaceAll('R\$', '').replaceAll('.', '').replaceAll(',', '.').trim();
+      return double.tryParse(str);
     }
-
-    pw.Widget buildSoftTh(String text) {
-      return pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-        color: lightRed,
-        child: pw.Text(
-          text,
-          style: pw.TextStyle(
-            font: styles.bold,
-            fontSize: 7,
-            color: themeRed,
-          ),
-        ),
-      );
-    }
-
-    pw.Widget buildSoftTd(String text, {bool isBold = false, PdfColor? color}) {
-      return pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-        child: pw.Text(
-          text,
-          style: pw.TextStyle(
-            font: isBold ? styles.bold : styles.regular,
-            fontSize: 7,
-            color: color ?? textDark,
-          ),
-        ),
-      );
-    }
-
-    String formatCurrency(dynamic val) {
-      if (val == null) return '-';
-      final str = val.toString();
-      if (str.toUpperCase().startsWith('R\$')) return str;
-
-      final clean = str.replaceAll(RegExp(r'[^0-9.,]'), '');
-      if (clean.isEmpty) return str;
-
-      try {
-        final parsed = double.parse(clean.replaceAll(',', '.'));
-        return 'R\$ ' + parsed.toStringAsFixed(2).replaceAll('.', ',');
-      } catch (_) {
-        return str;
-      }
-    }
-
-    final String? fipeOficialStr = data['fipe_valor_oficial']?.toString();
-    final double? valorFipeDouble =
-        VehicleDepreciationService.converterFipeParaDouble(fipeOficialStr);
-
-    final rawApontamentos = data['apontamentos_veiculo'] is List
-        ? (data['apontamentos_veiculo'] as List)
-        : [];
-    final List<DepreciacaoItem> validApontamentos =
-        VehicleDepreciationService.parseRespostaIa(rawApontamentos);
-
+    final rawApontamentos = (data['apontamentos'] ?? data['apontamentos_veiculo']) as List<dynamic>? ?? [];
+    final valorFipeDouble = parseFipe(data['fipe_valor_oficial']);
+    
+    final validApontamentos = VehicleDepreciationService.parseRespostaIa(rawApontamentos);
     final resultadoDepreciacao = VehicleDepreciationService.processar(
       valorFipe: valorFipeDouble,
       itens: validApontamentos,
     );
 
-    final observacoesList = (data['observacoes'] != null &&
-            data['observacoes'] is List)
-        ? (data['observacoes'] as List)
-        : [];
-
-    pw.Widget buildTitleBanner() {
+    pw.Widget buildSectionTitle(String title, {PdfColor? bgColor}) {
       return pw.Container(
         width: double.infinity,
-        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        margin: const pw.EdgeInsets.only(bottom: 2),
+        margin: const pw.EdgeInsets.only(top: 14, bottom: 8),
+        padding: const pw.EdgeInsets.symmetric(vertical: 5, horizontal: 8),
         decoration: pw.BoxDecoration(
-          color: lightRed,
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
-          border: pw.Border.all(color: themeRed, width: 0.8),
+          color: bgColor ?? themeGreen,
         ),
-        child: pw.Center(
-          child: pw.Text(
-            'FICHA TÉCNICA INTELIGENTE DO VEÍCULO (IA)',
-            style: pw.TextStyle(
-              font: styles.bold,
-              fontSize: 9.5,
-              color: themeRed,
-            ),
+        child: pw.Text(
+          title.toUpperCase(),
+          style: pw.TextStyle(
+            font: styles.bold,
+            fontSize: 9,
+            color: textDark, // Preto para legibilidade sobre amarelo
+            letterSpacing: 0.5,
           ),
         ),
       );
     }
 
-    pw.Widget buildSpecsAndMaintenanceSideBySide() {
-      final specs = data['especificacoes_tecnicas'] as Map<String, dynamic>?;
-      final manut = data['manutencao'] as Map<String, dynamic>?;
-
-      return pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          if (specs != null && specs.isNotEmpty)
-            pw.Expanded(
-              flex: 1,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  buildRedBar('ESPECIFICAÇÕES TÉCNICAS'),
-                  pw.Container(
-                    decoration: pw.BoxDecoration(
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(3)),
-                      border: pw.Border.all(color: borderRed, width: 0.5),
-                    ),
-                    child: pw.Table(
-                      columnWidths: const {
-                        0: pw.FlexColumnWidth(1.0),
-                        1: pw.FlexColumnWidth(1.2),
-                      },
-                      border: pw.TableBorder.symmetric(
-                        inside: pw.BorderSide(color: borderRed, width: 0.5),
-                      ),
-                      children: specs.entries.map((e) {
-                        return pw.TableRow(children: [
-                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
-                          buildSoftTd(e.value.toString()),
-                        ]);
-                      }).toList(),
-                    ),
-                  ),
-                ],
+    pw.Widget buildItemText(String label, String value, {bool isBullet = false}) {
+      if (value.isEmpty) return pw.SizedBox.shrink();
+      return pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4),
+        child: pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            if (isBullet)
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(right: 4, top: 2.5),
+                child: pw.Container(width: 3, height: 3, decoration: pw.BoxDecoration(color: textMuted, shape: pw.BoxShape.circle)),
               ),
-            ),
-          if (specs != null && specs.isNotEmpty && manut != null && manut.isNotEmpty)
-            pw.SizedBox(width: 6),
-          if (manut != null && manut.isNotEmpty)
-            pw.Expanded(
-              flex: 1,
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  buildRedBar('MANUTENÇÃO RECOMENDADA'),
-                  pw.Container(
-                    decoration: pw.BoxDecoration(
-                      borderRadius:
-                          const pw.BorderRadius.all(pw.Radius.circular(3)),
-                      border: pw.Border.all(color: borderRed, width: 0.5),
-                    ),
-                    child: pw.Table(
-                      columnWidths: const {
-                        0: pw.FlexColumnWidth(1.0),
-                        1: pw.FlexColumnWidth(1.2),
-                      },
-                      border: pw.TableBorder.symmetric(
-                        inside: pw.BorderSide(color: borderRed, width: 0.5),
-                      ),
-                      children: manut.entries.map((e) {
-                        return pw.TableRow(children: [
-                          buildSoftTh(e.key.replaceAll('_', ' ').toUpperCase()),
-                          buildSoftTd(e.value.toString()),
-                        ]);
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
+            pw.Text('$label: ', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textDark)),
+            pw.Expanded(child: pw.Text(value, style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textMuted))),
+          ],
+        ),
       );
     }
 
-    pw.Widget buildPecasDesgaste() {
-      if (data['pecas_desgaste'] == null ||
-          data['pecas_desgaste'] is! List ||
-          (data['pecas_desgaste'] as List).isEmpty) {
-        return pw.SizedBox.shrink();
-      }
-
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          buildRedBar('PEÇAS DE DESGASTE E ESTIMATIVA DE TROCA'),
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-              border: pw.Border.all(color: borderRed, width: 0.5),
-            ),
-            child: pw.Table(
-              columnWidths: const {
-                0: pw.FlexColumnWidth(1.6),
-                1: pw.FlexColumnWidth(1.0),
-                2: pw.FlexColumnWidth(1.0),
-                3: pw.FlexColumnWidth(1.3),
-              },
-              border: pw.TableBorder.symmetric(
-                inside: pw.BorderSide(color: borderRed, width: 0.5),
-              ),
+    // HELPER DA TABELA PREMIUM
+    pw.Widget buildPremiumTable(String titulo, Map dataMap) {
+      if (dataMap.isEmpty) return pw.SizedBox.shrink();
+      return pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 10),
+        child: pw.Column(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Text(titulo.toUpperCase(), style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textDark, letterSpacing: 0.5)),
+            pw.SizedBox(height: 4),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              columnWidths: const { 0: pw.FlexColumnWidth(1), 1: pw.FlexColumnWidth(1.4) },
               children: [
                 pw.TableRow(
-                  decoration: pw.BoxDecoration(color: lightRed),
+                  decoration: pw.BoxDecoration(color: themeGreen),
                   children: [
-                    buildSoftTh('PEÇA'),
-                    buildSoftTh('VIDA ÚTIL'),
-                    buildSoftTh('VALOR PEÇA'),
-                    buildSoftTh('MÃO DE OBRA'),
-                  ],
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), 
+                      child: pw.Text('INFORMAÇÃO', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: textDark))
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), 
+                      child: pw.Text('DADOS', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: textDark))
+                    ),
+                  ]
                 ),
-                ...((data['pecas_desgaste'] as List).map((item) {
-                  final tempo = item['tempo_mao_de_obra_estimado']?.toString() ?? '';
-                  final tempoStr = tempo.isNotEmpty ? ' ($tempo)' : '';
-                  return pw.TableRow(children: [
-                    buildSoftTd(item['peca']?.toString() ?? ''),
-                    buildSoftTd(item['vida_util_media']?.toString() ?? ''),
-                    buildSoftTd(formatCurrency(item['valor_peca_estimado'])),
-                    buildSoftTd('${formatCurrency(item['valor_mao_de_obra_estimado'])}$tempoStr'),
-                  ]);
-                }).toList()),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    pw.Widget buildApontamentosWidget() {
-      if (resultadoDepreciacao.itens.isEmpty) return pw.SizedBox.shrink();
-
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          buildRedBar(
-            'DEPRECIAÇÃO ESTIMADA POR APONTAMENTOS (${resultadoDepreciacao.itens.length} ITENS)',
-            bgColor: const PdfColor.fromInt(0xFFF57F17),
-          ),
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-              border: pw.Border.all(
-                color: const PdfColor.fromInt(0xFFFFE082),
-                width: 0.5,
-              ),
-            ),
-            child: pw.Table(
-              columnWidths: const {
-                0: pw.FlexColumnWidth(1.4),
-                1: pw.FlexColumnWidth(1.6),
-                2: pw.FlexColumnWidth(0.9),
-                3: pw.FlexColumnWidth(0.9),
-                4: pw.FlexColumnWidth(1.0),
-              },
-              border: pw.TableBorder.symmetric(
-                inside: const pw.BorderSide(
-                  color: PdfColor.fromInt(0xFFFFE082),
-                  width: 0.5,
-                ),
-              ),
-              children: [
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(
-                    color: PdfColor.fromInt(0xFFFFF9C4),
-                  ),
-                  children: [
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-                      child: pw.Text(
-                        'PEÇA / COMPONENTE',
-                        style: pw.TextStyle(
-                          font: styles.bold,
-                          fontSize: 7,
-                          color: const PdfColor.fromInt(0xFFF57F17),
-                        ),
-                      ),
-                    ),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-                      child: pw.Text(
-                        'PROBLEMA / DANO APONTADO',
-                        style: pw.TextStyle(
-                          font: styles.bold,
-                          fontSize: 7,
-                          color: const PdfColor.fromInt(0xFFF57F17),
-                        ),
-                      ),
-                    ),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-                      child: pw.Text(
-                        'VALOR PEÇA',
-                        style: pw.TextStyle(
-                          font: styles.bold,
-                          fontSize: 7,
-                          color: const PdfColor.fromInt(0xFFF57F17),
-                        ),
-                      ),
-                    ),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-                      child: pw.Text(
-                        'MÃO DE OBRA',
-                        style: pw.TextStyle(
-                          font: styles.bold,
-                          fontSize: 7,
-                          color: const PdfColor.fromInt(0xFFF57F17),
-                        ),
-                      ),
-                    ),
-                    pw.Container(
-                      padding: const pw.EdgeInsets.symmetric(vertical: 2.5, horizontal: 4),
-                      child: pw.Text(
-                        'TOTAL ITEM',
-                        style: pw.TextStyle(
-                          font: styles.bold,
-                          fontSize: 7,
-                          color: const PdfColor.fromInt(0xFFF57F17),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                ...(resultadoDepreciacao.itens.map((item) {
-                  return pw.TableRow(children: [
-                    buildSoftTd(item.nomePeca, isBold: true),
-                    buildSoftTd(item.descricaoProblema),
-                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.valorPeca)),
-                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.valorMaoDeObra)),
-                    buildSoftTd(VehicleDepreciationService.formatarMoeda(item.custoTotal), isBold: true),
-                  ]);
-                }).toList()),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    pw.Widget buildObservacoesWidget() {
-      if (observacoesList.isEmpty) return pw.SizedBox.shrink();
-
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          buildRedBar('OBSERVAÇÕES ADICIONAIS'),
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(5),
-            decoration: pw.BoxDecoration(
-              color: lightRed,
-              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3)),
-              border: pw.Border.all(color: borderRed, width: 0.5),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: (observacoesList.map((obs) {
-                return pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 2),
-                  child: pw.Row(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                ...dataMap.entries.map((e) {
+                  return pw.TableRow(
                     children: [
                       pw.Container(
-                        margin: const pw.EdgeInsets.only(top: 3, right: 4),
-                        width: 3,
-                        height: 3,
-                        decoration: pw.BoxDecoration(
-                          color: themeRed,
-                          shape: pw.BoxShape.circle,
-                        ),
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                        color: PdfColors.grey100,
+                        child: pw.Text(e.key.toString().toUpperCase().replaceAll('_', ' '), style: pw.TextStyle(font: styles.bold, fontSize: 7, color: textDark))
                       ),
-                      pw.Expanded(
-                        child: pw.Text(
-                          '$obs',
-                          style: pw.TextStyle(
-                            font: styles.regular,
-                            fontSize: 7,
-                            color: textDark,
-                          ),
-                        ),
+                      pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), 
+                        child: pw.Text(e.value?.toString() ?? '-', style: pw.TextStyle(font: styles.regular, fontSize: 7, color: textDark))
                       ),
-                    ],
-                  ),
-                );
-              }).toList()),
-            ),
-          ),
-        ],
+                    ]
+                  );
+                }).toList()
+              ]
+            )
+          ]
+        )
       );
     }
 
-    pw.Widget buildAnaliseFinalWidget() {
-      final resumo = data['resumo_inteligente']?.toString() ?? '';
-      final fipeFormatada = resultadoDepreciacao.fipeDisponivel
-          ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFipe)
-          : 'Valor FIPE indisponível';
-      final depreciacaoFormatada =
-          VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.depreciacaoTotal);
-      final valorFinalFormatado = resultadoDepreciacao.fipeDisponivel
-          ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFinal)
-          : 'Indisponível';
+    final s1 = data['secao1_visao_geral'] is Map ? data['secao1_visao_geral'] as Map : null;
+    final s2 = data['secao2_pontos_positivos'] is List ? data['secao2_pontos_positivos'] as List<dynamic> : null;
+    final s3 = data['secao3_pontos_atencao'] is List ? data['secao3_pontos_atencao'] as List<dynamic> : null;
+    final s5 = data['secao5_ficha_tecnica'] is Map ? data['secao5_ficha_tecnica'] as Map : null;
+    final s6 = data['secao6_desempenho_consumo'] is Map ? data['secao6_desempenho_consumo'] as Map : null;
+    final s7 = data['secao7_manutencao_custos'] is Map ? data['secao7_manutencao_custos'] as Map : null;
+    final s11 = data['secao11_resumo_executivo'] is Map ? data['secao11_resumo_executivo'] as Map : null;
 
-      return pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.symmetric(vertical: 3.5, horizontal: 6),
-            margin: const pw.EdgeInsets.only(top: 4),
-            decoration: pw.BoxDecoration(
-              color: mainGreen,
-              borderRadius: const pw.BorderRadius.only(
-                topLeft: pw.Radius.circular(3),
-                topRight: pw.Radius.circular(3),
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        header: (ctx) => _buildHeader(vistoria, styles, logo, state: state),
+        footer: (ctx) => _buildPdfFooter(ctx, styles),
+        build: (ctx) {
+          final List<pw.Widget> widgets = [];
+
+          widgets.add(
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.symmetric(vertical: 8),
+              margin: const pw.EdgeInsets.only(bottom: 10),
+              decoration: pw.BoxDecoration(
+                color: themeGreen,
+                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+              ),
+              child: pw.Center(
+                child: pw.Text(
+                  'ANÁLISE ULTRA DO VEÍCULO',
+                  style: pw.TextStyle(
+                    font: styles.bold,
+                    fontSize: 14,
+                    color: textDark,
+                    letterSpacing: 1.5,
+                  ),
+                ),
               ),
             ),
-            child: pw.Text(
-              'AVALIAÇÃO FINANCEIRA E DEPRECIAÇÃO (FIPE + APONTAMENTOS)',
-              style: pw.TextStyle(
-                font: styles.bold,
-                fontSize: 7.5,
-                color: PdfColors.white,
-              ),
-            ),
-          ),
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(5),
-            decoration: pw.BoxDecoration(
-              borderRadius: const pw.BorderRadius.only(
-                bottomLeft: pw.Radius.circular(3),
-                bottomRight: pw.Radius.circular(3),
-              ),
-              border: pw.Border.all(color: mainGreen, width: 0.5),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                if (resumo.isNotEmpty) ...[
-                  pw.RichText(
-                    text: pw.TextSpan(
-                      children: [
-                        pw.TextSpan(
-                          text: 'Resumo Técnico: ',
-                          style: pw.TextStyle(
-                            font: styles.bold,
-                            fontSize: 7,
-                            color: textDark,
-                          ),
-                        ),
-                        pw.TextSpan(
-                          text: resumo,
-                          style: pw.TextStyle(
-                            font: styles.regular,
-                            fontSize: 7,
-                            color: textDark,
-                          ),
-                        ),
-                      ],
+          );
+
+          if (s1 != null) {
+            widgets.add(buildSectionTitle('1. VISÃO GERAL DO VEÍCULO'));
+            widgets.add(pw.Text(s1['resumo_apresentacao']?.toString() ?? '', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: textDark, lineSpacing: 1.2)));
+            widgets.add(pw.SizedBox(height: 6));
+            widgets.add(buildItemText('Perfil de Utilização', s1['perfil_utilizacao']?.toString() ?? '', isBullet: true));
+            widgets.add(buildItemText('Diferenciais', s1['principais_diferenciais']?.toString() ?? '', isBullet: true));
+          }
+
+          if (s2 != null && s2.isNotEmpty) {
+            widgets.add(buildSectionTitle('2. O QUE É BOM NESTE VEÍCULO'));
+            for (var item in s2.whereType<Map>()) {
+              widgets.add(buildItemText(item['titulo']?.toString() ?? '', item['descricao']?.toString() ?? '', isBullet: true));
+            }
+          }
+
+          if (s3 != null && s3.isNotEmpty) {
+            widgets.add(buildSectionTitle('3. PONTOS QUE MERECEM ATENÇÃO'));
+            for (var item in s3.whereType<Map>()) {
+              widgets.add(
+                pw.Container(
+                  margin: const pw.EdgeInsets.only(bottom: 6),
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromHex('#FFFBF2'),
+                    border: pw.Border(
+                      left: pw.BorderSide(color: warningColor, width: 3),
+                      top: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                      right: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
+                      bottom: const pw.BorderSide(color: PdfColors.grey300, width: 0.5),
                     ),
                   ),
-                  pw.SizedBox(height: 4),
-                ],
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    // Bloco 1: Valor FIPE
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(item['componente']?.toString().toUpperCase() ?? '', style: pw.TextStyle(font: styles.bold, fontSize: 9, color: warningColor)),
+                      pw.SizedBox(height: 4),
+                      buildItemText('Motivo', item['motivo']?.toString() ?? ''),
+                      buildItemText('Sinais', item['sinais']?.toString() ?? ''),
+                      buildItemText('Verificação', item['verificacao']?.toString() ?? ''),
+                      buildItemText('Impacto', '${item['nivel_impacto']} (${item['consequencia_financeira']})'),
+                    ]
+                  )
+                )
+              );
+            }
+          }
+
+          if (s5 != null) {
+            widgets.add(buildSectionTitle('FICHA TÉCNICA RESUMIDA'));
+            final motor = (s5 != null && s5['motorizacao'] is Map) ? s5['motorizacao'] as Map : null;
+            final trans = (s5 != null && s5['transmissao'] is Map) ? s5['transmissao'] as Map : null;
+            final dimen = (s5 != null && s5['dimensoes'] is Map) ? s5['dimensoes'] as Map : null;
+            
+            widgets.add(
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (motor != null) pw.Expanded(child: buildPremiumTable('Motorização', motor)),
+                  if (motor != null && (trans != null || dimen != null)) pw.SizedBox(width: 12),
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        if (trans != null) buildPremiumTable('Transmissão', trans),
+                        if (dimen != null) buildPremiumTable('Dimensões', dimen),
+                      ]
+                    )
+                  )
+                ]
+              )
+            );
+          }
+
+          if (s6 != null) {
+            widgets.add(buildSectionTitle('DESEMPENHO E CONSUMO'));
+            final desemp = (s6 != null && s6['desempenho'] is Map) ? s6['desempenho'] as Map : null;
+            final cons = (s6 != null && s6['consumo'] is Map) ? s6['consumo'] as Map : null;
+            
+            widgets.add(
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (desemp != null)
+                    pw.Expanded(child: buildPremiumTable('Desempenho', desemp)),
+                  if (desemp != null && cons != null) pw.SizedBox(width: 12),
+                  if (cons != null)
+                    pw.Expanded(child: buildPremiumTable('Consumo Estimado', cons)),
+                ]
+              )
+            );
+          }
+
+          if (s7 != null) {
+            widgets.add(buildSectionTitle('MANUTENÇÃO E CUSTOS'));
+            final fluidos = (s7 != null && s7['fluidos'] is List) ? s7['fluidos'] as List : null;
+            final custos = (s7 != null && s7['custos_estimados'] is List) ? s7['custos_estimados'] as List : null;
+            
+            widgets.add(
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  if (fluidos != null && fluidos.isNotEmpty)
                     pw.Expanded(
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
-                        decoration: pw.BoxDecoration(
-                          color: const PdfColor.fromInt(0xFFF5F5F5),
-                          borderRadius: pw.BorderRadius.circular(2),
-                        ),
-                        child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text(
-                              'VALOR FIPE (OFICIAL):',
-                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: textDark),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('FLUIDOS E LUBRIFICANTES', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textDark)),
+                          pw.SizedBox(height: 4),
+                          pw.Container(
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#F5F5F5'),
+                              border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
                             ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              fipeFormatada,
-                              style: pw.TextStyle(
-                                font: styles.bold,
-                                fontSize: resultadoDepreciacao.fipeDisponivel ? 9.5 : 7.5,
-                                color: textDark,
-                              ),
-                            ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              resultadoDepreciacao.fipeDisponivel ? 'Tabela FIPE oficial' : 'FIPE não retornou valor',
-                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
-                            ),
-                          ],
-                        ),
-                      ),
+                            padding: const pw.EdgeInsets.all(6),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: fluidos.whereType<Map>().map((f) => pw.Padding(
+                                padding: const pw.EdgeInsets.only(bottom: 3),
+                                child: pw.Text('• ${f['item']}: ${f['especificacao']} (${f['capacidade']}) - Troca: ${f['intervalo_troca']}', style: pw.TextStyle(font: styles.regular, fontSize: 7, color: textDark))
+                              )).toList(),
+                            )
+                          )
+                        ]
+                      )
                     ),
-                    pw.SizedBox(width: 4),
-                    // Bloco 2: Depreciação por Apontamentos
+                  if (fluidos != null && fluidos.isNotEmpty && custos != null && custos.isNotEmpty) pw.SizedBox(width: 12),
+                  if (custos != null && custos.isNotEmpty)
                     pw.Expanded(
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
-                        decoration: pw.BoxDecoration(
-                          color: const PdfColor.fromInt(0xFFE3F2FD),
-                          borderRadius: pw.BorderRadius.circular(2),
-                        ),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('CUSTOS ESTIMADOS', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: textDark)),
+                          pw.SizedBox(height: 4),
+                          pw.Container(
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromHex('#F5F5F5'),
+                              border: pw.Border.all(color: PdfColors.grey300, width: 0.5),
+                            ),
+                            padding: const pw.EdgeInsets.all(6),
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: custos.whereType<Map>().map((c) => pw.Padding(
+                                padding: const pw.EdgeInsets.only(bottom: 3),
+                                child: pw.Text('• ${c['item']}: ${c['faixa_custo']}', style: pw.TextStyle(font: styles.regular, fontSize: 7, color: textDark))
+                              )).toList(),
+                            )
+                          )
+                        ]
+                      )
+                    ),
+                ]
+              )
+            );
+          }
+
+          if (s11 != null) {
+            widgets.add(buildSectionTitle('RESUMO EXECUTIVO'));
+            widgets.add(buildItemText('Destaque', s11['destaque_principal']?.toString() ?? '', isBullet: true));
+            widgets.add(buildItemText('Vantagens', s11['vantagens']?.toString() ?? '', isBullet: true));
+            widgets.add(buildItemText('Atenção', s11['atencao']?.toString() ?? '', isBullet: true));
+            widgets.add(buildItemText('Perfil Ideal', s11['perfil_ideal']?.toString() ?? '', isBullet: true));
+          }
+
+          // DEPRECIAÇÃO
+          if (resultadoDepreciacao.itens.isNotEmpty) {
+            widgets.add(buildSectionTitle('DEPRECIAÇÃO ESTIMADA POR APONTAMENTOS (${resultadoDepreciacao.itens.length} ITENS)'));
+            
+            widgets.add(
+              pw.Table(
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                columnWidths: const {
+                  0: pw.FlexColumnWidth(1.2),
+                  1: pw.FlexColumnWidth(1.8),
+                  2: pw.FlexColumnWidth(1.0),
+                },
+                children: [
+                  pw.TableRow(
+                    decoration: pw.BoxDecoration(color: PdfColor.fromHex('#B71C1C')), // Dark Red for Warning
+                    children: [
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text('PEÇA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.white))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text('PROBLEMA', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.white))),
+                      pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text('CUSTO EST.', style: pw.TextStyle(font: styles.bold, fontSize: 7, color: PdfColors.white))),
+                    ]
+                  ),
+                  ...resultadoDepreciacao.itens.map((item) {
+                    return pw.TableRow(
+                      children: [
+                        pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text(item.nomePeca, style: pw.TextStyle(font: styles.bold, fontSize: 7, color: textDark))),
+                        pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text(item.descricaoProblema, style: pw.TextStyle(font: styles.regular, fontSize: 7, color: textDark))),
+                        pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: pw.Text(VehicleDepreciationService.formatarMoeda(item.custoTotal), style: pw.TextStyle(font: styles.bold, fontSize: 7, color: textDark))),
+                      ]
+                    );
+                  }).toList()
+                ]
+              )
+            );
+          }
+
+          widgets.add(pw.SizedBox(height: 14));
+          widgets.add(
+            pw.Container(
+              width: double.infinity,
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: themeGreen,
+                borderRadius: pw.BorderRadius.circular(6),
+                border: pw.Border.all(color: themeGreen, width: 2),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text('RESULTADO FINANCEIRO DA AVALIAÇÃO', style: pw.TextStyle(font: styles.bold, fontSize: 12, color: PdfColors.white, letterSpacing: 0.5)),
+                  pw.SizedBox(height: 12),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      // FIPE
+                      pw.Expanded(
                         child: pw.Column(
                           crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
+                            pw.Text('TABELA FIPE OFICIAL', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.white)),
+                            pw.SizedBox(height: 4),
                             pw.Text(
-                              'DEPRECIAÇÃO ESTIMADA:',
-                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: blueColor),
+                              resultadoDepreciacao.fipeDisponivel ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFipe) : 'Indisponível',
+                              style: pw.TextStyle(font: styles.bold, fontSize: 16, color: PdfColors.white)
                             ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              depreciacaoFormatada,
-                              style: pw.TextStyle(font: styles.bold, fontSize: 9.5, color: blueColor),
-                            ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              resultadoDepreciacao.temApontamentos
-                                  ? '${resultadoDepreciacao.itens.length} apontamento(s) orçado(s)'
-                                  : 'Sem defeitos apontados (R\$ 0,00)',
-                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
-                            ),
-                          ],
+                          ]
                         ),
                       ),
-                    ),
-                    pw.SizedBox(width: 4),
-                    // Bloco 3: Valor Final Estimado
-                    pw.Expanded(
-                      child: pw.Container(
-                        padding: const pw.EdgeInsets.symmetric(vertical: 4, horizontal: 5),
-                        decoration: pw.BoxDecoration(
-                          color: lightRed,
-                          borderRadius: pw.BorderRadius.circular(2),
-                        ),
+                      
+                      // Depreciação
+                      pw.Container(width: 1, height: 30, color: PdfColors.grey400),
+                      pw.Expanded(
                         child: pw.Column(
-                          crossAxisAlignment: pw.CrossAxisAlignment.end,
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
                           children: [
+                            pw.Text('DEPRECIAÇÃO ESTIMADA', style: pw.TextStyle(font: styles.regular, fontSize: 8, color: PdfColors.white)),
+                            pw.SizedBox(height: 4),
                             pw.Text(
-                              'VALOR ESTIMADO FINAL:',
-                              style: pw.TextStyle(font: styles.bold, fontSize: 6.5, color: themeRed),
+                              '- ${VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.depreciacaoTotal)}',
+                              style: pw.TextStyle(font: styles.bold, fontSize: 12, color: PdfColor.fromHex('#FFCDD2'))
                             ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              valorFinalFormatado,
-                              style: pw.TextStyle(
-                                font: styles.bold,
-                                fontSize: resultadoDepreciacao.fipeDisponivel ? 10 : 8,
-                                color: themeRed,
-                              ),
-                            ),
-                            pw.SizedBox(height: 1),
-                            pw.Text(
-                              'FIPE - Depreciação',
-                              style: pw.TextStyle(font: styles.regular, fontSize: 5.5, color: textMuted),
-                            ),
-                          ],
+                          ]
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                pw.SizedBox(height: 4),
-                pw.Text(
-                  '* Regra de Avaliação: O valor base do veículo provém exclusivamente da consulta oficial à Tabela FIPE. A depreciação é estritamente a soma determinística de peças e serviços dos defeitos apontados no laudo pelo vistoriador. Caso nenhum defeito seja apontado, a depreciação é R\$ 0,00.',
-                  style: pw.TextStyle(
-                    font: styles.regular,
-                    fontSize: 5.8,
-                    color: PdfColors.grey700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
 
-    // Se o conteúdo couber em 1 página (menos de 4 apontamentos e poucas observações), monta tudo em 1 página única e densa
-    final canFitInOnePage = validApontamentos.length <= 4 && observacoesList.length <= 3;
+                      // Valor Final
+                      pw.Container(width: 1, height: 30, color: PdfColors.grey400),
+                      pw.Expanded(
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.center,
+                          children: [
+                            pw.Container(
+                              padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColors.white,
+                                borderRadius: pw.BorderRadius.circular(4),
+                              ),
+                              child: pw.Column(
+                                children: [
+                                  pw.Text('VALOR FINAL SUGERIDO', style: pw.TextStyle(font: styles.bold, fontSize: 8, color: themeGreen)),
+                                  pw.SizedBox(height: 2),
+                                  pw.Text(
+                                    resultadoDepreciacao.fipeDisponivel ? VehicleDepreciationService.formatarMoeda(resultadoDepreciacao.valorFinal) : 'Indisponível',
+                                    style: pw.TextStyle(font: styles.bold, fontSize: 16, color: themeGreen)
+                                  ),
+                                ]
+                              )
+                            )
+                          ]
+                        ),
+                      ),
+                    ]
+                  )
+                ]
+              )
+            )
+          );
 
-    if (canFitInOnePage) {
-      pdf.addPage(pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        build: (ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _buildHeader(vistoria, styles, logo, state: state),
-              buildTitleBanner(),
-              buildSpecsAndMaintenanceSideBySide(),
-              buildPecasDesgaste(),
-              buildApontamentosWidget(),
-              buildObservacoesWidget(),
-              buildAnaliseFinalWidget(),
-              pw.Spacer(),
-              _buildFooter(vistoria, styles, ctx, assinatura,
-                  showSignatures: false),
-              _buildPdfFooter(ctx, styles),
-            ],
-          );
-        },
-      ));
-    } else {
-      // Caso tenha muitos apontamentos, divide em 2 páginas organizadas e sem espaços vazios excessivos
-      pdf.addPage(pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        build: (ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _buildHeader(vistoria, styles, logo, state: state),
-              buildTitleBanner(),
-              buildSpecsAndMaintenanceSideBySide(),
-              buildPecasDesgaste(),
-              buildApontamentosWidget(),
-              pw.Spacer(),
-              _buildFooter(vistoria, styles, ctx, assinatura,
-                  showSignatures: false),
-              _buildPdfFooter(ctx, styles),
-            ],
-          );
-        },
-      ));
-
-      pdf.addPage(pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        build: (ctx) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              _buildHeader(vistoria, styles, logo, state: state),
-              buildTitleBanner(),
-              buildObservacoesWidget(),
-              buildAnaliseFinalWidget(),
-              pw.Spacer(),
-              _buildFooter(vistoria, styles, ctx, assinatura,
-                  showSignatures: false),
-              _buildPdfFooter(ctx, styles),
-            ],
-          );
-        },
-      ));
-    }
+          return widgets;
+        }
+      )
+    );
   }
 
   static pw.Widget _buildSituacaoGeralRow(

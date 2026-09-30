@@ -725,6 +725,10 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       );
 
       try {
+        if (mounted) {
+          _wizardState.setStatusConsulta('andamento');
+          _wizardState.forceUpdate();
+        }
         await _aplicarDadosConsulta(
           fonte: escolhida['fonte'] ?? 'radar',
           tokenConsulta: escolhida['tokenConsulta'],
@@ -1524,7 +1528,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => const ModalAtrelarPesquisa(),
+      builder: (ctx) => ModalAtrelarPesquisa(vistoriaId: _wizardState.vistoriaId),
     );
 
     if (veiculo != null) {
@@ -1683,6 +1687,7 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
   }
 
   void _confirmarFinalizar() async {
+    await _salvar();
     if (!_wizardState.isChecklist && (_wizardState.statusConsulta == 'pendente' || _wizardState.statusConsulta == 'andamento')) {
       showDialog(
         context: context,
@@ -1825,11 +1830,8 @@ class _VistoriaWizardScreenState extends State<VistoriaWizardScreen> {
     //   ),
     // );
     
-    final desejaFichaIa = false;
-
-    if (desejaFichaIa != null) {
-      _wizardState.gerarFichaTecnicaComIa = desejaFichaIa;
-    }
+    // O valor de gerarFichaTecnicaComIa já vem preenchido do step_conclusao.dart.
+    // Removido o override "final desejaFichaIa = true" para respeitar a escolha do usuário.
 
     if (!mounted) return;
 
